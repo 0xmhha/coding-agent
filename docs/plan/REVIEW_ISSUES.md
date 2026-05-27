@@ -380,3 +380,154 @@
 - `/work` 첫 실행 시 누락 설정을 자동 감지하고 안내하는 로직
 
 **해결 시점**: Phase 2 완료 후 (MCP 서버들이 동작하는 시점에)
+
+---
+
+## RI-17. /merge 커맨드의 Phase 배치 불일치 [Phase 1 / Phase 7]
+
+**상태**: `OPEN`
+
+**문제**: P1-5에서 /merge 커맨드를 Phase 1에 배치했지만, /merge가 동작하려면 PR URL(Phase 6 EVALUATION_PASS 이후 생성)이 필요하다. Phase 1에서는 PR이 존재하지 않으므로 /merge를 테스트할 수 없다.
+
+**영향**: Phase 1의 /merge 구현이 실제로는 Phase 7까지 검증 불가.
+
+**해결 방향**:
+- Phase 1에서는 /merge를 **커맨드 등록(plugin.json) + 스텁**만 포함
+- /merge의 로직 구현은 Phase 7(P7-5)에서 수행
+- P1-5의 상세 로직을 P7-5로 이동하고, P1-5는 스텁으로 축소
+
+**해결 시점**: Phase 1 (P1-5 스텁화) + Phase 7 (P7-5 구현)
+
+---
+
+## RI-18. Code Review 파이프라인의 review-report.md 미정의 [Phase 5]
+
+**상태**: `OPEN`
+
+**문제**: P5-8에서 Code Review 유형은 "ANALYSIS → PLANNING(리뷰 리포트) → COMPLETION"으로 분기한다고 정의했지만, 리뷰 리포트(review-report.md)의 구체적 포맷과 Planner가 어떻게 "리뷰 모드"로 전환하는지 정의되지 않았다.
+
+**영향**: Code Review 티켓 처리 시 Planner가 무엇을 생성해야 하는지 불명확.
+
+**해결 방향**:
+- review-report.md 포맷 정의:
+  ```markdown
+  # Code Review Report: {TICKET-ID}
+  ## 리뷰 대상
+  ## 발견 사항 (Findings)
+  ### [severity] {finding title}
+  - 위치: {file}:{line}
+  - 설명: ...
+  - 권장 조치: ...
+  ## 개선 제안 (Suggestions)
+  ## 리스크 평가
+  ```
+- Planner 내부에서 `ticket_type == "code_review"` 시:
+  - ANALYSIS까지는 동일 (CKV/CKG 검색)
+  - PLANNING에서 plan.md 대신 review-report.md 생성
+  - design/implementation/evaluation 단계 건너뜀
+
+**해결 시점**: Phase 5 (P5-8 구현 시)
+
+---
+
+## RI-19. Release 파이프라인 상세 미정의 [Phase 5]
+
+**상태**: `OPEN`
+
+**문제**: P5-8에서 Release 유형은 "ANALYSIS → EVALUATION → COMPLETION(태그)"으로 분기한다고 정의했지만, 구체적으로 ANALYSIS에서 "포함 변경사항 취합"이 어떻게 동작하는지, COMPLETION에서 태깅/CHANGELOG 생성의 상세가 없다.
+
+**영향**: Release 티켓 처리 시 구체적 동작이 불명확.
+
+**해결 방향**:
+- ANALYSIS (Release 모드):
+  - 티켓의 "포함 변경사항" 필드에서 STABLE-xxx 목록 추출
+  - 각 티켓의 작업 폴더에서 변경 요약 수집
+  - 전체 변경 요약 문서 생성
+- EVALUATION (Release 모드):
+  - unit test + lint + security + ChainBench 전체 실행 (변경 코드가 아닌 전체 기준)
+- COMPLETION (Release 모드):
+  ```
+  git tag v{version}
+  git push origin v{version}
+  CHANGELOG.md 업데이트 (포함 변경사항 목록)
+  Jira 티켓 → Complete
+  ```
+
+**해결 시점**: Phase 5 (P5-8 구현 시)
+
+---
+
+## RI-20. ChainBench MCP 인터페이스 검증 [Phase 6]
+
+**상태**: `OPEN`
+
+**문제**: Phase 6 설계에서 ChainBench MCP의 tool 인터페이스(chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop)를 "예상"으로 정의했다. 실제 ChainBench MCP의 tool 이름과 파라미터가 다를 수 있다.
+
+**영향**: Phase 6 구현 시 실제 ChainBench MCP API와 불일치하면 연동 코드 재작성 필요.
+
+**해결 방향**:
+- Phase 6 시작 전에 실제 ChainBench MCP의 tool 목록 확인:
+  - ChainBench MCP 서버를 실행하고 tool list 조회
+  - 또는 ChainBench 프로젝트의 MCP tool 정의 코드 확인
+- 설계 문서의 tool 인터페이스를 실제와 일치하도록 업데이트
+- 인터페이스가 크게 다르면 P6-5의 핵심 로직 수정 필요
+
+**해결 시점**: Phase 6 시작 전 (사전 조사)
+
+---
+
+## RI-21. Evaluator에 go test -race 미포함 [Phase 6]
+
+**상태**: `OPEN`
+
+**문제**: RI-11에서 Concurrency Analyzer의 정적 분석 한계를 보완하기 위해 `go test -race`를 권장했지만, Evaluator의 4-stage 파이프라인에 race detector가 포함되어 있지 않다.
+
+**영향**: 동시성 관련 수정 후 race condition이 테스트에서 검출되지 않을 수 있음.
+
+**해결 방향**:
+- Stage 1(Unit Test)에 `-race` 플래그 옵션 추가:
+  ```bash
+  # 동시성 관련 패키지에 대해 race detector 실행
+  go test -race ./consensus/... ./core/txpool/... -count=1
+  ```
+- 전체 테스트에 -race를 적용하면 시간이 크게 증가하므로, 동시성 관련 패키지만 대상으로 제한
+- CKG의 concurrency_impact 결과에서 영향받는 패키지를 -race 대상으로 사용
+
+**해결 시점**: Phase 6 (P6-2 구현 시)
+
+---
+
+## RI-22. patterns.json 공유 전략 미확정 [공통]
+
+**상태**: `OPEN`
+
+**문제**: shared/patterns.json을 Jira Gateway MCP(TypeScript)와 CKS MCP(Go) 양쪽에서 사용해야 한다. 현재 파일은 프로젝트 루트의 shared/에 있지만, 각 MCP 서버 프로젝트에서 이 파일에 접근하는 방법(symlink, 빌드 시 복사, embed)이 정의되지 않았다.
+
+**영향**: MCP 서버 빌드/실행 시 patterns.json 경로 불일치 가능.
+
+**해결 방향**:
+- **Jira Gateway MCP (TypeScript)**: 런타임에 `../../shared/patterns.json` 상대 경로로 로드. 또는 .mcp.json의 env로 경로 주입
+- **CKS MCP (Go)**: `//go:embed ../../shared/patterns.json` 으로 빌드 시 내장. 또는 런타임 환경변수 `CKS_PATTERNS_PATH`
+- **권장**: 환경변수 기반 경로 주입 (`.mcp.json`의 env에서 설정). 빌드 의존성 없음.
+
+**해결 시점**: Phase 2 (P2-1) + Phase 3 (P3-1) 각각 구현 시
+
+---
+
+## RI-23. 임베딩 캐시 전략 부재 [Phase 3]
+
+**상태**: `OPEN`
+
+**문제**: P3-7(Indexing Pipeline)에서 incremental index는 변경 파일만 재처리한다고 정의했지만, 임베딩 결과의 캐싱 메커니즘이 없다. 동일 청크를 다시 임베딩하는 불필요한 재계산이 발생할 수 있다.
+
+**영향**: incremental index에서도 불필요한 임베딩 호출 → 시간 낭비 (RI-09 악화).
+
+**해결 방향**:
+- 청크 ID(hash of file_path + symbol_name)를 키로, 임베딩 벡터를 캐시
+- incremental index 시:
+  1. 변경 파일의 청크 재파싱
+  2. 청크 내용(code)의 hash 비교 → 변경 없으면 기존 임베딩 재사용
+  3. 변경된 청크만 re-embed
+- 캐시 저장: SQLite chunks 테이블의 code_hash 컬럼 + 기존 벡터 보존
+
+**해결 시점**: Phase 3 (P3-7 구현 시)
