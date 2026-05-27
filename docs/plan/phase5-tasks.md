@@ -268,25 +268,95 @@ self-review loop:
 
 ---
 
-## P5-8. 작업 유형별 파이프라인 분기 [NEW] `M`
+## P5-8. 작업 유형별 파이프라인 분기 [NEW] `L` ← RI-18, RI-19 반영으로 난이도 상향
 
 **핵심 로직**:
-```
-Code Review (pipeline_variant == "review_only"):
-  TICKET_INTAKE → ANALYSIS → PLANNING(review-report.md) → COMPLETION
-  Planner가 코드 분석 후 리뷰 리포트만 생성
-  구현/평가 단계 건너뜀
 
-Release (pipeline_variant == "release"):
-  TICKET_INTAKE → ANALYSIS(포함 변경사항 취합) → EVALUATION(전체 테스트) → COMPLETION(태그)
-  계획/설계/구현 단계 건너뜀
-  COMPLETION에서: git tag v{version} + push + CHANGELOG
+### Code Review (pipeline_variant == "review_only")
+
+> ⚠️ **RI-18**: review-report.md 포맷과 Planner 리뷰 모드 전환 로직을 구체화.
+
+```
+흐름: TICKET_INTAKE → ANALYSIS → PLANNING(리뷰 모드) → COMPLETION
+
+Planner 리뷰 모드 (ticket_type == "code_review"):
+  ANALYSIS는 동일: CKV/CKG로 대상 코드 분석
+  PLANNING에서 plan.md 대신 review-report.md 생성:
+
+  review-report.md 포맷:
+    # Code Review Report: {TICKET-ID}
+    
+    ## 리뷰 대상
+    - 모듈: {scope.modules}
+    - 관점: {scope.perspective}
+    
+    ## 발견 사항 (Findings)
+    ### [{severity}] {finding title}
+    - 위치: {file}:{line}
+    - 코드: (해당 코드 인용)
+    - 설명: (문제 설명)
+    - 권장 조치: (개선 방법)
+    
+    ## 개선 제안 (Suggestions)
+    - {priority}: {suggestion}
+    
+    ## 코드 품질 요약
+    - 전체 평가: {good / needs-improvement / critical}
+    - 동시성 안전성: {평가}
+    - 테스트 커버리지: {평가}
+    - 에러 처리: {평가}
+
+  COMPLETION:
+    Jira 댓글에 리뷰 요약 게시
+    state → COMPLETED (PR 없음, 구현 없음)
+```
+
+### Release (pipeline_variant == "release")
+
+> ⚠️ **RI-19**: Release 파이프라인의 ANALYSIS, EVALUATION, COMPLETION 각 단계 상세.
+
+```
+흐름: TICKET_INTAKE → ANALYSIS → EVALUATION → COMPLETION
+
+ANALYSIS (Release 모드):
+  1. 티켓의 "포함 변경사항" 필드에서 STABLE-xxx 목록 추출
+  2. 각 STABLE-xxx 티켓의 작업 폴더 탐색:
+     → analysis.md에서 변경 요약 수집
+     → test-report.md에서 테스트 결과 수집
+  3. release-summary.md 생성:
+     - 포함 변경사항 전체 목록
+     - 영향 모듈 통합 목록
+     - 각 변경의 리스크 레벨
+  산출물: release-summary.md
+
+EVALUATION (Release 모드):
+  전체 코드베이스 대상 (변경 코드만이 아닌 전체):
+  - go test ./... (전체 unit test)
+  - golangci-lint
+  - go vet
+  - ChainBench 통합 테스트 (기본 genesis 설정)
+  산출물: test-report.md (release 전용)
+
+COMPLETION (Release 모드):
+  1. git tag v{version}
+  2. git push origin v{version}
+  3. CHANGELOG.md 업데이트:
+     ## v{version} ({date})
+     ### Changes
+     - STABLE-xxx: {summary}
+     - STABLE-yyy: {summary}
+  4. Jira 티켓 → Complete
+  산출물: 태그, CHANGELOG 업데이트
 ```
 
 **완료 기준**:
-- [ ] Orchestrator가 ticket_type으로 분기
-- [ ] Code Review: 리뷰 리포트 생성 후 완료
-- [ ] Release: 전체 테스트 + 태깅
+- [ ] Orchestrator가 ticket_type으로 3가지 분기 (full / review_only / release)
+- [ ] Code Review: Planner가 리뷰 모드로 전환 + review-report.md 생성
+- [ ] Code Review: review-report.md에 발견사항/제안/품질요약 포함
+- [ ] Release: ANALYSIS에서 포함 변경사항 취합 + release-summary.md 생성
+- [ ] Release: EVALUATION에서 전체 코드베이스 테스트
+- [ ] Release: COMPLETION에서 태그 + CHANGELOG 업데이트
+- [ ] Release: git push origin v{version} 전에 유저 확인 (안전장치)
 
 ---
 

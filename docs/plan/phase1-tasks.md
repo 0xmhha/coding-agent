@@ -168,55 +168,31 @@ plugin.json, 디렉토리 구조, .gitignore 등 초기 스캐폴딩.
 
 ---
 
-## P1-5. Command: /merge [NEW] `M`
+## P1-5. Command: /merge [NEW] `S` ← RI-17 반영: 스텁만
 
-**상태**: ✅ 골격 완료 → 로직 구현 필요
+**상태**: ✅ 골격 완료 (Phase 1에서는 스텁만)
 
 **파일**: `commands/merge.md`
 
-**입력**: `jira_id: string`
+> ⚠️ **RI-17**: /merge가 동작하려면 PR URL이 필요한데, PR은 Phase 6 EVALUATION_PASS
+> 이후에 생성된다. Phase 1에서는 커맨드 등록 + 스텁만 포함하고,
+> **로직 구현은 Phase 7(P7-5)에서 수행한다.**
 
-**출력**: Squash merge 완료 + Jira Complete
+**Phase 1 범위**:
+- plugin.json에 커맨드 등록 (완료)
+- commands/merge.md에 인터페이스 정의 (완료)
+- 실행 시 "이 커맨드는 PR 생성 후 사용 가능합니다" 안내 메시지
 
-**핵심 로직**:
-```
-1. 작업 폴더에서 PR 확인
-   call: find_workspace(jira_id)
-   read: state.json → COMPLETION.pr_url
-   없으면 → "이 티켓에 대한 PR이 없습니다"
+**Phase 7(P7-5)에서 구현할 내용**:
+- 전제조건 검증 (approved, checks, mergeable)
+- squash merge 실행
+- Jira 상태 Complete + 댓글
+- 로컬 정리 + state 업데이트
+- commit body 길이 관리 (RI-14: 10+ step 시 카테고리별 요약)
 
-2. PR 번호 추출
-   pr_url에서 number 추출
-
-3. 전제조건 검증 (3개 모두 충족 필요)
-   a. gh pr view {num} --json reviewDecision → "APPROVED"
-   b. gh pr checks {num} → 모든 check PASS
-   c. gh pr view {num} --json mergeable → "MERGEABLE"
-   미충족 시 → 어떤 조건이 미충족인지 리스트 출력, 중단
-
-4. Squash merge
-   squash_body = 개별 커밋 메시지 목록 + Jira URL + PR #
-   bash: gh pr merge {num} --squash --delete-branch \
-     --subject "{JIRA-ID}: {summary}" \
-     --body "{squash_body}"
-
-5. Jira 업데이트
-   jira-gateway: jira_add_comment(jira_id, "Merged. Commit: {hash}")
-   jira-gateway: jira_update_status(jira_id, "Complete")
-   Jira 실패 → 경고만 (merge는 이미 완료)
-
-6. 로컬 정리 + state 업데이트
-   bash: git checkout main && git pull
-   state.json → current_state = "COMPLETED"
-   state.COMPLETION.merged_at = now()
-```
-
-**완료 기준**:
-- [ ] 3개 전제조건 모두 검증
-- [ ] 미충족 조건을 구체적으로 유저에게 알림
-- [ ] squash commit body에 개별 커밋 목록 포함
-- [ ] Jira 상태 Complete + 댓글 추가
-- [ ] 로컬 main 브랜치 동기화
+**완료 기준 (Phase 1)**:
+- [ ] 커맨드가 인식됨
+- [ ] PR 없는 상태에서 실행 시 안내 메시지 출력
 
 ---
 

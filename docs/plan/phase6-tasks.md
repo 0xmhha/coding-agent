@@ -56,7 +56,17 @@ go test ${CHANGED_PKGS} -v -count=1
 # 커버리지
 go test ${CHANGED_PKGS} -coverprofile=coverage.out -covermode=atomic
 go tool cover -func=coverage.out
+
+# RI-21: 동시성 관련 패키지에 race detector 실행
+# CKG의 concurrency_impact 결과에서 영향받는 패키지를 대상으로 사용
+RACE_PKGS=$(동시성 영향 패키지 목록, 예: consensus/... core/txpool/...)
+go test -race ${RACE_PKGS} -count=1 -timeout=300s 2>&1 | tee logs/race-test.log
 ```
+
+> ⚠️ **RI-21**: `go test -race`를 전체 패키지에 적용하면 시간이 크게 증가하므로,
+> CKG concurrency_impact에서 식별된 동시성 관련 패키지만 대상으로 제한한다.
+> related-code.json의 concurrency_impact 데이터를 참조하여 대상 패키지를 결정.
+> -race 결과는 test-report.md의 별도 섹션으로 리포트.
 
 **결과 파싱**:
 ```
@@ -65,6 +75,10 @@ go test 출력에서:
   "--- FAIL:" → failed count++, 실패 상세 캡처
   "ok" / "FAIL" 라인에서 패키지별 결과
   커버리지 %를 패키지별로 추출
+
+go test -race 출력에서:
+  "WARNING: DATA RACE" → race condition 탐지
+  goroutine 스택 트레이스 캡처
 ```
 
 **완료 기준**:
@@ -72,6 +86,8 @@ go test 출력에서:
 - [ ] passed/failed/skipped 카운트 정확
 - [ ] 커버리지 % 추출 (전체 + 패키지별)
 - [ ] 실패 테스트의 파일/라인/에러메시지 캡처
+- [ ] 동시성 관련 패키지에 -race 실행 + 결과 파싱
+- [ ] race condition 탐지 시 FAIL 판정
 
 ---
 
@@ -124,8 +140,20 @@ gosec ./... 2>&1 | tee logs/gosec.log
 
 ## P6-5. Stage 4: ChainBench Integration Test [NEW] `XL`
 
+> ⚠️ **RI-20**: 아래 tool 인터페이스(chainbench_setup, chainbench_start 등)는
+> Phase 6 설계에서 **예상한** 이름이다. 실제 ChainBench MCP의 tool 이름/파라미터와
+> 다를 수 있으므로, **구현 전에 반드시 ChainBench MCP의 실제 tool list를 확인**한다.
+>
+> 확인 방법:
+> 1. ChainBench MCP 서버 실행 → MCP Inspector로 tool list 조회
+> 2. 또는 ChainBench 프로젝트의 MCP tool 정의 소스 코드 확인
+> 3. 인터페이스 불일치 시 이 문서의 핵심 로직을 업데이트
+
 **핵심 로직**:
 ```
+0. [사전] ChainBench MCP tool list 확인 (RI-20)
+   실제 tool 이름과 파라미터를 확인하여 아래 호출을 맞춤
+
 1. 바이너리 빌드
    bash: cd {go-stablenet-root} && go build -o ./build/gstable ./cmd/gstable
    timeout: 5분

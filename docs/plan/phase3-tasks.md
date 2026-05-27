@@ -21,19 +21,23 @@ cks-mcp/
 │   ├── ckg/                 # Phase 4
 │   ├── filter/              # P3-10
 │   └── types/types.go
-└── shared/ → ../shared/     # symlink 또는 embed
+└── shared/                   # patterns.json 접근 (아래 RI-22 참조)
 ```
 
 **의존성**:
 ```
 github.com/modelcontextprotocol/go-sdk
 modernc.org/sqlite             # CGo-free SQLite
-github.com/nicholasgasior/gsfft  # sqlite-vss 대안 검토
 ```
+
+> ⚠️ **RI-22**: shared/patterns.json 접근 방법 결정 필요.
+> 권장: 환경변수 `CKS_PATTERNS_PATH`로 경로 주입 (.mcp.json의 env에서 설정).
+> 빌드 시 embed(//go:embed)는 상대 경로 제약으로 복잡해질 수 있음.
 
 **완료 기준**:
 - [ ] `go run ./cmd/cks-server`로 MCP 서버 시작
 - [ ] tool 목록 조회 가능 (빈 응답이라도)
+- [ ] patterns.json 경로를 환경변수로 주입 가능
 
 ---
 
@@ -324,7 +328,9 @@ func (idx *Indexer) FullIndex(root string) (*IndexStats, error) {
 
 func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, error) {
     // 1. git diff --name-only {sinceCommit}..HEAD -- '*.go'
-    // 2. Modified → re-parse, re-embed, update
+    // 2. Modified → re-parse → code_hash 비교:
+    //      변경됨 → re-embed + update (RI-23: 캐시 활용)
+    //      변경 없음 → 기존 벡터 재사용 (skip embed)
     // 3. Added → parse, embed, insert
     // 4. Deleted → delete from store
     // 5. index-meta.json 업데이트
@@ -333,11 +339,22 @@ func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, err
 
 **저장 위치**: `.coding-agent/index/ckv.db`, `.coding-agent/index/index-meta.json`
 
+> ⚠️ **RI-23**: 임베딩 캐시 — chunks 테이블에 `code_hash` 컬럼 추가.
+> incremental index 시 code_hash가 동일하면 re-embed를 건너뛰고 기존 벡터 재사용.
+> 이로써 RI-09(인덱싱 시간) 문제도 완화.
+
+> ⚠️ **RI-09**: 인덱싱 시간이 CPU 환경에서 60분+ 걸릴 수 있음.
+> 대응: scope.modules 기반 우선 인덱싱 (관련 패키지 먼저), 나머지는 백그라운드.
+> 진행률 표시 (N/total 청크, 예상 남은 시간).
+
 **완료 기준**:
-- [ ] Full index가 go-stablenet 규모에서 완료 (30분 이내)
+- [ ] Full index가 go-stablenet 규모에서 완료
 - [ ] Incremental index가 변경 파일만 처리
+- [ ] code_hash 기반 임베딩 캐시 동작 (변경 없는 청크는 skip)
 - [ ] index-meta.json에 마지막 커밋 해시 기록
 - [ ] 중복 인덱싱 방지 (이미 인덱싱된 커밋 skip)
+- [ ] scope 기반 우선 인덱싱 옵션
+- [ ] 진행률 출력
 
 ---
 

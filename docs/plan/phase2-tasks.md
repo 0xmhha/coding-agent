@@ -26,6 +26,13 @@ jira-gateway-mcp/
 └── .env.example          # JIRA_BASE_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL
 ```
 
+> ⚠️ **RI-22**: shared/patterns.json 접근 — TypeScript에서는 런타임 fs.readFile로
+> `../../shared/patterns.json` 상대 경로 로드. 또는 .mcp.json의 env에서
+> `PATTERNS_PATH` 환경변수로 경로 주입 (권장).
+
+> ⚠️ **RI-01 + RI-15**: 이 Phase 시작 시 `.mcp.json`을 프로젝트 루트에 생성하여
+> jira-gateway MCP 서버를 등록해야 한다. 환경변수(JIRA_BASE_URL 등)도 함께 설정.
+
 **핵심 로직**:
 ```typescript
 // src/index.ts
