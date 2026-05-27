@@ -1,0 +1,9 @@
+{
+  "name": "coding-agent",
+  "version": "0.1.0",
+  "description": "go-stablenet Jira-driven automated development pipeline",
+  "author": {
+    "name": "mhha"
+  },
+  "license": "Apache-2.0"
+}

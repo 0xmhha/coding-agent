@@ -1,11 +1,10 @@
 ---
 name: stablenet-context
-description: |
-  go-stablenet domain knowledge. Module classification, concurrency patterns,
-  and context for the Planner agent to understand the codebase structure.
+description: "go-stablenet 도메인 지식. 모듈 분류(consensus/core/governance/p2p/...), 동시성 패턴, 복잡도 추정."
+type: skill
 ---
 
-# Stablenet Context Skill
+# Stablenet Context
 
 go-stablenet(geth fork) 프로젝트의 도메인 지식을 제공한다.
 
@@ -15,7 +14,6 @@ go-stablenet(geth fork) 프로젝트의 도메인 지식을 제공한다.
 - consensus가 변경됨 (WBFT)
 - native coin이 ETH가 아닌 stablecoin
 - system contract (GovStaking, GovConfig, GovNCP, GovRewardeeImp) 지원
-- 대규모 Go 코드베이스
 
 ## 모듈 분류
 
@@ -29,22 +27,14 @@ go-stablenet(geth fork) 프로젝트의 도메인 지식을 제공한다.
 | txpool | core/txpool/ | 트랜잭션 풀 관리 |
 | state | core/state/ | 상태 DB, 계정/스토리지 |
 | params | params/ | 체인 설정, 하드포크 파라미터 |
-| cmd | cmd/ | CLI 엔트리포인트 |
 
-## 동시성 패턴
+## 복잡도 추정
 
-- consensus와 txpool은 goroutine 기반 동작이 핵심
-- channel로 블록/트랜잭션 전파
-- sync.RWMutex로 stateDB 보호
-- context.Context로 취소/타임아웃 전파
-
-## 주의사항
-
-- consensus 변경 시 p2p/core에 연쇄 영향 가능
-- system contract 수정 시 genesis 설정과 일관성 확인 필요
-- 하드포크 파라미터 변경 시 호환성 검증 필수
+- 1 모듈, 동시성 무관 → `simple`
+- 1-2 모듈, 동시성 일부 → `moderate`
+- 2+ 모듈 또는 consensus 관련 → `complex`
 
 ## 상세화
 
-이 스킬은 실제 go-stablenet 프로젝트 경로가 전달된 후
+이 스킬은 go-stablenet 프로젝트 경로가 전달된 후
 코드 탐색을 통해 모듈별 상세 정보가 추가된다.

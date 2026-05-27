@@ -1,13 +1,9 @@
 ---
-name: review
-description: Apply PR code review feedback. Reads review comments, structures them, triggers re-work cycle.
-arguments:
-  - name: pr_url
-    description: "PR URL or #number (e.g., https://github.com/org/repo/pull/456 or #456)"
-    required: true
+description: PR 코드리뷰 피드백 반영. 리뷰 코멘트 수집 → 구조화 → 수정 작업 사이클 진입.
+argument-hint: "<PR URL 또는 #number, 예: #456>"
 ---
 
-# /review <PR-URL>
+# /coding-agent:review
 
 PR 코드 리뷰 피드백을 읽고 수정 작업을 수행한다.
 

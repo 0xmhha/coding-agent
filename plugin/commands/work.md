@@ -1,13 +1,9 @@
 ---
-name: work
-description: Start work from a Jira ticket. Reads ticket, runs sensitive check, creates workspace, dispatches orchestrator.
-arguments:
-  - name: jira_id
-    description: "Jira ticket ID (e.g., STABLE-1234)"
-    required: true
+description: Jira 티켓 기반 작업 시작. 티켓 읽기 → 민감정보 필터 → 작업 폴더 생성 → Orchestrator 디스패치.
+argument-hint: "<JIRA-ID, 예: STABLE-1234>"
 ---
 
-# /work <JIRA-ID>
+# /coding-agent:work
 
 Jira 티켓 기반 자동화 작업을 시작한다.
 

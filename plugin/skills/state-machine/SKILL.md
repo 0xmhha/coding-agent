@@ -1,11 +1,10 @@
 ---
 name: state-machine
-description: |
-  State transition management for the coding-agent pipeline.
-  Manages state.json CRUD, transition validation, failure logging, and recovery.
+description: "coding-agent 파이프라인의 상태 전이 관리. state.json CRUD, 전이 조건 검증, failure 로깅, 중단 복구."
+type: skill
 ---
 
-# State Machine Skill
+# State Machine
 
 coding-agent 파이프라인의 상태 전이를 관리한다.
 
@@ -43,3 +42,28 @@ recurring_patterns도 갱신.
 | EVALUATION → COMPLETION | 모든 test result PASS |
 | EVALUATION → ANALYSIS | 하나 이상 FAIL + cycles < max |
 | * → BLOCKED | cycles ≥ max 또는 revisions ≥ max |
+
+## state.json 스키마
+
+```jsonc
+{
+  "ticket_id": "STABLE-1234",
+  "created_at": "ISO timestamp",
+  "workspace_dir": ".coding-agent/tickets/STABLE-1234_20260527_000000",
+  "ticket_type": "feature",
+  "current_state": "TICKET_INTAKE",
+  "current_agent": null,
+  "states": {
+    "TICKET_INTAKE": { "status": "pending" },
+    "ANALYSIS": { "status": "pending" },
+    "PLANNING": { "status": "pending" },
+    "DESIGN": { "status": "pending", "revision": 0 },
+    "IMPLEMENTATION": { "status": "pending", "branch": null, "plan_progress": null },
+    "EVALUATION": { "status": "pending", "results": {} },
+    "COMPLETION": { "status": "pending", "pr_url": null }
+  },
+  "failure_log": [],
+  "failure_summary": { "total_failures": 0, "by_state": {}, "by_type": {}, "recurring_patterns": [] },
+  "config": { "max_design_revisions": 3, "max_eval_cycles": 3 }
+}
+```

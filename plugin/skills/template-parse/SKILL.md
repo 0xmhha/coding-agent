@@ -1,11 +1,10 @@
 ---
 name: template-parse
-description: |
-  Parse and validate Jira ticket templates. Identifies ticket type
-  (Feature/Bug Fix/Code Review/Release) and extracts structured fields.
+description: "Jira 티켓 템플릿 파싱. 작업 유형(Feature/Bug Fix/Code Review/Release) 식별 + 필드 구조화 + 파이프라인 분기 결정."
+type: skill
 ---
 
-# Template Parse Skill
+# Template Parse
 
 Jira 티켓의 템플릿 유형을 식별하고 필드를 구조화한다.
 
@@ -25,11 +24,11 @@ Jira 티켓의 템플릿 유형을 식별하고 필드를 구조화한다.
 
 ## 파이프라인 분기
 
-- **Feature / Bug Fix**: 전체 6단계 (ANALYSIS → ... → COMPLETION)
-- **Code Review**: ANALYSIS → PLANNING(리뷰 리포트) → COMPLETION (구현 생략)
-- **Release**: ANALYSIS → EVALUATION → COMPLETION(태그 + 릴리즈)
+- **Feature / Bug Fix** → `pipeline_variant: "full"` (전체 6단계)
+- **Code Review** → `pipeline_variant: "review_only"` (구현 생략)
+- **Release** → `pipeline_variant: "release"` (태그 + 릴리즈)
 
-## 출력
+## 출력 예시
 
 ```json
 {
@@ -38,11 +37,7 @@ Jira 티켓의 템플릿 유형을 식별하고 필드를 구조화한다.
   "requirements": ["..."],
   "scope": { "modules": ["consensus", "governance"], "files": [] },
   "acceptance_criteria": ["..."],
-  "pipeline_variant": "full"
+  "pipeline_variant": "full",
+  "missing_fields": []
 }
 ```
-
-## 에러
-
-- 인식 불가 유형 → "작업 유형" 필드 누락 경고 + 유저에게 확인 요청
-- 필수 필드 누락 → 누락 필드 목록 + 진행 여부 확인
