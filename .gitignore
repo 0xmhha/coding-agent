@@ -1,0 +1,15 @@
+# coding-agent work artifacts
+.coding-agent/
+
+# Node (jira-gateway-mcp)
+node_modules/
+dist/
+.env
+.env.*
+
+# Go (cks-mcp)
+/cks-mcp/bin/
+/cks-mcp/*.db
+
+# OS
+.DS_Store
