@@ -15,7 +15,7 @@ plugin/.claude-plugin/plugin.json, 디렉토리 구조(plugin/commands, plugin/s
 
 ## P1-2. Command: /work [NEW] `M`
 
-**상태**: ✅ 골격 완료 → 로직 구현 필요
+**상태**: ✅ 완료 (로직 구현 완료, RI-03 `--local` 옵션 포함)
 
 **파일**: `plugin/commands/work.md`
 
@@ -76,7 +76,7 @@ plugin/.claude-plugin/plugin.json, 디렉토리 구조(plugin/commands, plugin/s
 
 ## P1-3. Command: /review [NEW] `M`
 
-**상태**: ✅ 골격 완료 → 로직 구현 필요
+**상태**: ✅ 완료 (로직 구현 완료, gh CLI 기반)
 
 **파일**: `commands/review.md`
 
@@ -131,7 +131,7 @@ plugin/.claude-plugin/plugin.json, 디렉토리 구조(plugin/commands, plugin/s
 
 ## P1-4. Command: /status [NEW] `S`
 
-**상태**: ✅ 골격 완료 → 로직 구현 필요
+**상태**: ✅ 완료 (로직 구현 완료, BLOCKED 강조 포함)
 
 **파일**: `commands/status.md`
 
@@ -198,7 +198,7 @@ plugin/.claude-plugin/plugin.json, 디렉토리 구조(plugin/commands, plugin/s
 
 ## P1-6. Skill: state-machine [NEW] `L`
 
-**상태**: ✅ 골격 완료 → 함수 로직 구체화 필요
+**상태**: ✅ 완료 (6개 함수 + RI-02/RI-13 반영)
 
 **파일**: `plugin/skills/state-machine/SKILL.md`
 
@@ -287,7 +287,7 @@ state.json 생성:
 
 ## P1-7. Skill: template-parse [NEW] `M`
 
-**상태**: ✅ 골격 완료 → 파싱 로직 구체화 필요
+**상태**: ✅ 완료 (4개 유형 파싱 + RI-04 ADF 처리 명시)
 
 **파일**: `plugin/skills/template-parse/SKILL.md`
 
@@ -350,7 +350,7 @@ state.json 생성:
 
 ## P1-8. Skill: stablenet-context [NEW] `M`
 
-**상태**: ✅ 골격 완료 → go-stablenet 프로젝트 탐색 후 상세화
+**상태**: ✅ 완료 (일반 구조 모델링, 실제 프로젝트 경로 전달 시 동적 보강)
 
 **파일**: `plugin/skills/stablenet-context/SKILL.md`
 
