@@ -57,7 +57,7 @@ Orchestrator (자체가 에이전트)가 서브 에이전트를 디스패치할 
 
 ## 2. Orchestrator Agent 상세
 
-### 2.1 agents/orchestrator.md
+### 2.1 plugin/agents/orchestrator.md
 
 ```markdown
 ---
@@ -154,7 +154,7 @@ orchestrator(workspace_dir):
 
 ## 3. Planner Agent 상세
 
-### 3.1 agents/planner.md
+### 3.1 plugin/agents/planner.md
 
 ```markdown
 ---
@@ -344,7 +344,7 @@ EVALUATION_FAIL → ANALYSIS 재진입 시:
 
 ## 4. Implementer Agent 상세
 
-### 4.1 agents/implementer.md
+### 4.1 plugin/agents/implementer.md
 
 ```markdown
 ---

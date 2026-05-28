@@ -334,18 +334,10 @@ merge 성공 시:
      → 완료 처리
 ```
 
-### 5.2 plugin.json 업데이트
+### 5.2 커맨드 구조
 
-```jsonc
-{
-  "commands": [
-    { "name": "work", "file": "commands/work.md" },
-    { "name": "review", "file": "commands/review.md" },
-    { "name": "status", "file": "commands/status.md" },
-    { "name": "merge", "file": "commands/merge.md" }
-  ]
-}
-```
+Claude Code는 `plugin/commands/` 디렉토리를 자동 검색하므로
+plugin.json에 명시적 등록은 불필요하다. /merge 커맨드는 `plugin/commands/merge.md`에 이미 정의됨.
 
 ---
 

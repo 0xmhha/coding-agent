@@ -6,11 +6,11 @@
 
 ## P3-1. CKS MCP 서버 프로젝트 생성 [NEW] `M`
 
-**파일**: `cks-mcp/` 전체
+**파일**: `tools/cks-mcp/` 전체
 
 **산출물**:
 ```
-cks-mcp/
+tools/cks-mcp/
 ├── go.mod                    # module github.com/user/coding-agent/cks-mcp
 ├── go.sum
 ├── cmd/cks-server/
@@ -43,7 +43,7 @@ modernc.org/sqlite             # CGo-free SQLite
 
 ## P3-2. Go AST Code Chunker [NEW] `XL`
 
-**파일**: `cks-mcp/internal/ckv/chunker.go`
+**파일**: `tools/cks-mcp/internal/ckv/chunker.go`
 
 **입력**: Go 소스 파일 경로 (또는 프로젝트 루트)
 
@@ -127,7 +127,7 @@ func splitLargeFunc(fn *ast.FuncDecl, ...) []CodeChunk {
 
 ## P3-3. Embedding 통합 [NEW] `L`
 
-**파일**: `cks-mcp/internal/ckv/embedder.go`
+**파일**: `tools/cks-mcp/internal/ckv/embedder.go`
 
 **입력**: CodeChunk
 
@@ -179,7 +179,7 @@ ollama pull nomic-embed-text
 
 ## P3-4. Vector Store [NEW] `L`
 
-**파일**: `cks-mcp/internal/ckv/store.go`
+**파일**: `tools/cks-mcp/internal/ckv/store.go`
 
 **핵심 로직**:
 ```go
@@ -221,7 +221,7 @@ cosine_similarity(a, b []float32) float32:
 
 ## P3-5. 검색 파이프라인 [NEW] `L`
 
-**파일**: `cks-mcp/internal/ckv/search.go`
+**파일**: `tools/cks-mcp/internal/ckv/search.go`
 
 **핵심 로직**:
 ```go
@@ -267,7 +267,7 @@ func (s *SearchService) Search(req CkvSearchInput) (*CkvSearchOutput, error) {
 
 ## P3-6. Reranker [NEW] `M`
 
-**파일**: `cks-mcp/internal/ckv/reranker.go`
+**파일**: `tools/cks-mcp/internal/ckv/reranker.go`
 
 **핵심 로직**:
 ```go
@@ -315,7 +315,7 @@ func (r *Reranker) Rerank(query string, candidates []SearchResult) []SearchResul
 
 ## P3-7. Indexing Pipeline [NEW] `L`
 
-**파일**: `cks-mcp/internal/ckv/indexer.go`
+**파일**: `tools/cks-mcp/internal/ckv/indexer.go`
 
 **핵심 로직**:
 ```go
@@ -360,7 +360,7 @@ func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, err
 
 ## P3-8. MCP Tool: ckv_search [NEW] `M`
 
-**파일**: `cks-mcp/internal/server/server.go` (tool 등록)
+**파일**: `tools/cks-mcp/internal/server/server.go` (tool 등록)
 
 **인터페이스**: Phase 3 설계 문서 Section 7.1 참조
 
@@ -383,7 +383,7 @@ func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, err
 
 ## P3-10. Sensitive Filter (Go 포팅) [ADAPT] `M`
 
-**파일**: `cks-mcp/internal/filter/engine.go`
+**파일**: `tools/cks-mcp/internal/filter/engine.go`
 
 **입력**: Phase 2의 TypeScript 필터 엔진과 동일 로직, Go로 재구현
 

@@ -412,7 +412,7 @@ interface CkvIndexOutput {
 CKV(Phase 3)와 CKG(Phase 4)를 하나의 MCP 서버에 포함한다.
 
 ```
-cks-mcp/
+tools/cks-mcp/
 ├── go.mod
 ├── go.sum
 ├── cmd/

@@ -6,7 +6,7 @@
 
 ## P7-1. PR 자동 생성 [ADAPT] `M`
 
-**파일**: `agents/orchestrator.md`의 COMPLETION 처리
+**파일**: `plugin/agents/orchestrator.md`의 COMPLETION 처리
 
 **입력**: EVALUATION_PASS 상태의 workspace
 

@@ -387,7 +387,7 @@ critical severity + action:block인 패턴 탐지 시:
 ### 4.1 프로젝트 구조
 
 ```
-jira-gateway-mcp/
+tools/jira-gateway-mcp/
 ├── package.json
 ├── tsconfig.json
 ├── src/
@@ -468,10 +468,11 @@ Sensitive Filter는 Jira Gateway MCP와 CKS MCP(Phase 3-4) 모두에서 사용�
 coding-agent/
 ├── shared/
 │   └── patterns.json      ← SSoT (Single Source of Truth)
-├── jira-gateway-mcp/
-│   └── (symlink 또는 빌드 시 복사)
-└── cks-mcp/
-    └── (symlink 또는 빌드 시 복사)
+└── tools/
+    ├── jira-gateway-mcp/
+    │   └── (환경변수 PATTERNS_PATH로 shared/patterns.json 참조)
+    └── cks-mcp/
+        └── (환경변수 CKS_PATTERNS_PATH로 shared/patterns.json 참조)
 ```
 
 ### 5.1 패턴 커스터마이징

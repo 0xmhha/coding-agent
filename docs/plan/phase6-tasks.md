@@ -6,7 +6,7 @@
 
 ## P6-1. Evaluator Agent 구현 [ADAPT] `L`
 
-**파일**: `agents/evaluator.md` 완성
+**파일**: `plugin/agents/evaluator.md` 완성
 
 **입력**: workspace_dir (구현 완료된 브랜치)
 

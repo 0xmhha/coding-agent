@@ -27,7 +27,7 @@
 
 | Phase | 파일 | 작업 수 | 핵심 산출물 |
 |-------|------|---------|-----------|
-| [Phase 1](phase1-tasks.md) | Plugin Skeleton + State Machine | 10 | plugin.json, commands, skills, state.json 관리 |
+| [Phase 1](phase1-tasks.md) | Plugin Skeleton + State Machine | 10 | plugin/.claude-plugin/plugin.json, commands, skills, state.json 관리 |
 | [Phase 2](phase2-tasks.md) | Jira Gateway MCP + Sensitive Filter | 7 | MCP 프록시 서버, 패턴 매칭 엔진 |
 | [Phase 3](phase3-tasks.md) | CKS MCP - CKV Vector Search | 10 | Go AST 청커, 임베딩, 벡터 검색 |
 | [Phase 4](phase4-tasks.md) | CKS MCP - CKG Graph Search | 9 | 관계 추출, 동시성 분석, 그래프 탐색 |

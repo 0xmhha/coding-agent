@@ -6,7 +6,7 @@
 
 ## P4-1. Graph Store (SQLite Adjacency) [NEW] `L`
 
-**파일**: `cks-mcp/internal/ckg/store.go`
+**파일**: `tools/cks-mcp/internal/ckg/store.go`
 
 **핵심 로직**:
 ```go
@@ -40,7 +40,7 @@ func (s *GraphStore) Traverse(startIDs []string, depth int, relTypes []string) (
 
 ## P4-2. AST Relation Extractor [NEW] `XL`
 
-**파일**: `cks-mcp/internal/ckg/relations.go`
+**파일**: `tools/cks-mcp/internal/ckg/relations.go`
 
 **입력**: Go 프로젝트 루트 경로
 
@@ -116,7 +116,7 @@ func extractChannels(fn *ast.FuncDecl, info *types.Info) []GraphEdge
 
 ## P4-3. Git History Analyzer [NEW] `M`
 
-**파일**: `cks-mcp/internal/ckg/history.go`
+**파일**: `tools/cks-mcp/internal/ckg/history.go`
 
 **핵심 로직**:
 ```go
@@ -157,7 +157,7 @@ func SummarizeHistory(entries []SymbolHistory) string {
 
 ## P4-4. Concurrency Analyzer [NEW] `XL`
 
-**파일**: `cks-mcp/internal/ckg/concurrency.go`
+**파일**: `tools/cks-mcp/internal/ckg/concurrency.go`
 
 **핵심 로직**:
 ```go
@@ -220,7 +220,7 @@ func AssessRisk(shared []SharedResource) RiskAssessment {
 
 ## P4-5. Traversal Query Engine [NEW] `M`
 
-**파일**: `cks-mcp/internal/ckg/traversal.go`
+**파일**: `tools/cks-mcp/internal/ckg/traversal.go`
 
 **핵심 로직**:
 ```go
@@ -252,7 +252,7 @@ func (s *GraphStore) Traverse(startIDs []string, depth int, relTypes []string, m
 
 ## P4-7. MCP Tool: ckg_impact [NEW] `L`
 
-**파일**: `cks-mcp/internal/ckg/impact.go`
+**파일**: `tools/cks-mcp/internal/ckg/impact.go`
 
 **핵심 로직**:
 ```go
@@ -294,7 +294,7 @@ func AnalyzeImpact(symbol string, changeType string) (*ImpactResult, error) {
 
 ## P4-9. CKV + CKG 통합 검색 흐름 [NEW] `M`
 
-**파일**: `cks-mcp/internal/server/server.go`에서 tool 조합 패턴 문서화
+**파일**: `tools/cks-mcp/internal/server/server.go`에서 tool 조합 패턴 문서화
 
 실제 구현은 Agent 레벨(Phase 5)에서 수행. 여기서는 CKS MCP가 두 tool을 제공하고, Planner Agent가 순차 호출하는 패턴을 검증.
 

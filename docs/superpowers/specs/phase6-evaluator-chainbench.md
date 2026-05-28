@@ -5,7 +5,7 @@
 
 ## 1. Evaluator Agent 설계
 
-### 1.1 agents/evaluator.md
+### 1.1 plugin/agents/evaluator.md
 
 ```markdown
 ---

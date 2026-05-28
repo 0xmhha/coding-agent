@@ -8,8 +8,8 @@
 
 **상태**: ✅ 완료
 
-plugin.json, 디렉토리 구조, .gitignore 등 초기 스캐폴딩.
-`scaffold: add plugin skeleton` 커밋에서 완료.
+plugin/.claude-plugin/plugin.json, 디렉토리 구조(plugin/commands, plugin/skills/{name}/SKILL.md, plugin/agents, tools/), .gitignore 등 초기 스캐폴딩.
+플러그인 구조 수정 커밋에서 완료.
 
 ---
 
@@ -17,7 +17,7 @@ plugin.json, 디렉토리 구조, .gitignore 등 초기 스캐폴딩.
 
 **상태**: ✅ 골격 완료 → 로직 구현 필요
 
-**파일**: `commands/work.md`
+**파일**: `plugin/commands/work.md`
 
 **입력**: `jira_id: string` (예: STABLE-1234)
 
@@ -179,8 +179,8 @@ plugin.json, 디렉토리 구조, .gitignore 등 초기 스캐폴딩.
 > **로직 구현은 Phase 7(P7-5)에서 수행한다.**
 
 **Phase 1 범위**:
-- plugin.json에 커맨드 등록 (완료)
-- commands/merge.md에 인터페이스 정의 (완료)
+- plugin/.claude-plugin/plugin.json에 auto-discovery로 인식 (완료)
+- plugin/commands/merge.md에 인터페이스 정의 (완료)
 - 실행 시 "이 커맨드는 PR 생성 후 사용 가능합니다" 안내 메시지
 
 **Phase 7(P7-5)에서 구현할 내용**:
@@ -200,7 +200,7 @@ plugin.json, 디렉토리 구조, .gitignore 등 초기 스캐폴딩.
 
 **상태**: ✅ 골격 완료 → 함수 로직 구체화 필요
 
-**파일**: `skills/state-machine.md`
+**파일**: `plugin/skills/state-machine/SKILL.md`
 
 **핵심 로직 — 각 함수별**:
 
@@ -289,7 +289,7 @@ state.json 생성:
 
 **상태**: ✅ 골격 완료 → 파싱 로직 구체화 필요
 
-**파일**: `skills/template-parse.md`
+**파일**: `plugin/skills/template-parse/SKILL.md`
 
 **입력**: Jira 티켓의 description 텍스트 (markdown)
 
@@ -352,7 +352,7 @@ state.json 생성:
 
 **상태**: ✅ 골격 완료 → go-stablenet 프로젝트 탐색 후 상세화
 
-**파일**: `skills/stablenet-context.md`
+**파일**: `plugin/skills/stablenet-context/SKILL.md`
 
 **핵심 로직**:
 ```

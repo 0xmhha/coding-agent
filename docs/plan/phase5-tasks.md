@@ -6,7 +6,7 @@
 
 ## P5-1. Orchestrator Agent 구현 [NEW] `L`
 
-**파일**: `agents/orchestrator.md` 완성
+**파일**: `plugin/agents/orchestrator.md` 완성
 
 **입력**: workspace_dir (작업 폴더 경로)
 
@@ -73,7 +73,7 @@ orchestrator(workspace_dir):
 
 ## P5-2. Planner Agent — ANALYSIS [ADAPT] `L`
 
-**파일**: `agents/planner.md` (ANALYSIS 섹션)
+**파일**: `plugin/agents/planner.md` (ANALYSIS 섹션)
 
 **입력**: workspace_dir, ticket.json
 
@@ -133,7 +133,7 @@ analysis(workspace_dir):
 
 ## P5-3. Planner Agent — PLANNING [ADAPT] `M`
 
-**파일**: `agents/planner.md` (PLANNING 섹션)
+**파일**: `plugin/agents/planner.md` (PLANNING 섹션)
 
 **입력**: analysis.md, related-code.json
 
@@ -177,7 +177,7 @@ step 분해 규칙:
 
 ## P5-4. Planner Agent — DESIGN [NEW] `L`
 
-**파일**: `agents/planner.md` (DESIGN 섹션)
+**파일**: `plugin/agents/planner.md` (DESIGN 섹션)
 
 **입력**: plan.md, related-code.json
 
@@ -218,7 +218,7 @@ self-review loop:
 
 ## P5-5. Implementer Agent 구현 [ADAPT] `L`
 
-**파일**: `agents/implementer.md` 완성
+**파일**: `plugin/agents/implementer.md` 완성
 
 **입력**: workspace_dir (plan.md + design 포함)
 
@@ -362,7 +362,7 @@ COMPLETION (Release 모드):
 
 ## P5-9. Hook 구현 [NEW] `M`
 
-**파일**: `hooks/hooks.json` (활성화) + `hooks/on-agent-complete.js`, `hooks/on-commit.js`
+**파일**: `plugin/hooks/hooks.json` (활성화) + `plugin/hooks/on-agent-complete.js`, `plugin/hooks/on-commit.js`
 
 **핵심 로직**:
 ```javascript

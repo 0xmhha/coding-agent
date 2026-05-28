@@ -17,7 +17,7 @@
 
 **상태**: `OPEN`
 
-**문제**: plugin.json에 Jira Gateway MCP와 CKS MCP를 Claude Code에 연결하는 설정이 없다. Claude Code에서 MCP 서버를 사용하려면 프로젝트의 `.mcp.json` 또는 `.claude/settings.json`의 `mcpServers` 항목에 서버를 등록해야 한다.
+**문제**: plugin/mcp/ 에 Jira Gateway MCP와 CKS MCP를 Claude Code에 연결하는 설정이 없다. 플러그인의 MCP 설정(plugin/mcp/) 또는 프로젝트의 `.mcp.json`에 서버를 등록해야 한다.
 
 **영향**: 에이전트가 MCP tool을 호출할 수 없어 전체 파이프라인이 동작하지 않음.
 
@@ -333,7 +333,7 @@
     "mcpServers": {
       "jira-gateway": {
         "command": "npx",
-        "args": ["tsx", "jira-gateway-mcp/src/index.ts"],
+        "args": ["tsx", "tools/jira-gateway-mcp/src/index.ts"],
         "env": {
           "JIRA_BASE_URL": "",
           "JIRA_API_TOKEN": "",
@@ -342,7 +342,7 @@
       },
       "cks": {
         "command": "go",
-        "args": ["run", "./cks-mcp/cmd/cks-server"],
+        "args": ["run", "./tools/cks-mcp/cmd/cks-server"],
         "env": {
           "CKS_PROJECT_ROOT": "",
           "CKS_INDEX_PATH": ".coding-agent/index"
@@ -392,7 +392,7 @@
 **영향**: Phase 1의 /merge 구현이 실제로는 Phase 7까지 검증 불가.
 
 **해결 방향**:
-- Phase 1에서는 /merge를 **커맨드 등록(plugin.json) + 스텁**만 포함
+- Phase 1에서는 /merge를 **커맨드 등록(auto-discovery) + 스텁**만 포함
 - /merge의 로직 구현은 Phase 7(P7-5)에서 수행
 - P1-5의 상세 로직을 P7-5로 이동하고, P1-5는 스텁으로 축소
 

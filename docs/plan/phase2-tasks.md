@@ -6,13 +6,13 @@
 
 ## P2-1. Jira Gateway MCP 서버 프로젝트 생성 [NEW] `M`
 
-**파일**: `jira-gateway-mcp/` 전체
+**파일**: `tools/jira-gateway-mcp/` 전체
 
 **입력**: 없음 (프로젝트 스캐폴딩)
 
 **산출물**:
 ```
-jira-gateway-mcp/
+tools/jira-gateway-mcp/
 ├── package.json          # name: @coding-agent/jira-gateway-mcp
 ├── tsconfig.json         # strict, ESM
 ├── src/
@@ -58,7 +58,7 @@ await server.connect(transport);
 
 ## P2-2. Jira REST API 클라이언트 [NEW] `M`
 
-**파일**: `jira-gateway-mcp/src/upstream/jira-client.ts`
+**파일**: `tools/jira-gateway-mcp/src/upstream/jira-client.ts`
 
 **입력**: 환경변수 (JIRA_BASE_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL)
 
@@ -104,7 +104,7 @@ class JiraClient {
 
 ## P2-3. Sensitive Filter 엔진 [NEW] `L`
 
-**파일**: `jira-gateway-mcp/src/filter/`
+**파일**: `tools/jira-gateway-mcp/src/filter/`
 
 **입력**: 텍스트 (Jira 응답 본문)
 
@@ -213,7 +213,7 @@ function blocked(matches: Match[]): FilterResult {
 
 ## P2-5. MCP Tool 등록 [NEW] `M`
 
-**파일**: `jira-gateway-mcp/src/tools/`
+**파일**: `tools/jira-gateway-mcp/src/tools/`
 
 **핵심 로직**:
 
@@ -268,7 +268,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 ## P2-6. 필터 단위 테스트 [NEW] `M`
 
-**파일**: `jira-gateway-mcp/tests/`
+**파일**: `tools/jira-gateway-mcp/tests/`
 
 **테스트 케이스**:
 ```

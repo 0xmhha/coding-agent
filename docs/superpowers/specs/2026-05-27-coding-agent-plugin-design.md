@@ -122,22 +122,32 @@ CKS MCP는 자체 구축이므로 내부에 sensitive filter를 기본 포함한
 
 ```
 coding-agent/
-├── plugin.json
-├── commands/
-│   ├── work.md              # /work <JIRA-ID>
-│   ├── review.md            # /review <PR-URL>
-│   └── status.md            # /status [JIRA-ID]
-├── agents/
-│   ├── orchestrator.md      # 파이프라인 제어
-│   ├── planner.md           # 분석 + 계획 + 설계
-│   ├── implementer.md       # 코드 구현
-│   └── evaluator.md         # 테스트 + 검증
-├── skills/
-│   ├── template-parse.md    # Jira 템플릿 파싱/검증
-│   ├── stablenet-context.md # go-stablenet 도메인 지식
-│   └── state-machine.md     # 상태 전이 로직
-└── hooks/
-    └── hooks.json           # 에이전트 완료/커밋 이벤트
+├── plugin/                          # Claude Code 플러그인 (설치 단위)
+│   ├── .claude-plugin/
+│   │   └── plugin.json              # 매니페스트
+│   ├── commands/
+│   │   ├── work.md                  # /coding-agent:work <JIRA-ID>
+│   │   ├── review.md                # /coding-agent:review <PR-URL>
+│   │   ├── status.md                # /coding-agent:status [JIRA-ID]
+│   │   └── merge.md                 # /coding-agent:merge <JIRA-ID>
+│   ├── skills/
+│   │   ├── state-machine/SKILL.md   # 상태 전이 로직
+│   │   ├── template-parse/SKILL.md  # Jira 템플릿 파싱/검증
+│   │   └── stablenet-context/SKILL.md # go-stablenet 도메인 지식
+│   ├── agents/                      # 에이전트 정의
+│   │   ├── orchestrator.md
+│   │   ├── planner.md
+│   │   ├── implementer.md
+│   │   └── evaluator.md
+│   ├── hooks/                       # Phase 5에서 구현
+│   ├── mcp/                         # MCP 서버 등록 설정
+│   └── rules/
+├── tools/                           # 빌드 대상 MCP 서버 프로젝트
+│   ├── jira-gateway-mcp/            # Phase 2 (TypeScript)
+│   └── cks-mcp/                     # Phase 3-4 (Go)
+├── shared/                          # 공유 리소스
+│   └── patterns.json
+└── docs/                            # 설계/계획 문서
 ```
 
 ### 3.2 Commands
@@ -680,7 +690,7 @@ IMPLEMENTATION 복구 (중단 후 재시작):
 전체 시스템을 아래 순서로 분해하여 순차 구현한다.
 
 ### Phase 1: Plugin Skeleton + State Machine
-- plugin.json, commands, agents 기본 구조
+- plugin/.claude-plugin/plugin.json, commands, agents, skills 기본 구조
 - state.json 관리 로직
 - 아티팩트 폴더 생성/관리
 - /status 커맨드
