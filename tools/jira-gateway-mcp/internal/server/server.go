@@ -68,26 +68,26 @@ func Register(s *mcp.Server, deps Deps) {
 // --- Inputs ---
 
 type readTicketInput struct {
-	TicketID string `json:"ticket_id" jsonschema:"required,description=Jira ticket ID, e.g. STABLE-1234"`
+	TicketID string `json:"ticket_id" jsonschema:"Jira ticket ID, e.g. STABLE-1234"`
 }
 type readCommentsInput struct {
-	TicketID string `json:"ticket_id" jsonschema:"required"`
-	Since    string `json:"since,omitempty" jsonschema:"description=ISO 8601 datetime; only newer comments returned"`
+	TicketID string `json:"ticket_id"`
+	Since    string `json:"since,omitempty" jsonschema:"ISO 8601 datetime; only newer comments returned"`
 }
 type searchInput struct {
-	JQL        string `json:"jql" jsonschema:"required"`
+	JQL        string `json:"jql"`
 	MaxResults int    `json:"max_results,omitempty"`
 }
 type addCommentInput struct {
-	TicketID string `json:"ticket_id" jsonschema:"required"`
-	Body     string `json:"body" jsonschema:"required"`
+	TicketID string `json:"ticket_id"`
+	Body     string `json:"body"`
 }
 type updateStatusInput struct {
-	TicketID string `json:"ticket_id" jsonschema:"required"`
-	Target   string `json:"target" jsonschema:"required,description=Transition name, status name, or statusCategory key"`
+	TicketID string `json:"ticket_id"`
+	Target   string `json:"target" jsonschema:"Transition name, status name, or statusCategory key"`
 }
 type updateAssigneeInput struct {
-	TicketID  string `json:"ticket_id" jsonschema:"required"`
+	TicketID  string `json:"ticket_id"`
 	AccountID string `json:"account_id,omitempty"`
 }
 

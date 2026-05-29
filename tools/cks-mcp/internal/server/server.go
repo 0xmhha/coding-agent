@@ -64,20 +64,20 @@ func Register(s *mcp.Server, deps Deps) {
 // --- Inputs ---
 
 type ckvSearchInput struct {
-	Query          string `json:"query" jsonschema:"required,description=Natural language or code-identifier query"`
-	TopK           int    `json:"top_k,omitempty" jsonschema:"description=Maximum results to return (default 10)"`
+	Query          string `json:"query" jsonschema:"Natural language or code-identifier query"`
+	TopK           int    `json:"top_k,omitempty" jsonschema:"Maximum results to return (default 10)"`
 	Package        string `json:"package,omitempty"`
-	FilePattern    string `json:"file_pattern,omitempty" jsonschema:"description=SQL LIKE pattern, e.g. consensus/wbft/%"`
-	SymbolType     string `json:"symbol_type,omitempty" jsonschema:"description=function|method|struct|interface|const|var"`
-	ModifiedSince  string `json:"modified_since,omitempty" jsonschema:"description=ISO datetime filter"`
+	FilePattern    string `json:"file_pattern,omitempty" jsonschema:"SQL LIKE pattern, e.g. consensus/wbft/%"`
+	SymbolType     string `json:"symbol_type,omitempty" jsonschema:"function|method|struct|interface|const|var"`
+	ModifiedSince  string `json:"modified_since,omitempty" jsonschema:"ISO datetime filter"`
 	IncludeHistory bool   `json:"include_history,omitempty"`
-	Rerank         *bool  `json:"rerank,omitempty" jsonschema:"description=Default true"`
+	Rerank         *bool  `json:"rerank,omitempty" jsonschema:"Default true"`
 }
 
 type ckvIndexInput struct {
-	Mode        string   `json:"mode" jsonschema:"required,enum=full,enum=incremental"`
-	ProjectDir  string   `json:"project_dir" jsonschema:"required"`
-	Modules     []string `json:"modules,omitempty" jsonschema:"description=Optional priority list for full mode"`
+	Mode        string   `json:"mode" jsonschema:"one of: full or incremental"`
+	ProjectDir  string   `json:"project_dir"`
+	Modules     []string `json:"modules,omitempty" jsonschema:"Optional priority list for full mode"`
 	SinceCommit string   `json:"since_commit,omitempty"`
 }
 
@@ -143,8 +143,8 @@ func makeIndexHandler(deps Deps) mcp.ToolHandlerFor[ckvIndexInput, types.IndexSt
 // --- CKG inputs ---
 
 type ckgQueryInput struct {
-	Symbols            []string `json:"symbols" jsonschema:"required,description=Seed symbols (qualified or short name)"`
-	Depth              int      `json:"depth,omitempty" jsonschema:"description=BFS depth (default 2)"`
+	Symbols            []string `json:"symbols" jsonschema:"Seed symbols (qualified or short name)"`
+	Depth              int      `json:"depth,omitempty" jsonschema:"BFS depth (default 2)"`
 	RelationTypes      []string `json:"relation_types,omitempty"`
 	IncludeHistory     bool     `json:"include_history,omitempty"`
 	IncludeConcurrency bool     `json:"include_concurrency,omitempty"`
@@ -153,12 +153,12 @@ type ckgQueryInput struct {
 }
 
 type ckgImpactInput struct {
-	Symbol     string `json:"symbol" jsonschema:"required"`
-	ChangeType string `json:"change_type,omitempty" jsonschema:"description=signature|logic|delete (default logic)"`
+	Symbol     string `json:"symbol"`
+	ChangeType string `json:"change_type,omitempty" jsonschema:"signature|logic|delete (default logic)"`
 }
 
 type ckgIndexInput struct {
-	ProjectDir string `json:"project_dir" jsonschema:"required"`
+	ProjectDir string `json:"project_dir"`
 }
 
 // --- CKG handlers ---
