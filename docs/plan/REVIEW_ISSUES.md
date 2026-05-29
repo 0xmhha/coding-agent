@@ -11,11 +11,30 @@
 | `RESOLVED` | 해결 완료 (해결 방법 + 커밋/문서 참조) |
 | `DEFERRED` | 의도적으로 후순위 (이유 명시) |
 
+## 최종 감사 (2026-05-29)
+
+전체 23개 RI 모두 `RESOLVED`. Phase 1~7 구현 + Phase 8 셋업 가이드 완료 기준.
+
+| 범주 | 항목 |
+|------|------|
+| Phase 1 (스켈레톤) | RI-01, RI-02, RI-03 |
+| Phase 2 (Jira Gateway) | RI-04, RI-05, RI-06, RI-15 |
+| Phase 3 (CKV) | RI-07, RI-08, RI-09, RI-23 |
+| Phase 4 (CKG) | RI-10, RI-11 |
+| Phase 5 (Orchestration) | RI-12, RI-13, RI-17, RI-18, RI-19 |
+| Phase 6 (Evaluator) | RI-20, RI-21 |
+| Phase 7 (PR/Merge) | RI-14 |
+| 공통 | RI-16 (SETUP.md), RI-22 (PATTERNS_PATH) |
+
+런타임 실증이 필요한 항목 (사용자 환경 종속):
+- **RI-20**: 실제 ChainBench MCP의 tool 이름이 spec과 일치하는지는 §7.0 pre-flight가 첫 실행 시 자동 검증·BLOCKED.
+- **RI-08, RI-09**: Ollama 가용성·인덱싱 시간은 호스트 자원에 의존. BM25 폴백 + code_hash 캐시로 worst-case 흡수.
+
 ---
 
 ## RI-01. MCP 서버 등록 설정 누락 [Phase 1]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `plugin/.mcp.json`에 `jira-gateway`(`tools/jira-gateway-mcp/bin/jira-gateway-mcp`)와 `cks`(`tools/cks-mcp/bin/cks-server`) 두 서버 등록. `${CLAUDE_PLUGIN_ROOT}` 변수 사용, env block에 Jira 자격증명/CKS 인덱스 경로/패턴 파일 경로 주입. 커밋 `c1a92cc`(plugin 구조 전환) + `d41684e`(tools/ 이동).
 
 **문제**: plugin/mcp/ 에 Jira Gateway MCP와 CKS MCP를 Claude Code에 연결하는 설정이 없다. 플러그인의 MCP 설정(plugin/mcp/) 또는 프로젝트의 `.mcp.json`에 서버를 등록해야 한다.
 
@@ -32,7 +51,7 @@
 
 ## RI-02. ANALYSIS/PLANNING 중간 상태 복구 경로 불완전 [Phase 1]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `plugin/skills/state-machine/SKILL.md §2.6 get_resume_point()`이 ANALYSIS/PLANNING/DESIGN 각 단계의 부분 산출물(analysis.md/related-code.json/plan.md/design-v{N}.md)을 검사해서 `sub_status`(`fresh|partial|review_pending`) + `existing_artifacts` + `recommendation`을 반환한다. 커밋 `b5736d6`.
 
 **문제**: `get_resume_point()`는 IMPLEMENTATION 단계의 step/checkpoint 복구만 상세히 정의되어 있다. ANALYSIS나 PLANNING 중간에 중단된 경우, "현재 상태 반환"만 하고 구체적으로 어디서부터 재개하는지 정의가 없다.
 
@@ -50,7 +69,7 @@
 
 ## RI-03. Phase 2 미완성 시 /work 테스트 불가 [Phase 1]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `plugin/commands/work.md`가 `--local <path>` 옵션을 지원. argument-hint·§5.1·완료 기준 체크리스트에 모두 반영. MCP 없이 로컬 JSON 파일을 ticket.json으로 직접 사용 가능 (SETUP.md §7 smoke test에서 활용). 커밋 `bfee7ca`.
 
 **문제**: /work 커맨드가 Jira Gateway MCP를 호출하여 티켓을 읽는 것이 첫 단계인데, Phase 2가 아직 구현되지 않은 상태에서는 /work를 테스트할 수 없다.
 
@@ -68,7 +87,7 @@
 
 ## RI-04. Jira API v3의 ADF(Atlassian Document Format) 처리 [Phase 2]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/jira-gateway-mcp/internal/jira/adf.go` 자체 ADF→Markdown 변환기 구현 (HTML 의존성 제거). `adf_test.go`에 paragraph/heading/bullet list/ordered list/task list/code block 등 ≥8 노드 타입 테스트. `client.GetIssue()`에서 description 필드를 ADF로 받아 변환. 권장안 Option A(HTML 경유) 대신 Option B(ADF 직접 파싱)로 더 가벼운 의존성 그래프 확보. 커밋 `6d1b700`.
 
 **문제**: Jira Cloud API v3는 `description` 필드를 평문 markdown이 아닌 ADF(JSON 기반 문서 포맷)로 반환한다. template-parse skill은 markdown 섹션 헤더 기반 파싱을 전제하고 있어, ADF를 직접 파싱하거나 변환하는 처리가 필요하다.
 
@@ -87,7 +106,7 @@
 
 ## RI-05. Jira transition 이름의 프로젝트별 차이 [Phase 2]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/jira-gateway-mcp/internal/jira/client.go:140 TransitionIssue()`이 case-insensitive lookup으로 1) transition name 2) target status name 3) statusCategory key 순으로 해결. `jira_update_status` MCP tool description에 "Transition name, status name, or statusCategory key" 명시. 별도 설정 파일 없이 프로젝트별 명명 차이를 흡수. 커밋 `6d1b700`.
 
 **문제**: `jira_update_status("In Review")`에서 "In Review"는 Jira workflow의 transition name인데, 이는 프로젝트마다 다르다. 하드코딩하면 다른 Jira 프로젝트 설정에서 실패한다.
 
@@ -116,7 +135,7 @@
 
 ## RI-06. Sensitive Filter fail-safe 시 MCP 응답 형태 미정의 [Phase 2]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/jira-gateway-mcp/internal/filter/engine.go`가 내부 오류 시 BLOCKED 결과(empty text + fail-safe block 로그)를 반환. `server.go blockedResult()`은 `SENSITIVE_CONTENT_BLOCKED` 에러 코드 + `detected_patterns` + `recommendation` + `recoverable=false`로 구조화된 응답. `engine_test.go`의 `TestScanAndFilter_FailSafe`가 BLOCKED + empty text 보장. 커밋 `6d1b700`.
 
 **문제**: P2-3에서 "필터 엔진 자체 예외 시 차단"이라 했는데, 이때 MCP tool 응답으로 무엇을 반환하는지 정의되지 않았다. Agent 입장에서는 tool 호출 실패로 인식되며, 재시도 로직이 없으면 파이프라인이 멈춘다.
 
@@ -140,7 +159,7 @@
 
 ## RI-07. sqlite-vss의 Go 바인딩 호환성 [Phase 3]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/cks-mcp/go.mod`가 `modernc.org/sqlite v1.51.0` (CGo-free) 채택. `internal/ckv/store.go:17` 주석에 결정 근거 명시("sqlite-vss is not CGo-free, and the project size justifies brute-force MVP"). 벡터는 BLOB(float32)로 저장, `VectorSearch()` + `cosineSimilarity()`로 brute-force 계산. 향후 외부 vector DB 마이그레이션 경로 명시. 커밋 `292e7dc`.
 
 **문제**: sqlite-vss는 C 확장이며, Go의 CGo-free SQLite 드라이버(`modernc.org/sqlite`)와 호환되지 않는다. CGo 기반 드라이버(`mattn/go-sqlite3`)를 쓰면 빌드가 복잡해진다.
 
@@ -159,7 +178,7 @@
 
 ## RI-08. Ollama 미설치 환경에서 CKV 동작 불가 [Phase 3]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/cks-mcp/internal/ckv/bm25.go` BM25 lexical 폴백 구현 (k1=1.2, b=0.75, signature+godoc+code 토큰화). `search.go retrieve()`는 embedder=nil 또는 임베딩 호출 실패 시 자동으로 `bm25_fallback`으로 전환. `ckv_search` 응답의 `engine` 필드로 fallback 사용 여부를 클라이언트가 식별 가능. SETUP.md §9.4에 Ollama 미연결 시 동작 안내. 커밋 `292e7dc`.
 
 **문제**: P3-3에서 Ollama + nomic-embed-text를 임베딩 Tier 1으로 설정했는데, go-stablenet 개발 환경에 Ollama가 설치되어 있지 않을 수 있다. 임베딩 모델이 없으면 CKV 전체가 동작하지 않는다.
 
@@ -181,7 +200,7 @@
 
 ## RI-09. 인덱싱 시간 추정이 낙관적 [Phase 3]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — 3가지 완화 적용: (1) `indexer.go` code_hash 캐시(RI-23)로 incremental에서 변경 안 된 청크는 재임베딩 스킵, (2) `Progress` 콜백이 50개 단위로 stderr에 `[cks-mcp] indexing N/total: file` 진행률 출력, (3) `ckv_index` MCP tool이 `modules` 인자로 우선 인덱싱 범위 지정. SETUP.md §6에 초기 인덱싱 예상 시간 + Ollama 없는 환경에서 BM25 폴백으로 즉시 사용 가능 안내. 커밋 `292e7dc`.
 
 **문제**: P3-7에서 "~5000 파일 → 10-30분"으로 추정했으나, Ollama 로컬 임베딩은 CPU 환경에서 청크당 수백ms가 걸린다. 20000 청크 × 200ms = 약 67분. GPU 없는 환경에서는 예상보다 훨씬 오래 걸릴 수 있다.
 
@@ -201,7 +220,7 @@
 
 ## RI-10. AST Relation Extractor의 전체 빌드 의존 [Phase 4]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/cks-mcp/internal/ckg/relations.go`가 2-tier 구조 구현. Tier 1 `extractTyped()`는 `packages.Load("./...")`로 정확한 타입 정보 + 신뢰도 high. 실패 시 자동으로 `[cks-mcp] ckg: packages.Load failed (...); falling back to AST-only mode (RI-10)`을 stderr 출력 후 Tier 2 `extractASTOnly()`로 폴백 (`ModeASTOnly`). 모든 edge에 `extract_mode` 필드 부착하여 다운스트림이 신뢰도 판단 가능. 커밋 `15b75b2`.
 
 **문제**: P4-2에서 `packages.Load`로 cross-package 타입 resolve를 하려면 go-stablenet의 전체 의존성(geth 포함)을 빌드할 수 있어야 한다. 빌드 환경이 갖춰지지 않으면 `packages.Load`가 실패하며, 타입 정보 없이 AST만으로 관계를 추출해야 한다.
 
@@ -223,7 +242,7 @@
 
 ## RI-11. Concurrency Analyzer 정적 분석 한계 [Phase 4]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/cks-mcp/internal/ckg/concurrency.go`가 interface dispatch/reflect-based goroutine 감지 시 `confidenceDowngraded=true` 플래그 후 `risk_assessment.race_condition_risk = "unknown"`으로 기록. 정적 분석 한계를 명시적으로 표면화하여 Evaluator(RI-21)가 동적 검증으로 보완할 수 있게 함. 커밋 `15b75b2`.
 
 **문제**: goroutine이 인터페이스를 통해 실행되거나, reflect/unsafe로 동작하는 경우 정적 분석으로 추적이 불가능하다. geth에는 이런 패턴이 존재한다.
 
@@ -250,7 +269,7 @@
 
 ## RI-12. Orchestrator 테스트를 위한 MCP mock [Phase 5]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — RI-03의 `/work --local <path>` 옵션과 통합. orchestrator는 ticket.json이 작업 폴더에 이미 존재하면 Jira 호출 스킵, ANALYSIS도 manually placed analysis.md/related-code.json fixture를 그대로 사용. SETUP.md §7 smoke test가 Jira/CKS MCP 없이 Phase 1 파이프라인 검증 절차를 안내. 커밋 `bfee7ca` + `eb7b85a`.
 
 **문제**: Orchestrator가 동작하려면 Jira Gateway MCP + CKS MCP가 모두 필요한데, Phase 2-4가 완료되기 전에는 Orchestrator를 테스트할 수 없다.
 
@@ -268,7 +287,7 @@
 
 ## RI-13. Agent 간 에러 전파 및 아티팩트 완전성 검증 [Phase 5]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `plugin/skills/state-machine/SKILL.md §3 transition()` 가드가 단순 파일 존재 외에 필수 섹션 존재(analysis.md: 도메인/관련 코드/리스크, related-code.json: 비어 있지 않은 results 배열)를 검사. 누락 시 transition 거부 + state.json의 `failure_log`에 부족 항목 기록. orchestrator §3.x가 에이전트 호출 실패 → BLOCKED 전이로 이어지는 경로를 명시. 커밋 `b5736d6` + `eb7b85a`.
 
 **문제**: Planner 내부에서 CKS MCP 호출이 실패하면 analysis.md가 불완전한 상태로 생성될 수 있다. 현재 전이 조건은 "파일 존재"만 체크하므로, 불완전한 파일로도 다음 단계로 전이될 수 있다.
 
@@ -294,7 +313,7 @@
 
 ## RI-14. Squash merge commit body 길이 [Phase 7]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `plugin/commands/merge.md §4.2` size-aware strategy 구현. `plan_progress.total_steps <= 10`이면 개별 step 전체 나열, 11+면 [Interface, Implementation, Tests, Docs, Misc] 5개 카테고리 버킷으로 그룹화 후 `* {bucket} ({N} commits)` 요약. pr-sanitize 적용 후 `gh pr merge --squash` 전달. 커밋 `459a7ad`.
 
 **문제**: step이 많은 작업(10+ step)에서 모든 개별 커밋 메시지를 나열하면 squash commit body가 과도하게 길어진다.
 
@@ -320,7 +339,7 @@
 
 ## RI-15. MCP 서버 설정 파일 [공통]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — RI-01과 동일 해결. `plugin/.mcp.json`이 빌드 산출물(`tools/.../bin/...`)을 직접 가리키도록 구성됨. TypeScript `npx tsx` 경로 대신 Go 바이너리로 전환(이유: 단일 실행 파일·CGo-free·빠른 시작). ChainBench MCP는 별도 사용자 설정으로 분리. 커밋 `c1a92cc` + `d41684e`.
 
 **문제**: 프로젝트에 `.mcp.json`이 없다. Jira Gateway MCP, CKS MCP, ChainBench MCP를 Claude Code에서 사용하려면 MCP 서버 등록이 필요하다.
 
@@ -385,7 +404,7 @@
 
 ## RI-17. /merge 커맨드의 Phase 배치 불일치 [Phase 1 / Phase 7]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — Phase 1 P1-5에서는 `/merge` 커맨드 등록(auto-discovery용 frontmatter)만 수행하고 실제 로직은 Phase 7 P7-5에서 구현. 현재 `plugin/commands/merge.md`는 Phase 7 §6 사양만 보유 (Phase 1 stub 충돌 없음). 커밋 `459a7ad`.
 
 **문제**: P1-5에서 /merge 커맨드를 Phase 1에 배치했지만, /merge가 동작하려면 PR URL(Phase 6 EVALUATION_PASS 이후 생성)이 필요하다. Phase 1에서는 PR이 존재하지 않으므로 /merge를 테스트할 수 없다.
 
@@ -402,7 +421,7 @@
 
 ## RI-18. Code Review 파이프라인의 review-report.md 미정의 [Phase 5]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `orchestrator.md §6` "code_review" variant 정의: `TICKET_INTAKE → ANALYSIS → PLANNING(review-report) → COMPLETION`. `planner.md §7` review-report.md 포맷(리뷰 대상/Findings[severity]/Suggestions/Risk) + Jira 코멘트 게시 흐름 정의. Planner는 `mode=code_review`로 디스패치되어 §3 light ANALYSIS 후 §7로 점프. design/implementation/evaluation 단계 건너뜀. 커밋 `eb7b85a`.
 
 **문제**: P5-8에서 Code Review 유형은 "ANALYSIS → PLANNING(리뷰 리포트) → COMPLETION"으로 분기한다고 정의했지만, 리뷰 리포트(review-report.md)의 구체적 포맷과 Planner가 어떻게 "리뷰 모드"로 전환하는지 정의되지 않았다.
 
@@ -432,7 +451,7 @@
 
 ## RI-19. Release 파이프라인 상세 미정의 [Phase 5]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `orchestrator.md §6` "release" variant 정의: `TICKET_INTAKE → ANALYSIS → EVALUATION → COMPLETION(tag + CHANGELOG)`. `planner.md §8` release-summary.md 포맷(버전/포함 STABLE-xxx 목록/Release checklist) 정의. COMPLETION에서 `git tag v{version}` + `CHANGELOG.md` 업데이트 + Jira Complete. 안전장치: orchestrator §유저 확인 가드("Never tag or push tags without user confirmation"). 커밋 `eb7b85a`.
 
 **문제**: P5-8에서 Release 유형은 "ANALYSIS → EVALUATION → COMPLETION(태그)"으로 분기한다고 정의했지만, 구체적으로 ANALYSIS에서 "포함 변경사항 취합"이 어떻게 동작하는지, COMPLETION에서 태깅/CHANGELOG 생성의 상세가 없다.
 
@@ -459,7 +478,7 @@
 
 ## RI-20. ChainBench MCP 인터페이스 검증 [Phase 6]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` (사양 단계 완료) — `evaluator.md §7.0 Pre-flight`이 실제 ChainBench MCP의 tool 목록을 조회해 [chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop] 가용성 확인. 불일치 시 결과를 `ChainBench MCP interface mismatch: missing {missing}`로 BLOCKED 처리하고 spec 갱신 안내. SETUP.md §9.6 트러블슈팅에 동일 흐름 안내. 실제 ChainBench MCP 환경에서의 검증은 사용자 환경 종속(런타임). 커밋 `0058b4e`.
 
 **문제**: Phase 6 설계에서 ChainBench MCP의 tool 인터페이스(chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop)를 "예상"으로 정의했다. 실제 ChainBench MCP의 tool 이름과 파라미터가 다를 수 있다.
 
@@ -478,7 +497,7 @@
 
 ## RI-21. Evaluator에 go test -race 미포함 [Phase 6]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `evaluator.md §4.4 -race scope` 정의: CKG의 `concurrency_impact[].risk_assessment.race_condition_risk != "none"`인 심볼의 parent package만 `race_pkgs`로 추출 후 `go test -race ${race_pkgs[@]} -count=1 -timeout=300s` 실행. `eval-race.log`의 "WARNING: DATA RACE" 매칭으로 `result.race_detected` 설정. 전체 테스트 -race 적용으로 인한 시간 폭발 회피하면서 RI-11의 정적 분석 한계 보완. 커밋 `0058b4e`.
 
 **문제**: RI-11에서 Concurrency Analyzer의 정적 분석 한계를 보완하기 위해 `go test -race`를 권장했지만, Evaluator의 4-stage 파이프라인에 race detector가 포함되어 있지 않다.
 
@@ -499,7 +518,7 @@
 
 ## RI-22. patterns.json 공유 전략 미확정 [공통]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — 환경변수 기반 경로 주입으로 통일. `plugin/.mcp.json`의 env: `PATTERNS_PATH=${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json` (jira-gateway), `CKS_PATTERNS_PATH=${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json` (cks). 양쪽 모두 `resolvePatternsPath()` 헬퍼에서 env → project-root probe → cwd/shared 순으로 폴백. `plugin/skills/pr-sanitize/SKILL.md §3.1`도 동일 패턴(env → repo_root → plugin_root). 빌드 의존성 없음. 커밋 `6d1b700` + `292e7dc` + `459a7ad`.
 
 **문제**: shared/patterns.json을 Jira Gateway MCP(TypeScript)와 CKS MCP(Go) 양쪽에서 사용해야 한다. 현재 파일은 프로젝트 루트의 shared/에 있지만, 각 MCP 서버 프로젝트에서 이 파일에 접근하는 방법(symlink, 빌드 시 복사, embed)이 정의되지 않았다.
 
@@ -516,7 +535,7 @@
 
 ## RI-23. 임베딩 캐시 전략 부재 [Phase 3]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `tools/cks-mcp/internal/ckv/store.go`의 chunks 테이블에 `code_hash TEXT NOT NULL` 컬럼 + `idx_chunks_hash` 인덱스 추가. `Store.GetCodeHash(chunkID)` API + `indexer.go:149` incremental 루프가 `oldHash == chunk.CodeHash && oldHash != ""`일 때 임베딩 호출 스킵. 변경된 청크만 re-embed → RI-09 시간 추정 완화. 커밋 `292e7dc`.
 
 **문제**: P3-7(Indexing Pipeline)에서 incremental index는 변경 파일만 재처리한다고 정의했지만, 임베딩 결과의 캐싱 메커니즘이 없다. 동일 청크를 다시 임베딩하는 불필요한 재계산이 발생할 수 있다.
 
