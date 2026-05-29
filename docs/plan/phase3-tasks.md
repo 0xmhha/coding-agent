@@ -6,6 +6,8 @@
 
 ## P3-1. CKS MCP 서버 프로젝트 생성 [NEW] `M`
 
+**상태**: ✅ 완료. `tools/cks-mcp/` Go 모듈 + `cmd/server` 진입점 + `internal/{ckv,filter,server,types}/`.
+
 **파일**: `tools/cks-mcp/` 전체
 
 **산출물**:
@@ -42,6 +44,8 @@ modernc.org/sqlite             # CGo-free SQLite
 ---
 
 ## P3-2. Go AST Code Chunker [NEW] `XL`
+
+**상태**: ✅ 완료. `internal/ckv/chunker.go` — FuncDecl/Method/Struct/Interface/Const/Var 청킹, 200줄 초과 함수 sub-chunk 분할, vendor·_gen.go·hidden dir 제외.
 
 **파일**: `tools/cks-mcp/internal/ckv/chunker.go`
 
@@ -127,6 +131,8 @@ func splitLargeFunc(fn *ast.FuncDecl, ...) []CodeChunk {
 
 ## P3-3. Embedding 통합 [NEW] `L`
 
+**상태**: ✅ 완료. `internal/ckv/embedder.go` (Ollama probe + Dimension 자동 발견) + `internal/ckv/bm25.go` (RI-08 폴백). `FormatChunkForEmbedding`에 package/file/signature/godoc 컨텍스트 포함.
+
 **파일**: `tools/cks-mcp/internal/ckv/embedder.go`
 
 **입력**: CodeChunk
@@ -179,6 +185,8 @@ ollama pull nomic-embed-text
 
 ## P3-4. Vector Store [NEW] `L`
 
+**상태**: ✅ 완료. `internal/ckv/store.go` — `modernc.org/sqlite` (CGo-free) + brute-force cosine (RI-07). `code_hash` 컬럼 + `GetCodeHash` (RI-23 캐시).
+
 **파일**: `tools/cks-mcp/internal/ckv/store.go`
 
 **핵심 로직**:
@@ -220,6 +228,8 @@ cosine_similarity(a, b []float32) float32:
 ---
 
 ## P3-5. 검색 파이프라인 [NEW] `L`
+
+**상태**: ✅ 완료. `internal/ckv/search.go` — embed → vector/BM25 retrieve → over-fetch ×3 → enrich → rerank → sensitive filter.
 
 **파일**: `tools/cks-mcp/internal/ckv/search.go`
 
@@ -266,6 +276,8 @@ func (s *SearchService) Search(req CkvSearchInput) (*CkvSearchOutput, error) {
 ---
 
 ## P3-6. Reranker [NEW] `M`
+
+**상태**: ✅ 완료. `internal/ckv/reranker.go` — 4개 boost (signature ×1.5, godoc ×1.3, recent ×1.1, package proximity ×1.2). 테스트 가능한 clock 주입.
 
 **파일**: `tools/cks-mcp/internal/ckv/reranker.go`
 
@@ -315,6 +327,8 @@ func (r *Reranker) Rerank(query string, candidates []SearchResult) []SearchResul
 
 ## P3-7. Indexing Pipeline [NEW] `L`
 
+**상태**: ✅ 완료. `internal/ckv/indexer.go` — full/incremental, `code_hash` 캐시 reuse (RI-23), progress 콜백 (RI-09), `modules` 우선순위 필터, git status 변경 파일 포함.
+
 **파일**: `tools/cks-mcp/internal/ckv/indexer.go`
 
 **핵심 로직**:
@@ -360,6 +374,8 @@ func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, err
 
 ## P3-8. MCP Tool: ckv_search [NEW] `M`
 
+**상태**: ✅ 완료. `internal/server/server.go` — query/top_k/filters/include_history/rerank 파라미터 + `SearchResponse` 구조화 출력.
+
 **파일**: `tools/cks-mcp/internal/server/server.go` (tool 등록)
 
 **인터페이스**: Phase 3 설계 문서 Section 7.1 참조
@@ -373,6 +389,8 @@ func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, err
 
 ## P3-9. MCP Tool: ckv_index [NEW] `S`
 
+**상태**: ✅ 완료. `internal/server/server.go` — full/incremental + modules + since_commit + 진행률 stderr 로깅.
+
 **인터페이스**: Phase 3 설계 문서 Section 7.2 참조
 
 **완료 기준**:
@@ -382,6 +400,8 @@ func (idx *Indexer) IncrementalIndex(root, sinceCommit string) (*IndexStats, err
 ---
 
 ## P3-10. Sensitive Filter (Go 포팅) [ADAPT] `M`
+
+**상태**: ✅ 완료. `internal/filter/` — jira-gateway-mcp에서 포팅. RI-22: `CKS_PATTERNS_PATH` 환경변수가 `PATTERNS_PATH`보다 우선. fail-safe 동작 검증.
 
 **파일**: `tools/cks-mcp/internal/filter/engine.go`
 
