@@ -6,6 +6,8 @@
 
 ## P5-1. Orchestrator Agent 구현 [NEW] `L`
 
+**상태**: ✅ 완료. `plugin/agents/orchestrator.md` — state dispatch 표, EVALUATION_PASS → PR+Jira, EVALUATION_FAIL → cycle vs BLOCKED, review_only/release 변형 분기, sub-agent dispatch contract, safety policies.
+
 **파일**: `plugin/agents/orchestrator.md` 완성
 
 **입력**: workspace_dir (작업 폴더 경로)
@@ -73,6 +75,8 @@ orchestrator(workspace_dir):
 
 ## P5-2. Planner Agent — ANALYSIS [ADAPT] `L`
 
+**상태**: ✅ 완료. `plugin/agents/planner.md §3` — template-parse → CKV → stablenet-context → CKG query → CKG impact → analysis.md + related-code.json (ckv/ckg/impacts 통합 JSON).
+
 **파일**: `plugin/agents/planner.md` (ANALYSIS 섹션)
 
 **입력**: workspace_dir, ticket.json
@@ -133,6 +137,8 @@ analysis(workspace_dir):
 
 ## P5-3. Planner Agent — PLANNING [ADAPT] `M`
 
+**상태**: ✅ 완료. `planner.md §4` — atomic/reviewable/verifiable 제약, topological order(테스트는 구현 뒤), verification plan (race scope from CKG concurrency_impact), plan.md.
+
 **파일**: `plugin/agents/planner.md` (PLANNING 섹션)
 
 **입력**: analysis.md, related-code.json
@@ -177,6 +183,8 @@ step 분해 규칙:
 
 ## P5-4. Planner Agent — DESIGN [NEW] `L`
 
+**상태**: ✅ 완료. `planner.md §5` — per-step before/after pseudocode, side-effect 체크리스트, self-review loop (max_design_revisions 적용 + BLOCKED 전이), design-v{N}.md + design-changelog.md.
+
 **파일**: `plugin/agents/planner.md` (DESIGN 섹션)
 
 **입력**: plan.md, related-code.json
@@ -218,6 +226,8 @@ self-review loop:
 
 ## P5-5. Implementer Agent 구현 [ADAPT] `L`
 
+**상태**: ✅ 완료. `plugin/agents/implementer.md` — bootstrap → branch 관리 (main/master 보호) → per-step loop (begin/implement/build verify/split commit/end) → 전이.
+
 **파일**: `plugin/agents/implementer.md` 완성
 
 **입력**: workspace_dir (plan.md + design 포함)
@@ -241,6 +251,8 @@ self-review loop:
 
 ## P5-6. Checkpoint/복구 메커니즘 [ADAPT] `M`
 
+**상태**: ✅ 완료. `implementer.md §2.3 + §5` — get_resume_point 활용 fresh/resume 판별, 3가지 트리거(주기/마일스톤/사전 slow op) 체크포인트 작성, 재시작 시 work_in_progress + diff 복원.
+
 **핵심 로직**: Phase 5 설계 Section 4.2 + 시스템 설계 Section 8 참조
 
 **buddy 참고**:
@@ -256,6 +268,8 @@ self-review loop:
 
 ## P5-7. Bug Cycle 재진입 [ADAPT] `M`
 
+**상태**: ✅ 완료. `planner.md §6` — failure_log + test-report 로드, git diff(main..HEAD, unstaged, staged) 수집, CKS 원본과 종합하여 plan-fix-{cycle}.md 작성 후 PLANNING/DESIGN 통과.
+
 **핵심 로직**: Phase 5 설계 Section 3.5 참조
 
 **buddy 참고**: `plugin/skills/diagnose-bug/PROCEDURE.md` — 근본 원인 분석 프레임워크
@@ -269,6 +283,8 @@ self-review loop:
 ---
 
 ## P5-8. 작업 유형별 파이프라인 분기 [NEW] `L` ← RI-18, RI-19 반영으로 난이도 상향
+
+**상태**: ✅ 완료. **RI-18**: `orchestrator.md §6.1 + planner.md §7` Code Review 변형 (review-report.md 포맷 + 종결 처리). **RI-19**: `orchestrator.md §6.2 + planner.md §8` Release 변형 (release-summary.md + EVALUATION 전체 수트 + 태그+CHANGELOG 종결, 사용자 확인 게이트).
 
 **핵심 로직**:
 
@@ -361,6 +377,8 @@ COMPLETION (Release 모드):
 ---
 
 ## P5-9. Hook 구현 [NEW] `M`
+
+**상태**: ✅ 완료. `plugin/hooks/hooks.json` PostToolUse 매핑 + `on-agent-complete.sh` (서브에이전트 종료 로깅) + `on-commit.sh` (커밋 hash + subject + stat을 ticket 워크스페이스 impl.log에 기록). 두 스크립트 모두 fail-open: 비-git 환경 등에서도 exit 0.
 
 **파일**: `plugin/hooks/hooks.json` (활성화) + `plugin/hooks/on-agent-complete.js`, `plugin/hooks/on-commit.js`
 
