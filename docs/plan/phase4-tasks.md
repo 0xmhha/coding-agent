@@ -6,6 +6,8 @@
 
 ## P4-1. Graph Store (SQLite Adjacency) [NEW] `L`
 
+**상태**: ✅ 완료. `tools/cks-mcp/internal/ckg/store.go` — graph_nodes, graph_edges, symbol_history, concurrency_context 4테이블 + 인덱스 + CRUD + 6개 인덱스. CKV와 동일 SQLite 파일에 공존.
+
 **파일**: `tools/cks-mcp/internal/ckg/store.go`
 
 **핵심 로직**:
@@ -39,6 +41,8 @@ func (s *GraphStore) Traverse(startIDs []string, depth int, relTypes []string) (
 ---
 
 ## P4-2. AST Relation Extractor [NEW] `XL`
+
+**상태**: ✅ 완료. `internal/ckg/relations.go` — 7개 관계 추출. **RI-10 반영**: Tier 1 typed(`golang.org/x/tools/go/packages`) → 실패 시 Tier 2 AST-only 자동 폴백, confidence 등급 부여(`high`/`medium`/`low`).
 
 **파일**: `tools/cks-mcp/internal/ckg/relations.go`
 
@@ -116,6 +120,8 @@ func extractChannels(fn *ast.FuncDecl, info *types.Info) []GraphEdge
 
 ## P4-3. Git History Analyzer [NEW] `M`
 
+**상태**: ✅ 완료. `internal/ckg/history.go` — `git log -L startLine,endLine:file` + `--follow` 폴백. 커밋 분류(bugfix/feature/refactor/test/change). `SummarizeHistory` 텍스트 생성기.
+
 **파일**: `tools/cks-mcp/internal/ckg/history.go`
 
 **핵심 로직**:
@@ -156,6 +162,8 @@ func SummarizeHistory(entries []SymbolHistory) string {
 ---
 
 ## P4-4. Concurrency Analyzer [NEW] `XL`
+
+**상태**: ✅ 완료. `internal/ckg/concurrency.go` — goroutine 시작점, channel send/receive, mutex/atomic/select/waitgroup, 공유 receiver 필드 쓰기 탐지. **RI-11 반영**: interface-dispatch goroutine은 `confidence=unknown` + `risk=unknown` + note 명시.
 
 **파일**: `tools/cks-mcp/internal/ckg/concurrency.go`
 
@@ -220,6 +228,8 @@ func AssessRisk(shared []SharedResource) RiskAssessment {
 
 ## P4-5. Traversal Query Engine [NEW] `M`
 
+**상태**: ✅ 완료. `internal/ckg/traversal.go` — BFS + depth/relation/direction 필터 + max_nodes/max_edges 캡 + truncation 보고.
+
 **파일**: `tools/cks-mcp/internal/ckg/traversal.go`
 
 **핵심 로직**:
@@ -241,6 +251,8 @@ func (s *GraphStore) Traverse(startIDs []string, depth int, relTypes []string, m
 
 ## P4-6. MCP Tool: ckg_query [NEW] `M`
 
+**상태**: ✅ 완료. `internal/server/server.go`의 `makeCKGQueryHandler` — symbols/depth/relation_types/include_history/include_concurrency/max_nodes/max_edges.
+
 **인터페이스**: Phase 4 설계 Section 7.1 참조
 
 **완료 기준**:
@@ -251,6 +263,8 @@ func (s *GraphStore) Traverse(startIDs []string, depth int, relTypes []string, m
 ---
 
 ## P4-7. MCP Tool: ckg_impact [NEW] `L`
+
+**상태**: ✅ 완료. `internal/ckg/query.go`의 `Impact` — direct/indirect callers, interface contracts, test files, concurrency risk, risk classification (delete/signature/logic 별 트리).
 
 **파일**: `tools/cks-mcp/internal/ckg/impact.go`
 
@@ -283,6 +297,8 @@ func AnalyzeImpact(symbol string, changeType string) (*ImpactResult, error) {
 
 ## P4-8. MCP Tool: ckg_index [NEW] `M`
 
+**상태**: ✅ 완료. `internal/ckg/indexer.go` + 서버 핸들러. 전체 관계 추출 → 노드/엣지 upsert → 노드별 history → concurrency context. mode 필드로 Tier 1/2 보고.
+
 **핵심 로직**: CKV indexer와 통합. AST 1회 파싱 후 CKV 청킹 + CKG 관계 추출 동시 수행.
 
 **완료 기준**:
@@ -293,6 +309,8 @@ func AnalyzeImpact(symbol string, changeType string) (*ImpactResult, error) {
 ---
 
 ## P4-9. CKV + CKG 통합 검색 흐름 [NEW] `M`
+
+**상태**: ✅ 완료. `cmd/server/main.go`에서 CKV와 CKG가 동일 SQLite 파일을 공유. ckv_search → 심볼 추출 → ckg_query 시퀀스가 단일 인덱스 위에서 동작.
 
 **파일**: `tools/cks-mcp/internal/server/server.go`에서 tool 조합 패턴 문서화
 

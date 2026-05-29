@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/0xmhha/coding-agent/tools/cks-mcp/internal/ckg"
 	"github.com/0xmhha/coding-agent/tools/cks-mcp/internal/ckv"
 	srv "github.com/0xmhha/coding-agent/tools/cks-mcp/internal/server"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -65,15 +66,28 @@ func run() error {
 	search := ckv.NewSearchService(store, embedder, ckv.NewReranker())
 	indexer := ckv.NewIndexer(store, embedder)
 
+	// CKG shares the same SQLite path so a single index file holds both
+	// the vector chunks and the graph.
+	ckgStore, err := ckg.Open(indexPath)
+	if err != nil {
+		return fmt.Errorf("open ckg store: %w", err)
+	}
+	defer ckgStore.Close()
+	ckgQuery := ckg.NewQueryService(ckgStore)
+	ckgIndexer := ckg.NewIndexer(ckgStore)
+
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "cks",
 		Version: "0.1.0",
 	}, nil)
 	srv.Register(server, srv.Deps{
-		Store:    store,
-		Embedder: embedder,
-		Search:   search,
-		Indexer:  indexer,
+		Store:      store,
+		Embedder:   embedder,
+		Search:     search,
+		Indexer:    indexer,
+		CKGStore:   ckgStore,
+		CKGQuery:   ckgQuery,
+		CKGIndexer: ckgIndexer,
 	})
 
 	transport := &mcp.StdioTransport{}

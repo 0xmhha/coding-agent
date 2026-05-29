@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/0xmhha/coding-agent/tools/cks-mcp/internal/ckg"
 	"github.com/0xmhha/coding-agent/tools/cks-mcp/internal/ckv"
 	"github.com/0xmhha/coding-agent/tools/cks-mcp/internal/types"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -16,10 +17,13 @@ import (
 // Deps is the wiring point for handlers. Either fields may be nil — Search
 // requires Store + (embedder optional), Index requires Store + (embedder optional).
 type Deps struct {
-	Store    *ckv.Store
-	Embedder ckv.Embedder // may be nil → BM25 fallback
-	Search   *ckv.SearchService
-	Indexer  *ckv.Indexer
+	Store        *ckv.Store
+	Embedder     ckv.Embedder // may be nil → BM25 fallback
+	Search       *ckv.SearchService
+	Indexer      *ckv.Indexer
+	CKGStore     *ckg.Store
+	CKGQuery     *ckg.QueryService
+	CKGIndexer   *ckg.Indexer
 }
 
 // Register attaches all CKS tools to s.
@@ -37,6 +41,24 @@ func Register(s *mcp.Server, deps Deps) {
 			"Mode 'full' walks the project; 'incremental' uses git diff from the last indexed commit. " +
 			"Provide modules to prioritize a subset of top-level directories.",
 	}, makeIndexHandler(deps))
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "ckg_query",
+		Description: "Traverse the code knowledge graph from one or more seed symbols. " +
+			"Returns nodes + edges; optionally include git history and concurrency context.",
+	}, makeCKGQueryHandler(deps))
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "ckg_impact",
+		Description: "Analyze the blast radius of changing a symbol. Returns direct/indirect callers, " +
+			"interface contracts, test files, concurrency risk, and a high-level risk classification.",
+	}, makeCKGImpactHandler(deps))
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "ckg_index",
+		Description: "Build or refresh the CKG (relations + history + concurrency). " +
+			"Runs the typed extractor with a Tier-2 AST-only fallback when packages.Load fails (RI-10).",
+	}, makeCKGIndexHandler(deps))
 }
 
 // --- Inputs ---
@@ -111,6 +133,83 @@ func makeIndexHandler(deps Deps) mcp.ToolHandlerFor[ckvIndexInput, types.IndexSt
 			Modules:     in.Modules,
 			SinceCommit: in.SinceCommit,
 		})
+		if err != nil {
+			return errResult("INTERNAL_ERROR", err.Error()), stats, nil
+		}
+		return nil, stats, nil
+	}
+}
+
+// --- CKG inputs ---
+
+type ckgQueryInput struct {
+	Symbols            []string `json:"symbols" jsonschema:"required,description=Seed symbols (qualified or short name)"`
+	Depth              int      `json:"depth,omitempty" jsonschema:"description=BFS depth (default 2)"`
+	RelationTypes      []string `json:"relation_types,omitempty"`
+	IncludeHistory     bool     `json:"include_history,omitempty"`
+	IncludeConcurrency bool     `json:"include_concurrency,omitempty"`
+	MaxNodes           int      `json:"max_nodes,omitempty"`
+	MaxEdges           int      `json:"max_edges,omitempty"`
+}
+
+type ckgImpactInput struct {
+	Symbol     string `json:"symbol" jsonschema:"required"`
+	ChangeType string `json:"change_type,omitempty" jsonschema:"description=signature|logic|delete (default logic)"`
+}
+
+type ckgIndexInput struct {
+	ProjectDir string `json:"project_dir" jsonschema:"required"`
+}
+
+// --- CKG handlers ---
+
+func makeCKGQueryHandler(deps Deps) mcp.ToolHandlerFor[ckgQueryInput, types.CKGQueryResult] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in ckgQueryInput) (*mcp.CallToolResult, types.CKGQueryResult, error) {
+		if deps.CKGQuery == nil {
+			return errResult("UNINITIALIZED", "ckg query service is not configured"), types.CKGQueryResult{}, nil
+		}
+		rels := make([]types.RelationType, 0, len(in.RelationTypes))
+		for _, r := range in.RelationTypes {
+			rels = append(rels, types.RelationType(r))
+		}
+		res, err := deps.CKGQuery.Query(ctx, ckg.QueryRequest{
+			Symbols:            in.Symbols,
+			Depth:              in.Depth,
+			RelationTypes:      rels,
+			IncludeHistory:     in.IncludeHistory,
+			IncludeConcurrency: in.IncludeConcurrency,
+			MaxNodes:           in.MaxNodes,
+			MaxEdges:           in.MaxEdges,
+		})
+		if err != nil {
+			return errResult("INTERNAL_ERROR", err.Error()), types.CKGQueryResult{}, nil
+		}
+		return nil, *res, nil
+	}
+}
+
+func makeCKGImpactHandler(deps Deps) mcp.ToolHandlerFor[ckgImpactInput, types.CKGImpactResult] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in ckgImpactInput) (*mcp.CallToolResult, types.CKGImpactResult, error) {
+		if deps.CKGQuery == nil {
+			return errResult("UNINITIALIZED", "ckg query service is not configured"), types.CKGImpactResult{}, nil
+		}
+		res, err := deps.CKGQuery.Impact(ctx, ckg.ImpactRequest{
+			Symbol:     in.Symbol,
+			ChangeType: in.ChangeType,
+		})
+		if err != nil {
+			return errResult("INTERNAL_ERROR", err.Error()), types.CKGImpactResult{}, nil
+		}
+		return nil, *res, nil
+	}
+}
+
+func makeCKGIndexHandler(deps Deps) mcp.ToolHandlerFor[ckgIndexInput, types.CKGIndexStats] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in ckgIndexInput) (*mcp.CallToolResult, types.CKGIndexStats, error) {
+		if deps.CKGIndexer == nil {
+			return errResult("UNINITIALIZED", "ckg indexer is not configured"), types.CKGIndexStats{}, nil
+		}
+		stats, err := deps.CKGIndexer.Run(ctx, in.ProjectDir)
 		if err != nil {
 			return errResult("INTERNAL_ERROR", err.Error()), stats, nil
 		}

@@ -189,3 +189,159 @@ type IndexMeta struct {
 	EmbedderMode string    `json:"embedder_mode"`
 	Dimension    int       `json:"dimension"`
 }
+
+// ------------- CKG (Code Knowledge Graph) types -------------
+
+// RelationType enumerates the edge kinds we extract from Go AST.
+type RelationType string
+
+const (
+	RelCalls       RelationType = "calls"
+	RelImplements  RelationType = "implements"
+	RelUsesType    RelationType = "uses_type"
+	RelEmbeds      RelationType = "embeds"
+	RelReadsField  RelationType = "reads_field"
+	RelWritesField RelationType = "writes_field"
+	RelChannels    RelationType = "channels"
+)
+
+// ConfidenceLevel reports how reliable a CKG extraction is.
+// RI-10/11: when type info is missing or the pattern is interface-dispatch,
+// confidence drops so the consumer can adjust its decisions.
+type ConfidenceLevel string
+
+const (
+	ConfidenceHigh    ConfidenceLevel = "high"
+	ConfidenceMedium  ConfidenceLevel = "medium"
+	ConfidenceLow     ConfidenceLevel = "low"
+	ConfidenceUnknown ConfidenceLevel = "unknown"
+)
+
+// GraphNode is a code symbol in the CKG.
+type GraphNode struct {
+	ID            string     `json:"id"`             // sha256(package + qualified_name)[:16]
+	FilePath      string     `json:"file_path"`
+	PackageName   string     `json:"package_name"`
+	SymbolName    string     `json:"symbol_name"`
+	SymbolType    SymbolType `json:"symbol_type"`
+	QualifiedName string     `json:"qualified_name"` // "pkg.(*T).Method"
+	Signature     string     `json:"signature,omitempty"`
+	CodeSnippet   string     `json:"code_snippet,omitempty"` // up to ~20 lines
+	StartLine     int        `json:"start_line"`
+	EndLine       int        `json:"end_line"`
+	IndexedAt     time.Time  `json:"indexed_at"`
+}
+
+// GraphEdge connects two graph nodes by a typed relationship.
+type GraphEdge struct {
+	FromNode     string         `json:"from"`
+	ToNode       string         `json:"to"`
+	RelationType RelationType   `json:"relation_type"`
+	Confidence   ConfidenceLevel `json:"confidence"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+}
+
+// SymbolHistoryEntry is one git commit touching a node.
+type SymbolHistoryEntry struct {
+	NodeID        string `json:"node_id"`
+	CommitHash    string `json:"hash"`
+	CommitMessage string `json:"message"`
+	CommitDate    string `json:"date"`
+	Author        string `json:"author"`
+	DiffSummary   string `json:"diff_summary"`
+	ChangeType    string `json:"change_type"` // bugfix|feature|refactor|test|change
+}
+
+// ChannelOperation describes one send / receive on a channel.
+type ChannelOperation struct {
+	Channel   string `json:"channel"`
+	Direction string `json:"direction"` // "send" | "receive" | "both"
+	Type      string `json:"type"`
+}
+
+// SyncMechanism reports a synchronization primitive observed in a node.
+type SyncMechanism struct {
+	Type     string `json:"type"` // mutex | rwmutex | waitgroup | context | atomic | select
+	Variable string `json:"variable,omitempty"`
+	Scope    string `json:"scope"` // "entire_function" | "partial"
+}
+
+// SharedResource describes a struct field touched by multiple goroutines.
+type SharedResource struct {
+	Resource       string   `json:"resource"`
+	AccessType     string   `json:"access_type"` // "read" | "write" | "read_write"
+	ProtectedBy    string   `json:"protected_by,omitempty"`
+	OtherAccessors []string `json:"other_accessors,omitempty"`
+}
+
+// RiskAssessment summarizes race-condition risk for a node.
+type RiskAssessment struct {
+	RaceConditionRisk        string   `json:"race_condition_risk"` // none|low|medium|high|unknown
+	UnprotectedSharedAccess  []string `json:"unprotected_shared_access,omitempty"`
+	DeadlockPotential        []string `json:"deadlock_potential,omitempty"`
+	Note                     string   `json:"note,omitempty"`
+}
+
+// ConcurrencyContext captures everything CKG knows about a node's concurrency
+// behaviour. Fields without information are omitted from JSON output.
+type ConcurrencyContext struct {
+	NodeID             string             `json:"node_id"`
+	GoroutineContext   GoroutineContext   `json:"goroutine_context"`
+	SharedResources    []SharedResource   `json:"shared_resources,omitempty"`
+	ChannelOperations  []ChannelOperation `json:"channel_operations,omitempty"`
+	SyncMechanisms     []SyncMechanism    `json:"sync_mechanisms,omitempty"`
+	Risk               RiskAssessment     `json:"risk_assessment"`
+	Confidence         ConfidenceLevel    `json:"confidence"`
+}
+
+// GoroutineContext lists callers/callees that involve goroutine launches.
+type GoroutineContext struct {
+	LaunchedBy []string `json:"launched_by,omitempty"`
+	Launches   []string `json:"launches,omitempty"`
+}
+
+// CKGQueryResult is the structured output of ckg_query.
+type CKGQueryResult struct {
+	Nodes              []GraphNode          `json:"nodes"`
+	Edges              []GraphEdge          `json:"edges"`
+	History            []SymbolHistoryEntry `json:"history,omitempty"`
+	ConcurrencyImpact  []ConcurrencyContext `json:"concurrency_impact,omitempty"`
+	Metadata           CKGQueryMetadata     `json:"metadata"`
+}
+
+// CKGQueryMetadata reports query-level stats.
+type CKGQueryMetadata struct {
+	TotalNodes  int   `json:"total_nodes"`
+	TotalEdges  int   `json:"total_edges"`
+	Truncated   bool  `json:"truncated"`
+	QueryTimeMs int64 `json:"query_time_ms"`
+}
+
+// CKGImpactResult is the structured output of ckg_impact.
+type CKGImpactResult struct {
+	Symbol                string           `json:"symbol"`
+	DirectCallers         []string         `json:"direct_callers"`
+	IndirectCallers       []string         `json:"indirect_callers"`
+	InterfaceContracts    []string         `json:"interface_contracts"`
+	TestFiles             []string         `json:"test_files"`
+	ConcurrencyRisk       ConcurrencyImpact `json:"concurrency_risk"`
+	RecommendedTestScope  []string         `json:"recommended_test_scope"`
+	RiskLevel             string           `json:"risk_level"` // low|medium|high|critical
+	RiskExplanation       string           `json:"risk_explanation"`
+}
+
+// ConcurrencyImpact summarizes shared resource impact for ckg_impact.
+type ConcurrencyImpact struct {
+	AffectedGoroutines       []string `json:"affected_goroutines"`
+	SharedResourceConflicts  []string `json:"shared_resource_conflicts"`
+}
+
+// CKGIndexStats reports a CKG indexing run.
+type CKGIndexStats struct {
+	NodesCreated       int   `json:"nodes_created"`
+	EdgesCreated       int   `json:"edges_created"`
+	HistoryEntries     int   `json:"history_entries"`
+	ConcurrencyContexts int  `json:"concurrency_contexts"`
+	DurationMs         int64 `json:"duration_ms"`
+	Mode               string `json:"mode"` // "typed" or "ast_only" (RI-10)
+}
