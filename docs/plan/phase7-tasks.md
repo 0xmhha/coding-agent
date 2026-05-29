@@ -6,6 +6,8 @@
 
 ## P7-1. PR 자동 생성 [ADAPT] `M`
 
+**상태**: ✅ 완료. `plugin/agents/orchestrator.md §4` — branch push → body 조립(Jira/Summary/Changes/Test/Impact/Acceptance) → pr-sanitize 적용 → `gh pr create` → 라벨 → state 업데이트. push 실패는 state 진행 금지.
+
 **파일**: `plugin/agents/orchestrator.md`의 COMPLETION 처리
 
 **입력**: EVALUATION_PASS 상태의 workspace
@@ -53,6 +55,8 @@
 
 ## P7-2. Jira 연동 (PR 후) [NEW] `S`
 
+**상태**: ✅ 완료. `orchestrator.md §4 step 6` — jira_add_comment(PR URL) + jira_update_status("In Review"). 실패는 경고만, 파이프라인 중단하지 않음.
+
 **핵심 로직**:
 ```
 jira-gateway: jira_add_comment(ticket_id, "PR created: {pr_url}")
@@ -69,6 +73,8 @@ jira-gateway: jira_update_status(ticket_id, "In Review")
 ---
 
 ## P7-3. /review 코멘트 파싱 + 구조화 [NEW] `L`
+
+**상태**: ✅ 완료. `plugin/commands/review.md` — gh API로 inline+review 코멘트 수집, LLM으로 7유형 × 4심각도 분류, review-feedback-{N}.md 생성, ANALYSIS 재진입.
 
 **파일**: `commands/review.md`의 내부 로직
 
@@ -126,6 +132,8 @@ jira-gateway: jira_update_status(ticket_id, "In Review")
 
 ## P7-4. 리뷰 기반 재작업 [ADAPT] `L`
 
+**상태**: ✅ 완료. `planner.md §6` bugfix 모드 (plan-fix-{N}.md → 추가 커밋) + `orchestrator.md §4.1` review_cycle re-publish (브랜치 push + 코멘트 reply + 리뷰 재요청). state는 COMPLETION 유지 (PR 그대로).
+
 **핵심 로직**:
 ```
 1. Planner 리뷰 모드
@@ -160,6 +168,8 @@ jira-gateway: jira_update_status(ticket_id, "In Review")
 
 ## P7-5. /merge 구현 [ADAPT] `M`
 
+**상태**: ✅ 완료. `plugin/commands/merge.md` — 5단계 precondition(인증/PR open/approved/checks/mergeable) → **RI-14 두 단계 commit body** (≤10 step 전체 / 11+ step 카테고리 버킷) → pr-sanitize → `gh pr merge --squash --delete-branch`. 모든 외부 액션 로깅.
+
 **파일**: `commands/merge.md`의 내부 로직
 
 **핵심 로직**: Phase 1 P1-5 상세 참조
@@ -174,6 +184,8 @@ jira-gateway: jira_update_status(ticket_id, "In Review")
 ---
 
 ## P7-6. Merge 후 처리 [ADAPT] `M`
+
+**상태**: ✅ 완료. `merge.md §6` — Jira status=Complete + 댓글(merge hash) + main pull --ff-only + 안전한 로컬 브랜치 정리(`--merged` 확인 후 `-d`만, 절대 `-D` 금지) + state.COMPLETION.{merged_at, merge_commit} + current_state="COMPLETED".
 
 **핵심 로직**:
 ```
@@ -194,6 +206,8 @@ merge 성공 후:
 ---
 
 ## P7-7. PR body 민감정보 스캔 [NEW] `S`
+
+**상태**: ✅ 완료. `plugin/skills/pr-sanitize/SKILL.md` — shared/patterns.json 기반 regex + entropy, REDACT/BLOCK/WARN 분류, fail-safe(파일 미존재 → BLOCKED). Orchestrator §4(PR body), /merge §4–§6(squash body/comment/title), §4.1(reply body)에서 모두 호출.
 
 **핵심 로직**:
 ```

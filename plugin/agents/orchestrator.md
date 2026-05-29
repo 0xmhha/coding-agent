@@ -124,8 +124,7 @@ When the Evaluator reports all stages green:
    bash: git push -u origin {branch}
    Failure → report to user, do NOT mark COMPLETED.
 
-3. Assemble PR body
-   sections:
+3. Assemble PR body (sections appended in order; sanitize each)
      ## Jira → {JIRA_BASE_URL}/browse/{ticket_id}
      ## Summary → first paragraph of analysis.md
      ## Changes → for each step in plan_progress.steps:
@@ -135,13 +134,25 @@ When the Evaluator reports all stages green:
                   + affected modules)
      ## Acceptance Criteria → ticket.parsed_template.fields.acceptance_criteria
 
-   Before creating the PR, run a sensitive-info scan on the body. If patterns
-   are detected, strip the offending section and add a note instead. NEVER
-   include a redacted secret value in the PR body.
+   Run the pr-sanitize skill on the assembled body (P7-7):
+
+     result = pr-sanitize.scan(text=body, context="pr_body")
+     if not result.ok:
+        abort PR creation. Surface result.blocked_patterns to the user with
+        the suggested action ("edit the source artifact and re-run").
+        Do NOT advance state.
+     if result.scan_result == "REDACTED":
+        confirm with the user before proceeding (prefer fixing the source
+        per pr-sanitize §4).
+     body = result.text
+
+   Sanitize the title separately:
+     title = pr-sanitize.scan(
+       text="{ticket_id}: {summary}", context="pr_title").text
 
 4. Create PR
    bash: gh pr create \
-     --title "{ticket_id}: {summary}" \
+     --title "{title}" \
      --body "{body}" \
      --base main \
      --head {branch}
@@ -166,6 +177,45 @@ When the Evaluator reports all stages green:
 ```
 
 If step 2 (push) fails, the Orchestrator must NOT advance the state.
+
+### 4.1 Variant: review_cycle re-publish (after /review fix loop)
+
+When the pipeline reached EVALUATION_PASS via a review_cycle (mode came in
+through /review and the Implementer pushed additional fix commits), the
+Orchestrator updates the existing PR rather than creating a new one:
+
+```
+1. The branch already exists on the remote. Push the new commits:
+   bash: git push origin {branch}
+
+2. Skip `gh pr create` — the PR is already open.
+
+3. Reply to each addressed review comment (P7-4):
+   read {workspace}/review-feedback-{N}.md (highest N)
+   for each comment in that file:
+     - find the commit(s) that resolved it (look at the commits added since
+       the previous PR head; match step.description to the comment classifier)
+     - body = "Addressed in {commit_hash}: {one-line how}"
+     - body = pr-sanitize.scan(text=body, context="pr_review_reply").text
+     - bash: gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+             -f body="{body}"
+     Failures here are warnings; the human reviewer can still see the new commits.
+
+4. Re-request review when appropriate:
+   bash: gh pr edit {pr_number} --add-reviewer "<reviewer_login>"   (per reviewer)
+
+5. Jira note (best-effort):
+   jira_add_comment(ticket_id, "Review feedback addressed in {commit_range}")
+
+6. State stays at COMPLETION (the PR remains the COMPLETION artifact).
+   Do NOT regress to ANALYSIS or set COMPLETED — wait for either another
+   /review cycle or /merge.
+```
+
+The Orchestrator runs §4.1 when it observes `state.states.COMPLETION.pr_url`
+already set at the time it would otherwise enter §4. This is also why §4
+step 7 keeps `COMPLETION.status` at `"in_progress"` — the only thing that
+advances it to `"completed"` is `/coding-agent:merge`.
 
 ---
 
