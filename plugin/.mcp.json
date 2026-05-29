@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "jira-gateway": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/../tools/jira-gateway-mcp/bin/jira-gateway-mcp",
+      "args": [],
+      "env": {
+        "JIRA_BASE_URL": "${JIRA_BASE_URL}",
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}",
+        "JIRA_USER_EMAIL": "${JIRA_USER_EMAIL}",
+        "PATTERNS_PATH": "${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json"
+      }
+    }
+  }
+}

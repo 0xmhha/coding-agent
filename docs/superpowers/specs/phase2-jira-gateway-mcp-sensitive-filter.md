@@ -50,12 +50,14 @@ Agent(LLM)
 
 ### 2.1 구현 언어 및 프레임워크
 
-**TypeScript** + `@modelcontextprotocol/sdk`
+**Go** + `github.com/modelcontextprotocol/go-sdk`
 
 이유:
-- MCP SDK의 공식 TypeScript 지원이 가장 성숙
-- Atlassian MCP도 TypeScript 기반으로 상호 운용성 용이
-- JSON 처리, 정규식 매칭에 TypeScript가 적합
+- cks-mcp(Go)와 동일 툴체인 → 단일 빌드/테스트 명령
+- go-stablenet 팀이 Go 개발자라 유지보수 용이
+- npm/Node.js 추가 도구체인 불필요
+- Go 표준 라이브러리만으로 HTTP/JSON/regex/AST 처리 충분
+- Proxy는 Atlassian MCP를 우회하고 Jira REST API를 직접 호출하므로 TypeScript 생태계 의존 불필요
 
 ### 2.2 제공 MCP Tools
 

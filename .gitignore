@@ -1,15 +1,23 @@
 # coding-agent work artifacts
 .coding-agent/
 
-# Node (jira-gateway-mcp)
+# Secrets
+.env
+.env.local
+.env.production
+
+# Tooling build outputs
+/tools/*/bin/
+/tools/*/dist/
+/tools/*/coverage.out
+
+# Go
+*.db
+*.test
+
+# Node (legacy — TypeScript proxy removed in favor of Go)
 node_modules/
 dist/
-.env
-.env.*
-
-# Go (cks-mcp)
-/cks-mcp/bin/
-/cks-mcp/*.db
 
 # OS
 .DS_Store

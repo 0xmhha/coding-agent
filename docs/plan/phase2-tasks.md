@@ -6,32 +6,30 @@
 
 ## P2-1. Jira Gateway MCP 서버 프로젝트 생성 [NEW] `M`
 
-**파일**: `tools/jira-gateway-mcp/` 전체
+**상태**: ✅ 완료 (Go로 구현)
 
-**입력**: 없음 (프로젝트 스캐폴딩)
+**파일**: `tools/jira-gateway-mcp/` 전체
 
 **산출물**:
 ```
 tools/jira-gateway-mcp/
-├── package.json          # name: @coding-agent/jira-gateway-mcp
-├── tsconfig.json         # strict, ESM
-├── src/
-│   ├── index.ts          # MCP server 진입점 (stdio transport)
-│   ├── server.ts         # tool 등록 + 라우팅
-│   ├── tools/            # P2-5에서 구현
-│   ├── filter/           # P2-3에서 구현
-│   ├── upstream/         # P2-2에서 구현
-│   └── types.ts          # 공유 타입
-├── tests/                # P2-6에서 구현
-└── .env.example          # JIRA_BASE_URL, JIRA_API_TOKEN, JIRA_USER_EMAIL
+├── go.mod                              # module github.com/0xmhha/coding-agent/tools/jira-gateway-mcp
+├── go.sum
+├── cmd/server/main.go                  # stdio MCP server 진입점
+├── internal/
+│   ├── server/server.go                # 6개 tool 등록 + 핸들러
+│   ├── jira/{client.go, adf.go}        # Jira REST + ADF→Markdown
+│   ├── filter/{engine.go, patterns.go, entropy.go, redactor.go}
+│   └── types/types.go                  # 공유 타입
+├── .env.example
+└── README.md
 ```
 
-> ⚠️ **RI-22**: shared/patterns.json 접근 — TypeScript에서는 런타임 fs.readFile로
-> `../../shared/patterns.json` 상대 경로 로드. 또는 .mcp.json의 env에서
-> `PATTERNS_PATH` 환경변수로 경로 주입 (권장).
+> ✅ **RI-22**: shared/patterns.json 접근은 환경변수 `PATTERNS_PATH`로 주입.
+> 미설정 시 `runtime.Caller`로 자동 탐색 (project root/shared/patterns.json).
 
-> ⚠️ **RI-01 + RI-15**: 이 Phase 시작 시 `.mcp.json`을 프로젝트 루트에 생성하여
-> jira-gateway MCP 서버를 등록해야 한다. 환경변수(JIRA_BASE_URL 등)도 함께 설정.
+> ✅ **RI-01 + RI-15**: `plugin/.mcp.json`에 `jira-gateway` 서버 등록 완료.
+> `${CLAUDE_PLUGIN_ROOT}/../tools/jira-gateway-mcp/bin/jira-gateway-mcp` 실행.
 
 **핵심 로직**:
 ```typescript
@@ -57,6 +55,8 @@ await server.connect(transport);
 ---
 
 ## P2-2. Jira REST API 클라이언트 [NEW] `M`
+
+**상태**: ✅ 완료 (`internal/jira/client.go` + `adf.go`). RI-04(ADF→Markdown), RI-05(transitions 조회) 반영.
 
 **파일**: `tools/jira-gateway-mcp/src/upstream/jira-client.ts`
 
@@ -103,6 +103,8 @@ class JiraClient {
 ---
 
 ## P2-3. Sensitive Filter 엔진 [NEW] `L`
+
+**상태**: ✅ 완료 (`internal/filter/`: engine, patterns, entropy, redactor). RI-06 fail-safe 반영.
 
 **파일**: `tools/jira-gateway-mcp/src/filter/`
 
@@ -213,6 +215,8 @@ function blocked(matches: Match[]): FilterResult {
 
 ## P2-5. MCP Tool 등록 [NEW] `M`
 
+**상태**: ✅ 완료 (`internal/server/server.go`). 6개 tool 등록: read 3개(필터 적용) + write 3개(passthrough).
+
 **파일**: `tools/jira-gateway-mcp/src/tools/`
 
 **핵심 로직**:
@@ -268,6 +272,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 ## P2-6. 필터 단위 테스트 [NEW] `M`
 
+**상태**: ✅ 완료. `internal/filter/{entropy,redactor,engine}_test.go` + `internal/jira/adf_test.go`. 모두 통과.
+
 **파일**: `tools/jira-gateway-mcp/tests/`
 
 **테스트 케이스**:
@@ -300,6 +306,8 @@ redactor.test.ts:
 ---
 
 ## P2-7. 패턴 커스터마이징 [NEW] `S`
+
+**상태**: ✅ 완료. `internal/filter/patterns.go`의 `mergeByID` + `resolveCustomPatternsPath`.
 
 **파일**: patterns.ts의 loadPatterns() 내부
 
