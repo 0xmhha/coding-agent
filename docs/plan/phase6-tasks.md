@@ -6,6 +6,8 @@
 
 ## P6-1. Evaluator Agent 구현 [ADAPT] `L`
 
+**상태**: ✅ 완료. `plugin/agents/evaluator.md` — bootstrap(state + go build) → 4-stage 순차 실행 → 통합 리포트 + failure_log → 상태 전이. 모든 stage 결과 한 번에 보고.
+
 **파일**: `plugin/agents/evaluator.md` 완성
 
 **입력**: workspace_dir (구현 완료된 브랜치)
@@ -43,6 +45,8 @@ evaluator(workspace_dir):
 ---
 
 ## P6-2. Stage 1: Unit Test [NEW] `M`
+
+**상태**: ✅ 완료. `evaluator.md §4` — 전체 + 변경 패키지 커버리지 + **RI-21 `-race`** (related-code.json의 concurrency_impact + consensus/txpool/miner 우선) + 결과 파싱(passed/failed/skipped + race 탐지).
 
 **핵심 로직**:
 ```bash
@@ -91,7 +95,9 @@ go test -race 출력에서:
 
 ---
 
-## P6-3. Stage 2: Lint & Format [ADAPT] `S`
+## P6-3. Stage 2: Lint & Format [NEW] `S`
+
+**상태**: ✅ 완료. `evaluator.md §5` — golangci-lint JSON + gofmt -l + goimports -l. error → FAIL, format 위반도 FAIL (style drift 방지).
 
 **핵심 로직**:
 ```bash
@@ -110,7 +116,9 @@ goimports -d . 2>&1 | tee logs/imports.log
 
 ---
 
-## P6-4. Stage 3: Security Scan [ADAPT] `M`
+## P6-4. Stage 3: Security Scan [NEW] `M`
+
+**상태**: ✅ 완료. `evaluator.md §6` — go vet + gosec(optional) + diff-targeted 4가지 패턴(하드코딩 시크릿, unsafe, 에러 무시, 신규 공유필드 미보호). critical/high → FAIL.
 
 **핵심 로직**:
 ```bash
@@ -139,6 +147,8 @@ gosec ./... 2>&1 | tee logs/gosec.log
 ---
 
 ## P6-5. Stage 4: ChainBench Integration Test [NEW] `XL`
+
+**상태**: ✅ 완료. `evaluator.md §7` — **RI-20 사전 도구 검증** (예상 도구 5개와 실제 비교) → 빌드 → setup → start+stabilize → 5min monitoring → 표준 tx 테스트 → **finally cleanup 보장**. 20분 총 타임아웃.
 
 > ⚠️ **RI-20**: 아래 tool 인터페이스(chainbench_setup, chainbench_start 등)는
 > Phase 6 설계에서 **예상한** 이름이다. 실제 ChainBench MCP의 tool 이름/파라미터와
@@ -199,6 +209,8 @@ gosec ./... 2>&1 | tee logs/gosec.log
 
 ## P6-6. test-report.md 생성기 [NEW] `M`
 
+**상태**: ✅ 완료. `evaluator.md §8` — Summary 표 + 4 stage 상세 + Failure Analysis (FAIL 시) + 사이클별 보존(test-report-{N}.md).
+
 **핵심 로직**:
 ```
 4-stage 결과를 마크다운 리포트로 조합:
@@ -226,6 +238,8 @@ Commit: {HEAD hash}
 ---
 
 ## P6-7. failure_log 자동 기록 [ADAPT] `M`
+
+**상태**: ✅ 완료. `evaluator.md §9` — 다중 stage FAIL을 단일 consolidated entry로 병합 (전체 상황 한눈에). agent_analysis 포함, resolution.transitioned_to는 Orchestrator가 결정.
 
 **핵심 로직**:
 ```
