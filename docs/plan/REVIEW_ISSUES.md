@@ -362,7 +362,7 @@
 
 ## RI-16. 초기 셋업 가이드 부재 [공통]
 
-**상태**: `OPEN`
+**상태**: `RESOLVED` — `docs/SETUP.md` 작성 완료. 10개 섹션(prerequisites → 빌드 → env → 플러그인 설치 → 인덱싱 → smoke test → 실제 워크플로우 → 트러블슈팅). Troubleshooting §9에 RI-08/RI-13/RI-20/RI-22 발생 시 해결 방법 명시.
 
 **문제**: 플러그인을 처음 사용하는 개발자를 위한 셋업 가이드가 없다. Jira API token, Ollama 설치, ChainBench MCP 연결, go-stablenet 경로 등 사전 설정이 필요하다.
 
