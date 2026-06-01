@@ -5,10 +5,11 @@
 
 | 항목 | 값 |
 |------|----|
-| 작성일 | 2026-05-29 |
-| 마지막 커밋 | `2d9cec6 docs: mark all 23 review issues resolved with audit summary` |
-| 브랜치 | `main` (origin보다 3 commits 앞섬, push 안 됨) |
-| 작업 진행률 | Phase 1~7 + RI-01~23 + SETUP.md 모두 완료. 다음 단계는 §7 "남은 작업" 참조 |
+| 작성일 (최초) | 2026-05-29 |
+| 최종 갱신 | 2026-06-01 — code-level verification 보고서 반영 |
+| 마지막 커밋 | `9226b34 docs: add code-level implementation verification report` |
+| 브랜치 | `main` (origin과 동기화) |
+| 작업 진행률 | Phase 1·2·5·7 충실 구현. Phase 3·4·6에 코드 격차 발견 (§6.2·§7.1 F 참조). 문서/RI 상태와 코드 사이 일부 불일치 보정 진행 중 |
 
 ---
 
@@ -186,26 +187,33 @@ coding-agent/
 
 ## 6. 완료한 작업 (검증된 사실)
 
-### 6.1 Phase 단위
+### 6.1 Phase 단위 (2026-06-01 보정)
 
-| Phase | 작업 수 | 상태 | 주요 산출물 |
+| Phase | 작업 수 | 상태 | 주요 산출물 / 격차 |
 |-------|---------|------|-----------|
-| Phase 1 (Skeleton + State Machine) | 10 | ✅ | plugin manifest, 4 commands, state-machine/template-parse/stablenet-context skills, hook 골격 |
-| Phase 2 (Jira Gateway MCP) | 7 | ✅ | Go MCP server, ADF 변환, 6 tools, sensitive filter + fail-safe |
-| Phase 3 (CKV) | 10 | ✅ | Go AST chunker, Ollama probe, BM25, brute-force cosine, reranker, indexer |
-| Phase 4 (CKG) | 9 | ✅ | 7 relation types, Tier 1/2 fallback, history, concurrency, traversal, impact |
-| Phase 5 (Agent Pipeline) | 9 | ✅ | Orchestrator + Planner (4 modes) + Implementer + checkpoint + hooks |
-| Phase 6 (Evaluator) | 7 | ✅ | 4-stage (unit+race / lint / security / chainbench) + test-report + failure_log |
-| Phase 7 (PR + Review + Merge) | 7 | ✅ | PR body 조립, pr-sanitize, /review 7×4 분류, /merge 5-precondition |
-| 공통 | 4 | ✅ (Q-1/Q-2 부분만 분리 가능) | patterns.json, workspace 패턴, safeguards, evaluator logs |
+| Phase 1 (Skeleton + State Machine) | 10 | ✅ 충실 (초과) | plugin manifest, 4 commands, state-machine/template-parse/stablenet-context skills, hooks 동작 스크립트 |
+| Phase 2 (Jira Gateway MCP) | 7 | ✅ 충실 (43 tests pass) | Go MCP server, 자체 ADF 변환, 6 tools, sensitive filter + fail-safe. **누락**: `logs/sensitive-block-*.log` 감사파일, server/jira HTTP 단위 테스트 |
+| Phase 3 (CKV) | 10 | ⚠️ 동작하나 격차 (22 tests pass) | AST chunker / Ollama probe / BM25 / brute-force cosine / reranker / indexer 구현됨. **격차**: 배치 임베딩 누락(P3-3 수용 기준), "하이브리드"가 점수 융합이 아닌 단순 폴백, 구조체 >50필드 분할 미구현, 통합 테스트 부재 |
+| Phase 4 (CKG) | 9 | ⚠️ 정확도 미달 (9 tests pass, -race clean) | 4테이블 store, 7 관계, history+분류, 동시성 분석, BFS+impact 구현. **격차**: `calls`가 `_ = info`로 타입 무시한 이름 기반 매칭 (relations.go:657) → 동명 함수 오연결·interface→구현 엣지 없음. `channels`가 producer→consumer 매칭 없는 셀프루프 (relations.go:631). `code_snippet` 항상 빈 값, const/var 노드 미생성, `ckg_index` incremental 모드 없음, CKV+CKG 단일 AST 패스 통합 미달 |
+| Phase 5 (Agent Pipeline) | 9 | ✅ 충실 | Orchestrator + Planner(4 modes) + Implementer + checkpoint + hooks. **이슈**: 모든 에이전트가 비표준 모델 ID(`opus-4.7`/`sonnet-4.6`) 사용 — 런타임 resolve 실패 가능 |
+| Phase 6 (Evaluator) | 7 | ⚠️ Evaluator 사양만 완비 | Stage 1~3(unit+race/lint/security)는 spec 충실. **격차**: ChainBench 구현체 0건, `plugin/.mcp.json`에 chainbench 서버 미등록 → `mcp__chainbench__*` 호출 영구 resolve 실패 → Stage 4는 RI-20 §7.0 pre-flight에서 항상 BLOCKED |
+| Phase 7 (PR + Review + Merge) | 7 | ✅ 충실 | PR body 조립, pr-sanitize, /review 7×4 분류, /merge 5-precondition + size-aware body. **소소한 이탈**: 재리뷰가 `gh pr ready` 대신 `--add-reviewer`, 산출물명 `plan-review-{N}` → `plan-fix-{N}` |
+| 공통 | 4 | ✅ (Q-1/Q-2 부분만 별도 분리 가능) | patterns.json, workspace 패턴, safeguards, evaluator logs |
 
-### 6.2 Review Issue 감사
+> 격차의 상세 코드 위치와 권고는 `docs/plan/IMPLEMENTATION_VERIFICATION.md` (2026-05-31 검증 보고서) 참조. 이 문서가 발견한 격차는 §7.1 F (코드 격차 수정) 카테고리로 분류됨.
 
-`docs/plan/REVIEW_ISSUES.md` §"최종 감사 (2026-05-29)" 참조. 23개 모두 `RESOLVED` + 증거 (코드 경로/커밋 hash) 기록.
+### 6.2 Review Issue 감사 (2026-06-01 재평가)
+
+`docs/plan/REVIEW_ISSUES.md` §"최종 감사 (2026-05-29)"에서는 23개 모두 `RESOLVED` 선언. 2026-05-31 코드 검증 보고서가 일부 항목을 보정해야 함을 발견:
+
+| RI | 기존 상태 | 보정 후 실제 상태 | 사유 |
+|----|----------|-----------------|------|
+| RI-10 (AST Tier-1 typed) | RESOLVED | **PARTIALLY RESOLVED** | Tier-1 진입은 하지만 `calls` 추출에서 `_ = info`로 타입 정보 무시하고 이름 기반 lookup. "타입 기반 정확 추출" 주장 미달 |
+| RI-20 (ChainBench 인터페이스) | RESOLVED (사양 단계 완료) | **OPEN (코드 격차)** | Pre-flight 사양만 있고 `.mcp.json`에 chainbench 미등록 → tool 호출 자체가 영구 resolve 실패 |
+| RI-09 (인덱싱 시간) | RESOLVED | **PARTIALLY RESOLVED** | code_hash 캐시는 구현됐지만 배치 임베딩(P3-3 수용 기준) 미구현으로 worst-case 시간 미해소 |
 
 런타임 실증 잔존 (사용자 환경 종속):
-- **RI-20**: 실제 ChainBench MCP tool 이름은 §7.0 pre-flight가 첫 실행 시 자동 검증·BLOCKED
-- **RI-08, RI-09**: Ollama 가용성·인덱싱 시간은 호스트 자원 의존. BM25 폴백 + code_hash 캐시로 worst-case 흡수
+- **RI-08, 부분 RI-09**: Ollama 가용성. BM25 폴백 + code_hash 캐시로 worst-case 부분 흡수
 
 ### 6.3 SETUP.md (RI-16)
 
@@ -221,14 +229,29 @@ coding-agent/
 
 분류는 우선순위가 아니라 작업 성격. §7.5에 권장 순서.
 
-### 7.1 A. 품질 향상 (선택적)
+### 7.1 F. 코드 격차 수정 (2026-06-01 추가, 최우선)
+
+`docs/plan/IMPLEMENTATION_VERIFICATION.md`가 빌드/테스트와 코드 대조로 발견. 우리 문서가 "RESOLVED"라 선언했지만 코드 레벨로는 미달인 항목들.
+
+| ID | 작업 | 코드 위치 / 근거 | 영향받는 RI |
+|----|------|----------------|------------|
+| F-1 | **ChainBench MCP 등록 또는 외부 설정 안내** | `plugin/.mcp.json`에 `chainbench` 서버 항목 추가하거나 SETUP.md §5에 "사용자가 별도 등록해야 함"을 명시. 현재는 evaluator의 `mcp__chainbench__*` 호출이 영구 resolve 실패 | RI-20 OPEN으로 |
+| F-2 | **CKG `calls` 타입 기반 재구현** | `tools/cks-mcp/internal/ckg/relations.go:641-684 resolveCallEdge` — 이미 로드한 `types.Info`를 사용해 `*types.Func` resolve. `_ = info` 제거. interface dispatch 시 `types.Implements` 활용 | RI-10 PARTIALLY → RESOLVED 복원 |
+| F-3 | **CKG `channels` producer→consumer 매칭** | `tools/cks-mcp/internal/ckg/relations.go:619-639 chanEdge` — 셀프루프 대신 같은 채널 변수에 대한 send/recv 짝 매칭. AST 패스에서 채널 식별자 추적 |  |
+| F-4 | **CKV 배치 임베딩** | `tools/cks-mcp/internal/ckv/indexer.go:158` — 단건 호출 대신 N개 청크 묶어 `embedder.EmbedBatch` 추가. Ollama `/api/embed`는 배치 지원. P3-3 수용 기준 | RI-09 PARTIALLY → RESOLVED 복원 |
+| F-5 | **모델 ID 정정** | `plugin/agents/{orchestrator,planner,implementer,evaluator}.md` frontmatter의 `opus-4.7` → `claude-opus-4-7`, `sonnet-4.6` → `claude-sonnet-4-6` (또는 환경의 실제 alias로 검증) | 런타임 안전성 |
+| F-6 | **CKG incremental + 단일 AST 패스 통합** | `ckg/indexer.go`에 incremental 모드 추가, CKV indexer와 AST 패스 공유 | spec §9 통합 검색 흐름 |
+| F-7 | **문서 TypeScript 잔재 정리** | `docs/plan/common-tasks.md` (COMMON-1), `REVIEW_ISSUES.md` RI-15/RI-22 본문 일부 — Go 기준으로 갱신 | 문서 정확도 |
+| F-8 | **`code_snippet` 채우기, const/var 노드 생성** | CKG store에서 코드 스니펫 컬럼 활용, const/var 선언도 노드 생성 |  |
+
+### 7.2 A. 품질 향상 (선택적)
 
 | ID | 작업 | 범위 | 차단 요인 |
 |----|------|------|---------|
 | Q-1 | `workspace-helper` skill 추출 | 현재 `/work`, `/status`, `/review`, `/merge`에 4중 복제된 `.coding-agent/tickets/{id}_*` 패턴을 단일 skill로 추출 | 없음. 순수 리팩토링 |
 | Q-2 | 에이전트별 통일 로깅 | 현재 evaluator만 `{ws}/logs/eval-*.log` 출력. orchestrator/planner/implementer도 `{ws}/logs/{agent}.log` 패턴 적용 | 없음. SKILL/agent 문서 수정만 |
 
-### 7.2 B. 런타임 실증
+### 7.3 B. 런타임 실증
 
 | ID | 작업 | 범위 | 차단 요인 |
 |----|------|------|---------|
@@ -237,7 +260,7 @@ coding-agent/
 | R-3 | ChainBench MCP §7.0 pre-flight 실측 | 실제 tool 이름과 spec의 [chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop] 일치 검증. 불일치 시 evaluator.md §7.0 fallback 메시지에 spec 보정 안내 | ChainBench MCP 인스턴스 |
 | R-4 | /work → /review → /merge 풀 사이클 1회 | 단일 STABLE 티켓으로 end-to-end. 누락된 엣지 케이스 노출 | 실 Jira + go-stablenet PR 권한 + ChainBench |
 
-### 7.3 C. 운영성 / 배포
+### 7.4 C. 운영성 / 배포
 
 | ID | 작업 | 범위 | 차단 요인 |
 |----|------|------|---------|
@@ -246,21 +269,27 @@ coding-agent/
 | O-3 | GitHub Actions CI | 두 MCP 서버 빌드 + `go test ./...` + `go vet` | 없음 |
 | O-4 | v0.1.0 첫 릴리즈 | 빌드된 두 바이너리를 Releases에 첨부 → SETUP.md "Build from source" 스킵 가능 | O-3 통과 후 |
 
-### 7.4 D. 후속 확장 (Out of scope, 후순위)
+### 7.5 D. 후속 확장 (Out of scope, 후순위)
 
 - 다중 ticket 동시 처리 (현재 single workspace 락 가정)
 - GitLab/Gitea 지원 (현재 `gh` CLI/GitHub PR API 종속)
 - 다른 geth fork 지원 (stablenet-context skill 일반화)
 
-### 7.5 권장 진행 순서
+### 7.6 권장 진행 순서 (2026-06-01 재조정)
 
-가장 가치 높은 순:
-1. **O-1 (README.md)** — 1시간 미만. 현 상태 외부 공유 가능 베이스라인
-2. **O-3 (CI)** — 회귀 방지. 후속 변경 안전망
-3. **Q-1 (workspace-helper)** — 코드 중복 제거. 후속 명령 추가 비용 절감
-4. **R-2 (실 코드 인덱싱)** — RI-09 시간 추정 보정 + BM25 정확도 실측
-5. **O-4 (v0.1.0)** — 사용자 배포 채널 확보
-6. **R-1, R-3, R-4** — 실 환경 의존, 사용자가 환경 준비된 시점에 진행
+코드 격차가 운영성보다 먼저. "외부 공개 전에 진짜 동작하는지부터" 원칙:
+
+1. **F-5 모델 ID 정정** — 5분. 미수정 시 런타임 에이전트 디스패치 자체가 실패할 수 있음. 가장 먼저
+2. **F-1 ChainBench 등록 또는 안내** — 30분. evaluator Stage 4가 영구 BLOCKED인 현 상황 해소. SETUP.md §9에 트러블슈팅 보강
+3. **O-3 CI** — 1-2시간. 후속 변경 회귀 방지. F-2 이후 작업의 안전망
+4. **F-2 CKG calls 타입 기반** — 3-4시간. CKG 정확도의 핵심. 이미 `types.Info` 로드 중이라 활용만 하면 됨
+5. **F-4 CKV 배치 임베딩** — 2-3시간. Ollama API는 배치 지원
+6. **F-7 문서 TS 잔재 정리** — 30분. 신뢰성 확보
+7. **O-1 README** — 1시간. F-1~F-5 보정 후 정확한 현황 반영
+8. **F-3, F-6, F-8** — Phase 4 정확도 추가 개선
+9. **Q-1, Q-2** — 리팩토링
+10. **O-2 LICENSE, O-4 v0.1.0** — 외부 공개 단계
+11. **R-1, R-2, R-3, R-4** — 실 환경 의존
 
 ---
 
@@ -269,10 +298,11 @@ coding-agent/
 ### 8.1 최소 읽기 순서 (15분 안에 컨텍스트 확보)
 
 1. **이 문서** (HANDOFF.md) — 전체 그림
-2. **`docs/SETUP.md`** — 실행/빌드/디버깅 방법
-3. **`docs/superpowers/specs/2026-05-27-coding-agent-plugin-design.md`** — 시스템 설계 원본
-4. **`docs/plan/REVIEW_ISSUES.md`** — 모든 의사결정 근거 + 트레이드오프
-5. **`plugin/agents/orchestrator.md`** — 상태 전이의 진실 소스 (state machine 그림)
+2. **`docs/plan/IMPLEMENTATION_VERIFICATION.md`** — 2026-05-31 빌드/테스트 기반 검증 보고서. 코드와 문서 사이 실제 격차의 진실 소스. §7.1 F 작업의 근거
+3. **`docs/SETUP.md`** — 실행/빌드/디버깅 방법
+4. **`docs/superpowers/specs/2026-05-27-coding-agent-plugin-design.md`** — 시스템 설계 원본
+5. **`docs/plan/REVIEW_ISSUES.md`** — 모든 의사결정 근거 + 트레이드오프 (단, §6.2 표를 먼저 보고 보정된 상태로 해석)
+6. **`plugin/agents/orchestrator.md`** — 상태 전이의 진실 소스 (state machine 그림)
 
 세부 작업 진입 시:
 - 에이전트 사양 변경 → `plugin/agents/*.md` + 해당 Phase spec
@@ -351,12 +381,14 @@ cd tools/cks-mcp           && go test ./... && cd -
 
 새 세션이 의심해야 할 가정들:
 
-1. **ChainBench MCP의 tool 이름이 spec과 일치한다는 가정**: 실증 안 됨. §7.0 pre-flight가 자동 검증·BLOCKED 처리하므로 fail-safe.
-2. **ADF 변환기가 모든 노드 타입을 커버한다는 가정**: 8+ 노드 타입 테스트했지만 color/inline card/mention/emoji 등 누락 가능. 실 Jira 인스턴스로 R-1 실증 필요.
-3. **`packages.Load`가 go-stablenet 전체 트리에서 성공한다는 가정**: 실증 안 됨. 실패 시 Tier 2 폴백 자동 동작하지만 confidence 등급 저하.
-4. **Ollama 임베딩 시간 추정 (RI-09)**: 청크당 200ms 기준 ~67분 (20K 청크). 실 측정 안 됨. CPU/GPU 자원에 크게 의존.
-5. **/merge가 squash로만 동작한다는 가정**: merge commit / rebase 지원 안 함. 사용자 합의로 결정된 결정 — 뒤집지 말 것.
-6. **state.json 구조의 후방 호환성**: 현재 스키마 변경 시 마이그레이션 로직 없음. 명시적으로 RI-2X로 등록되지 않은 상태. 큰 변경 전에 사용자 확인 필요.
+1. **ChainBench MCP가 실제로 호출 가능하다는 가정**: ❌ 사실이 아님. `.mcp.json`에 미등록 + 구현체 0건. evaluator Stage 4 영구 BLOCKED. **F-1로 해결 예정**.
+2. **CKG `calls` 관계가 타입 기반 정확 매칭이라는 가정**: ❌ 사실이 아님. `_ = info`로 타입 정보 무시, 이름 기반 lookup. 동명 함수 오연결 가능. **F-2로 해결 예정**.
+3. **에이전트 모델 ID가 런타임에 resolve된다는 가정**: ❌ 의심됨. `opus-4.7`/`sonnet-4.6`는 환경 알림에 명시된 `claude-opus-4-7` 형식과 다름. **F-5로 해결 예정**.
+4. **ADF 변환기가 모든 노드 타입을 커버한다는 가정**: 8+ 노드 타입 테스트했지만 color/inline card/mention/emoji 등 누락 가능. 실 Jira 인스턴스로 R-1 실증 필요.
+5. **`packages.Load`가 go-stablenet 전체 트리에서 성공한다는 가정**: 실증 안 됨. 실패 시 Tier 2 폴백 자동 동작하지만 confidence 등급 저하.
+6. **Ollama 임베딩 시간 추정 (RI-09)**: 청크당 200ms 기준 ~67분 (20K 청크). 실 측정 안 됨 + 배치 미구현으로 실측 시간이 더 길 가능성. **F-4로 단축 예정**.
+7. **/merge가 squash로만 동작한다는 가정**: merge commit / rebase 지원 안 함. 사용자 합의 결정 — 뒤집지 말 것.
+8. **state.json 구조의 후방 호환성**: 현재 스키마 변경 시 마이그레이션 로직 없음. 명시적으로 RI-2X로 등록되지 않은 상태. 큰 변경 전에 사용자 확인 필요.
 
 ---
 
@@ -382,8 +414,10 @@ cd tools/cks-mcp           && go test ./... && cd -
 | (이어서) | Phase 1~7 구현 (TypeScript → Go 전환 포함) |
 | (이어서) | 통합 검증 + jsonschema 태그 fix |
 | 2026-05-29 | `9c68bbf` | SETUP.md + RI-16 RESOLVED |
-| 2026-05-29 | `2d9cec6` | 23개 RI 최종 감사 + 모두 RESOLVED |
-| 2026-05-29 | (이 커밋) | HANDOFF.md 작성 |
+| 2026-05-29 | `2d9cec6` | 23개 RI 최종 감사 + 모두 RESOLVED 선언 |
+| 2026-05-29 | `a8cab77` | HANDOFF.md 초안 작성 |
+| 2026-05-31 | `9226b34` | (다른 머신) code-level implementation verification 보고서 추가. Phase 3/4/6 격차 발견 |
+| 2026-06-01 | (이 커밋) | HANDOFF.md §6.1·§6.2·§7.1 F·§7.6·§8·§10 보정. 보고서 발견을 작업 계획에 통합 |
 
 ---
 

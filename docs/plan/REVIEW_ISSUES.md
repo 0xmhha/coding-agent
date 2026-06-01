@@ -11,9 +11,18 @@
 | `RESOLVED` | 해결 완료 (해결 방법 + 커밋/문서 참조) |
 | `DEFERRED` | 의도적으로 후순위 (이유 명시) |
 
-## 최종 감사 (2026-05-29)
+## 최종 감사 (2026-05-29) — 보정 (2026-06-01)
 
-전체 23개 RI 모두 `RESOLVED`. Phase 1~7 구현 + Phase 8 셋업 가이드 완료 기준.
+> ⚠️ 2026-05-31 `docs/plan/IMPLEMENTATION_VERIFICATION.md` (코드 빌드/테스트 검증 보고서)가 일부 RI의 RESOLVED 선언이 코드 레벨로 미달임을 발견. 아래 표는 2026-05-29 시점 선언이며, 보정된 상태는 각 RI 항목의 본문 참조.
+
+| RI | 2026-05-29 선언 | 2026-06-01 실제 | 보정 작업 |
+|----|---------------|---------------|---------|
+| RI-09 | RESOLVED | PARTIALLY RESOLVED | F-4 배치 임베딩 |
+| RI-10 | RESOLVED | PARTIALLY RESOLVED | F-2 calls 타입 기반 |
+| RI-20 | RESOLVED (사양 단계 완료) | OPEN | F-1 chainbench 등록/안내 |
+| 나머지 20개 | RESOLVED | RESOLVED 유지 | 해당 없음 |
+
+전체 23개 RI 중 20개 `RESOLVED`, 2개 `PARTIALLY RESOLVED`, 1개 `OPEN`. Phase 1~7 구현 + Phase 8 셋업 가이드 완료 기준.
 
 | 범주 | 항목 |
 |------|------|
@@ -200,7 +209,9 @@
 
 ## RI-09. 인덱싱 시간 추정이 낙관적 [Phase 3]
 
-**상태**: `RESOLVED` — 3가지 완화 적용: (1) `indexer.go` code_hash 캐시(RI-23)로 incremental에서 변경 안 된 청크는 재임베딩 스킵, (2) `Progress` 콜백이 50개 단위로 stderr에 `[cks-mcp] indexing N/total: file` 진행률 출력, (3) `ckv_index` MCP tool이 `modules` 인자로 우선 인덱싱 범위 지정. SETUP.md §6에 초기 인덱싱 예상 시간 + Ollama 없는 환경에서 BM25 폴백으로 즉시 사용 가능 안내. 커밋 `292e7dc`.
+**상태**: `PARTIALLY RESOLVED` (2026-06-01 재평가) — 3가지 완화 중 (1) code_hash 캐시 + (2) 진행률 + (3) modules 우선순위는 그대로 유효. 그러나 `IMPLEMENTATION_VERIFICATION.md`가 발견: **배치 임베딩 미구현** (`indexer.go:158` 단건 호출만). P3-3 수용 기준 "배치 임베딩 지원(throughput 향상)" 미충족 → CPU 환경 첫 인덱싱 시 worst-case 시간(~67분 추정)이 그대로 남음.
+
+**보정 작업**: HANDOFF.md §7.1 F-4 — Ollama `/api/embed`의 배치 인자 활용해 N개 청크 묶음 호출. 완료 시 본 RI를 `RESOLVED`로 복원.
 
 **문제**: P3-7에서 "~5000 파일 → 10-30분"으로 추정했으나, Ollama 로컬 임베딩은 CPU 환경에서 청크당 수백ms가 걸린다. 20000 청크 × 200ms = 약 67분. GPU 없는 환경에서는 예상보다 훨씬 오래 걸릴 수 있다.
 
@@ -220,7 +231,11 @@
 
 ## RI-10. AST Relation Extractor의 전체 빌드 의존 [Phase 4]
 
-**상태**: `RESOLVED` — `tools/cks-mcp/internal/ckg/relations.go`가 2-tier 구조 구현. Tier 1 `extractTyped()`는 `packages.Load("./...")`로 정확한 타입 정보 + 신뢰도 high. 실패 시 자동으로 `[cks-mcp] ckg: packages.Load failed (...); falling back to AST-only mode (RI-10)`을 stderr 출력 후 Tier 2 `extractASTOnly()`로 폴백 (`ModeASTOnly`). 모든 edge에 `extract_mode` 필드 부착하여 다운스트림이 신뢰도 판단 가능. 커밋 `15b75b2`.
+**상태**: `PARTIALLY RESOLVED` (2026-06-01 재평가) — Tier 1/Tier 2 폴백 구조 자체는 구현됨 (`relations.go` extractTyped/extractASTOnly). 그러나 `IMPLEMENTATION_VERIFICATION.md` (2026-05-31)이 발견: **Tier 1 진입 후에도 `calls` 추출에서 `_ = info`로 타입 정보를 명시적으로 무시 (`relations.go:657`)하고 이름 기반 `lookupCallNode`(`relations.go:671-684`)로 fallback**. 결과적으로 동명 함수 오연결·interface→구현 엣지 부재. "타입 기반 정확 추출" 본래 의도 미달.
+
+**보정 작업**: HANDOFF.md §7.1 F-2 — `types.Info`를 사용해 `*types.Func` resolve, `types.Implements`로 interface dispatch 처리. 완료 시 본 RI를 `RESOLVED`로 복원.
+
+**원래 해결책 (Tier 2 폴백)**: 그대로 유효 — packages.Load 실패 시 AST-only 폴백 동작.
 
 **문제**: P4-2에서 `packages.Load`로 cross-package 타입 resolve를 하려면 go-stablenet의 전체 의존성(geth 포함)을 빌드할 수 있어야 한다. 빌드 환경이 갖춰지지 않으면 `packages.Load`가 실패하며, 타입 정보 없이 AST만으로 관계를 추출해야 한다.
 
@@ -478,7 +493,13 @@
 
 ## RI-20. ChainBench MCP 인터페이스 검증 [Phase 6]
 
-**상태**: `RESOLVED` (사양 단계 완료) — `evaluator.md §7.0 Pre-flight`이 실제 ChainBench MCP의 tool 목록을 조회해 [chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop] 가용성 확인. 불일치 시 결과를 `ChainBench MCP interface mismatch: missing {missing}`로 BLOCKED 처리하고 spec 갱신 안내. SETUP.md §9.6 트러블슈팅에 동일 흐름 안내. 실제 ChainBench MCP 환경에서의 검증은 사용자 환경 종속(런타임). 커밋 `0058b4e`.
+**상태**: `OPEN` (2026-06-01 재평가) — `IMPLEMENTATION_VERIFICATION.md`가 발견: **ChainBench 구현체가 이 저장소에 0건이고 `plugin/.mcp.json`에 `chainbench` 서버가 등록되어 있지 않음** (`jira-gateway`, `cks` 두 개만). 따라서 evaluator의 `mcp__chainbench__*` 도구 호출은 §7.0 pre-flight를 통과할 수 없고 영구 BLOCKED. 사양 단계만 완료되었고 런타임에서는 동작 불가.
+
+**보정 작업**: HANDOFF.md §7.1 F-1 — 둘 중 하나 선택:
+- (a) `plugin/.mcp.json`에 chainbench 서버 항목 추가 (ChainBench MCP 별도 빌드 필요)
+- (b) SETUP.md §5에 "사용자가 ChainBench MCP를 별도 설치하고 `.mcp.json`에 추가해야 함"을 명시 + §9.6 트러블슈팅 보강
+
+**원래 사양 (§7.0 pre-flight)**: 도구 이름 불일치 시 BLOCKED 처리 로직은 그대로 유효 — 일단 서버가 등록된 후에 동작.
 
 **문제**: Phase 6 설계에서 ChainBench MCP의 tool 인터페이스(chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop)를 "예상"으로 정의했다. 실제 ChainBench MCP의 tool 이름과 파라미터가 다를 수 있다.
 
