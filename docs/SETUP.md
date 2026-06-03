@@ -6,89 +6,117 @@ order; each one ends with a quick verification command so you know it worked.
 
 If something fails, skip to [§9 Troubleshooting](#9-troubleshooting).
 
+> **R1' architecture.** The coding-agent is the orchestrator/consumer. It talks
+> to three MCP servers: `jira-gateway` (in this repo), `cks`
+> (code-knowledge-system, a sibling repo that composes ckv semantic + ckg graph
+> retrieval), and `chainbench` (a sibling repo, the deterministic test runner).
+> ckv/ckg are dev-only and not reached directly. The agent-facing tool surface
+> is frozen in `contract/agent-mcp.schema.json`.
+
 ---
 
 ## 1. Prerequisites
 
 | Tool | Why | Check |
 |------|-----|-------|
-| Go ≥ 1.25 | Build both MCP servers + your stablenet test runs | `go version` |
+| Go ≥ 1.25 | Build jira-gateway + the sibling cks/chainbench Go wire | `go version` |
+| C toolchain (cc/clang) | cks links sqlite-vec (CGO) | `cc --version` |
+| Node ≥ 18 + npm | chainbench MCP server (TypeScript) | `node --version` |
 | git ≥ 2.40 | Branch/commit/log throughout the pipeline | `git --version` |
 | GitHub CLI (`gh`) ≥ 2.50 | PR creation, comments, status checks, merge | `gh auth status` |
 | Claude Code | Hosts the plugin | (CLI/IDE) |
 | Atlassian (Jira) Cloud account | Source of tickets | (web) |
-| ChainBench MCP server | Stage 4 of the Evaluator | (separate install) |
-| Ollama + `nomic-embed-text` | Optional: Tier-1 CKV embeddings (RI-08) | `ollama list` |
-| Python 3 | Optional: ad-hoc JSON inspection | `python3 --version` |
+| Ollama + `bge-m3` | Required for full cks retrieval (semantic + intent) | `ollama list` |
+| Python 3 | Lint script + ad-hoc JSON inspection | `python3 --version` |
 
 A note on optionality:
 
-- **Ollama** is optional. Without it, CKV falls back to BM25 (lexical) search.
-  The pipeline still works; result quality is just lower.
-- **ChainBench** is required for Stage 4 of the Evaluator. If you skip its
-  installation, the Evaluator will fail Stage 4 with a clear message
-  identifying the missing MCP tools (RI-20).
+- **Ollama + bge-m3** is load-bearing for retrieval quality. bge-m3 is
+  multilingual (Korean + English), 1024-dim, and is shared by the intent
+  classifier and the ckv embedder. Without it, cks runs in a **degraded** mode
+  (Smart Dummy embedder); the pipeline still works but retrieval quality drops,
+  and `cks.ops.health` reports `degraded` so you know.
+- **chainbench** is required for Stage 4 of the Evaluator. If you skip it, the
+  Evaluator fails Stage 4 with a clear message identifying the missing MCP
+  tools, and the rest of the pipeline still runs.
 
 ---
 
-## 2. Clone the repository
+## 2. Clone the repositories
+
+The coding-agent depends on two sibling repos resolved by path at runtime
+(not vendored): `code-knowledge-system` (cks) and `chainbench`.
 
 ```bash
-git clone <repo-url> coding-agent
+git clone <coding-agent-url> coding-agent
+git clone <code-knowledge-system-url> code-knowledge-system
+git clone <chainbench-url> chainbench
 cd coding-agent
 ```
 
-The directory layout you should see:
+The coding-agent layout you should see:
 
 ```
 coding-agent/
 ├── plugin/                  # Claude Code plugin (commands, agents, skills, hooks)
-├── tools/                   # MCP servers (Go projects)
-│   ├── cks-mcp/             # Code Knowledge Search (CKV + CKG)
+│   └── .mcp.json            # MCP server registration (jira-gateway, cks, chainbench)
+├── contract/
+│   ├── agent-mcp.schema.json   # C1 SSoT: every tool the agents may call
+│   └── lint-tool-names.sh      # drift gate: prompt tool names must be in the schema
+├── tools/
 │   └── jira-gateway-mcp/    # Sensitive-filter proxy in front of Jira REST API
 ├── shared/
-│   └── patterns.json        # Sensitive-information policy, shared by both servers
+│   └── patterns.json        # Sensitive-information policy (jira-gateway)
 └── docs/                    # Specs and plans
 ```
 
+The cks shim that used to live at `tools/cks-mcp/` is gone — cks is the sibling
+`code-knowledge-system` repo now.
+
 ---
 
-## 3. Build both MCP servers
+## 3. Build the servers
+
+### 3.1 jira-gateway (in this repo)
 
 ```bash
 cd tools/jira-gateway-mcp
 go build -o bin/jira-gateway-mcp ./cmd/server
-
-cd ../cks-mcp
-go build -o bin/cks-server ./cmd/server
+go test ./...
 ```
 
-Verification:
+### 3.2 cks (sibling repo, CGO)
+
+cks inherits sqlite-vec, so it needs `CGO_ENABLED=1` and a C toolchain. Build
+the MCP binary into `bin/cks-mcp`:
 
 ```bash
-ls -l tools/jira-gateway-mcp/bin/jira-gateway-mcp
-ls -l tools/cks-mcp/bin/cks-server
+cd ../../../code-knowledge-system
+CGO_ENABLED=1 make build-bins      # produces bin/cks-mcp (+ cks-eval, etc.)
+ls -l bin/cks-mcp
 ```
 
-Both files should be ~10–20 MiB executables.
+### 3.3 chainbench (sibling repo, TS + Go wire)
 
-Run the test suites to confirm nothing was broken by your environment:
+chainbench is tri-language; the launcher needs the built TS bundle and the Go
+wire binary:
 
 ```bash
-cd tools/jira-gateway-mcp && go test ./...
-cd ../cks-mcp && go test ./...
+cd ../chainbench
+( cd mcp-server && npm install && npm run build )   # produces mcp-server/dist/index.js
+go build -C network -o chainbench-net ./cmd/chainbench-net
 ```
 
-All packages should print `ok`.
+The `chainbench-mcp` launcher (on PATH after `./install.sh`, or invoked
+directly) execs `${CHAINBENCH_DIR}/mcp-server/dist/index.js`.
 
 ---
 
 ## 4. Configure environment variables
 
-The plugin reads its secrets from environment variables that get forwarded
-into the MCP servers via `plugin/.mcp.json`. Set them once in your shell
-profile (or any process manager you use) so Claude Code's child processes
-inherit them.
+The plugin reads its secrets and server locations from environment variables
+forwarded into the MCP servers via `plugin/.mcp.json`. Set them once in your
+shell profile so Claude Code's child processes inherit them.
 
 ### 4.1 Jira (required)
 
@@ -101,12 +129,9 @@ export JIRA_USER_EMAIL="you@example.com"
 export JIRA_API_TOKEN="atlassian_api_token_here"
 ```
 
-Verify by reading a ticket the plugin will care about:
+Verify:
 
 ```bash
-JIRA_BASE_URL=$JIRA_BASE_URL \
-JIRA_API_TOKEN=$JIRA_API_TOKEN \
-JIRA_USER_EMAIL=$JIRA_USER_EMAIL \
 curl -s -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" \
   "$JIRA_BASE_URL/rest/api/3/myself" | python3 -m json.tool | head -5
 ```
@@ -114,71 +139,70 @@ curl -s -u "$JIRA_USER_EMAIL:$JIRA_API_TOKEN" \
 A successful call returns your account info. A 401 means the token or email
 is wrong.
 
-### 4.2 CKS index location
+### 4.2 cks (required)
 
-The CKS server stores its SQLite index at `CKS_INDEX_PATH`. If left unset
-it defaults to `.coding-agent/index/ckv.db` relative to your current working
-directory.
+cks is config-file driven (a single `-config <cks.yaml>` flag); the YAML carries
+the ckv/ckg index paths, the go-stablenet source root, the embedder model, and
+the Ollama endpoint. Point `.mcp.json` at the built binary and a config file:
 
 ```bash
-# Recommended: anchor to the project under analysis so the index follows the codebase.
-export CKS_INDEX_PATH="$HOME/Work/go-stablenet/.coding-agent/index/ckv.db"
+export CKS_MCP_BIN="$HOME/Work/code-knowledge-system/bin/cks-mcp"
+export CKS_CONFIG="$HOME/Work/code-knowledge-system/cks.yaml"
 ```
 
-### 4.3 Ollama (optional)
+Create `cks.yaml` from the example and edit the paths:
 
-If you want Tier-1 embeddings, install Ollama and pull the model:
+```bash
+cp "$HOME/Work/code-knowledge-system/policies/cks.yaml.example" "$CKS_CONFIG"
+# In cks.yaml set:
+#   backends.ckg.path        -> the ckg SQLite store (from `ckg build`)
+#   backends.ckg.source_root -> the go-stablenet working tree
+#   backends.ckv.path        -> the ckv vector store dir (from `ckv build`)
+#   backends.ckv.embed_model -> bge-m3
+#   backends.ckv.ollama_url  -> http://localhost:11434
+```
+
+### 4.3 Ollama + bge-m3 (required for full retrieval)
 
 ```bash
 brew install ollama        # or per https://ollama.com/download
 ollama serve &              # background daemon
-ollama pull nomic-embed-text
+ollama pull bge-m3          # multilingual, 1024-dim
 ```
 
-Then point the CKS server at it:
+Verify:
 
 ```bash
-export OLLAMA_BASE_URL="http://localhost:11434"
-export OLLAMA_EMBED_MODEL="nomic-embed-text"
-# Leave CKS_DISABLE_OLLAMA unset to enable vector search.
+curl -s http://localhost:11434/api/embed \
+  -d '{"model":"bge-m3","input":"hello"}' | head -c 80
 ```
 
-To force the BM25 fallback (e.g., for reproducibility in CI), set:
+A JSON body with an `embeddings` array confirms it works. If Ollama or bge-m3
+is unavailable, cks boots in degraded mode (Smart Dummy) and `cks.ops.health`
+reports `degraded` — the pipeline does not crash.
+
+### 4.4 chainbench (required for Evaluator Stage 4)
+
+The `chainbench-mcp` launcher self-resolves `CHAINBENCH_DIR` from
+`$HOME/.chainbench` by default; for a dev checkout point it explicitly:
 
 ```bash
-export CKS_DISABLE_OLLAMA=1
+export CHAINBENCH_DIR="$HOME/Work/chainbench"
 ```
 
-Verify Ollama:
-
-```bash
-curl -s http://localhost:11434/api/embeddings \
-  -d '{"model":"nomic-embed-text","prompt":"hello"}' | head -c 80
-```
-
-A JSON array starting with `{"embedding":[…]}` confirms it's working.
-
-### 4.4 ChainBench
-
-Install the ChainBench MCP server per its own instructions. Note the binary
-path (or `npx` invocation) so you can register it in your Claude Code's
-user-level MCP config. The coding-agent plugin doesn't ship ChainBench
-because it is a separate project. Phase 6 Stage 4 will detect missing tools
-and fail gracefully (RI-20) so the rest of the pipeline still runs to
-completion if you delay the ChainBench setup.
+Prerequisites (built in §3.3): `mcp-server/dist/index.js` and the
+`network/chainbench-net` wire binary must exist. The Evaluator initializes the
+network with `profile: "default"` — `default.yaml` IS the go-stablenet
+(stablenet-adapter) profile; there is no separate `go-stablenet` profile.
 
 ---
 
 ## 5. Install the plugin in Claude Code
 
 The plugin lives at `coding-agent/plugin/`. Point Claude Code at it via your
-user-level config (or use the marketplace mechanism your installation
-supports).
+user-level config (or your marketplace mechanism).
 
 ### 5.1 Direct path install (recommended for local development)
-
-In your Claude Code config (typically `~/.claude/config.json`, depending on
-client), add:
 
 ```jsonc
 {
@@ -190,105 +214,72 @@ client), add:
 }
 ```
 
-Claude Code's plugin loader will discover:
-
-- `plugin/.claude-plugin/plugin.json` (manifest)
-- `plugin/commands/*.md` (slash commands)
-- `plugin/agents/*.md` (sub-agents)
-- `plugin/skills/{name}/SKILL.md` (skills)
-- `plugin/hooks/hooks.json` (PostToolUse hooks)
-- `plugin/.mcp.json` (MCP server registration)
+Claude Code's plugin loader discovers `plugin/.claude-plugin/plugin.json`,
+`plugin/commands/*.md`, `plugin/agents/*.md`, `plugin/skills/{name}/SKILL.md`,
+`plugin/hooks/hooks.json`, and `plugin/.mcp.json`.
 
 ### 5.2 Verify Claude Code picks it up
 
-Restart Claude Code, open a project, and check:
+Restart Claude Code and run `/help`; you should see `/coding-agent:work`,
+`/coding-agent:review`, `/coding-agent:status`, `/coding-agent:merge`.
 
+Open the MCP status panel; **`jira-gateway`, `cks`, and `chainbench`** should
+all show as connected. If a server fails to start, check the launching
+process's env — `.mcp.json` substitutes `${...}` from the parent shell, so the
+variables from §4 must be exported.
+
+Run the tool-name drift gate to confirm the prompts and the contract agree:
+
+```bash
+bash contract/lint-tool-names.sh        # exits 0 when there is no drift
 ```
-/help
-```
-
-You should see `/coding-agent:work`, `/coding-agent:review`,
-`/coding-agent:status`, `/coding-agent:merge` in the slash command list.
-
-Open the MCP status panel (or use whatever your client exposes); both
-`jira-gateway` and `cks` should show as **connected**.
-
-If either MCP fails to start, check the launching process's env: the
-inherited environment must include the variables from §4 because
-`.mcp.json` substitutes `${...}` from the parent shell.
 
 ---
 
-## 6. First-time CKS indexing
+## 6. First-time indexing of go-stablenet
 
-Before the Planner can do anything useful, CKS needs to ingest the
-go-stablenet codebase.
+Before the Planner can retrieve anything, ckv and ckg must ingest the
+go-stablenet working tree.
 
-### 6.1 Index the project (full mode)
+### 6.1 Build the indexes (sibling cks CLIs)
 
-Inside Claude Code, call the `ckv_index` and `ckg_index` MCP tools directly
-(via your client's MCP UI, or by asking the LLM to call them):
-
-```jsonc
-// ckv_index input
-{
-  "mode": "full",
-  "project_dir": "/absolute/path/to/go-stablenet"
-}
-
-// ckg_index input
-{
-  "project_dir": "/absolute/path/to/go-stablenet"
-}
+```bash
+# Semantic (ckv) — requires Ollama + bge-m3; this is the slow one.
+ckv build --src /abs/path/to/go-stablenet --out /abs/path/to/ckv-store \
+          --embedder=ollama --model-name=bge-m3
+# Graph (ckg)
+ckg build --src /abs/path/to/go-stablenet --out /abs/path/to/ckg.db
 ```
 
-Expected wall time on a typical go-stablenet checkout:
-
-| Stage | Ollama installed | BM25 fallback |
-|-------|------------------|---------------|
-| ckv_index (full) | ~30–60 min (RI-09) | ~5–10 min |
-| ckg_index | ~5–10 min | ~5–10 min |
-
-Subsequent runs hit the `code_hash` cache (RI-23) and complete in seconds
-for unchanged files. The Planner triggers incremental updates
-automatically through `/coding-agent:work`.
+Point the paths you used here at `cks.yaml` (§4.2). A full bge-m3 embed of
+go-stablenet is throughput-gated and can take hours — run it once on a capable
+machine. Afterwards the agent keeps the index warm: the Planner calls
+`cks.ops.freshness` and, when stale, `cks.ops.index{mode:"incremental"}`.
 
 ### 6.2 Verify the index
 
-Ask CKV to find something you expect to exist:
+Ask cks (through Claude Code's MCP UI, or by asking the LLM to call the tool):
 
 ```jsonc
-// ckv_search input
-{
-  "query": "consensus finalize block",
-  "top_k": 5
-}
+// cks.context.semantic_search
+{ "query": "consensus finalize block", "k": 5 }
 ```
 
-You should get back results that mention `consensus/wbft/...` symbols. If
-the results are empty or unrelated, re-check the index path and project
-directory.
-
-For CKG:
+You should get results mentioning `consensus/...` symbols. For the graph:
 
 ```jsonc
-// ckg_query input
-{
-  "symbols": ["wbft.(*WBFTEngine).Finalize"],
-  "depth": 1,
-  "include_concurrency": true
-}
+// cks.context.get_subgraph
+{ "symbol": "Finalize", "depth": 1 }
 ```
 
-A non-empty `nodes` array indicates the graph was built.
+A non-empty subgraph indicates the graph was built. `cks.ops.health` should
+report `ok` (or `degraded` if Ollama is down).
 
 ---
 
 ## 7. Smoke test the pipeline
 
 ### 7.1 Local-mode `/work` (no Jira)
-
-Create a fake ticket file so you can validate Phase 1 without hitting Jira:
 
 ```bash
 cat > /tmp/test-ticket.json <<'EOF'
@@ -317,26 +308,17 @@ Then in Claude Code:
 ```
 
 You should see the Orchestrator pick up `TEST-1`, the Planner produce an
-`analysis.md`, and the pipeline halt politely when it can't find real code
-to modify (or when it asks you to confirm).
+`analysis.md`, and the pipeline halt politely when it can't find real code to
+modify (or when it asks you to confirm).
 
 ### 7.2 Status check
 
 ```
 /coding-agent:status
-```
-
-You should see one active workspace for `TEST-1`. Use the long form to
-inspect it:
-
-```
 /coding-agent:status TEST-1
 ```
 
 ### 7.3 Cleanup
-
-Active workspaces live under `.coding-agent/tickets/` in the project under
-analysis. Delete TEST-1 when you're done:
 
 ```bash
 rm -rf .coding-agent/tickets/TEST-1_*
@@ -351,17 +333,15 @@ Once the smoke test passes:
 1. Pick an actual Jira ticket. Try a small bugfix first.
 2. Run `/coding-agent:work STABLE-XXXX` without `--local`.
 3. Watch the Orchestrator advance through ANALYSIS → PLANNING → DESIGN →
-   IMPLEMENTATION → EVALUATION.
-4. When the Evaluator reaches Stage 4 (ChainBench), it will fail loudly
-   if your ChainBench MCP isn't wired up — that's a configuration
-   problem, not a pipeline bug (RI-20).
-5. After EVALUATION_PASS, the Orchestrator creates a PR. Review it
-   yourself or have a teammate review it.
-6. If reviewers leave comments, run `/coding-agent:review <PR-URL>` to
-   trigger the review cycle.
-7. When ready to merge, run `/coding-agent:merge STABLE-XXXX`. This is
-   the only command that touches `main`; it refuses to proceed unless the
-   PR is approved, all status checks are green, and it's mergeable.
+   IMPLEMENTATION → EVALUATION. The Implementer builds the modified binary at
+   `build/bin/gstable`; the Evaluator hands that path to chainbench.
+4. When the Evaluator reaches Stage 4 (ChainBench), it fails loudly if your
+   chainbench MCP isn't wired up — a configuration problem, not a pipeline bug.
+5. After EVALUATION_PASS, the Orchestrator creates a PR.
+6. If reviewers leave comments, run `/coding-agent:review <PR-URL>`.
+7. When ready, run `/coding-agent:merge STABLE-XXXX` — the only command that
+   touches `main`; it refuses unless the PR is approved, checks are green, and
+   it's mergeable.
 
 ---
 
@@ -369,95 +349,78 @@ Once the smoke test passes:
 
 ### 9.1 `MCP server 'cks' is not connected`
 
-- Check that the binary exists at the path `.mcp.json` points to.
-- Check that the parent shell exported `CKS_INDEX_PATH` and (if you want
-  vectors) the Ollama variables.
-- Read the server's stderr — Claude Code usually surfaces it in a panel.
-  The most common error is `Ollama unavailable`, which is a warning, not
-  an error: the server still boots in BM25 mode.
+- Check `CKS_MCP_BIN` points at the built `bin/cks-mcp` and `CKS_CONFIG` at a
+  valid `cks.yaml`.
+- Read the server's stderr. `Ollama unavailable` is a warning, not a fatal
+  error: cks boots in degraded (Smart Dummy) mode and `cks.ops.health` reports
+  `degraded`.
+- A CGO link error means cks was built without a C toolchain — rebuild with
+  `CGO_ENABLED=1` (§3.2).
 
 ### 9.2 `Jira: authentication failed`
 
 - Re-issue the token: <https://id.atlassian.com/manage-profile/security/api-tokens>.
-- Confirm `JIRA_USER_EMAIL` matches the account that owns the token. Some
-  organizations also require the token's "site access" to include your
-  Atlassian instance.
-- Try `curl` from §4.1 to isolate whether the problem is the token or the
-  plugin.
+- Confirm `JIRA_USER_EMAIL` matches the account that owns the token.
+- Try the `curl` from §4.1 to isolate token vs plugin.
 
 ### 9.3 `state.json transition blocked`
 
-The pipeline refuses to advance when an artifact is missing or incomplete
-(by design, RI-13). The error message lists the missing files. Open the
-workspace, fix the artifact (or delete the workspace if it's stale), and
-re-run `/coding-agent:work`.
+The pipeline refuses to advance when an artifact is missing or incomplete (by
+design). The error lists the missing files. Fix the artifact (or delete a stale
+workspace) and re-run `/coding-agent:work`.
 
-### 9.4 `Ollama probe failed`
+### 9.4 `cks.ops.health reports degraded`
 
-Either start Ollama (`ollama serve &`) or accept the BM25 fallback. The
-pipeline doesn't care which path you choose, but search relevance is better
-with Ollama. Set `CKS_DISABLE_OLLAMA=1` to silence the probe and force
-BM25.
+Ollama or bge-m3 is unavailable. Start Ollama (`ollama serve &`) and
+`ollama pull bge-m3`, or accept degraded retrieval. The pipeline keeps running;
+retrieval quality is just lower until the embedder is back.
 
 ### 9.5 `gh pr merge: PR is not mergeable`
 
-The merge command checks three things:
-
-1. PR is approved.
-2. All status checks succeeded.
-3. GitHub reports `mergeable: MERGEABLE`.
-
-If you're in CHANGES_REQUESTED, run `/coding-agent:review <PR-URL>`. If a
-check is failing, look at the gh output for the failing check name. If the
-state is CONFLICTING, resolve conflicts on the branch and push the resolution.
+The merge command checks: (1) PR approved, (2) all status checks succeeded,
+(3) GitHub reports `mergeable: MERGEABLE`. If CHANGES_REQUESTED, run
+`/coding-agent:review <PR-URL>`. If CONFLICTING, resolve on the branch and push.
 
 ### 9.6 `Evaluator Stage 4: ChainBench MCP interface mismatch`
 
-The Phase 6 spec listed expected tool names (`chainbench_setup`,
-`chainbench_start`, …). If your ChainBench server uses different names,
-update `plugin/agents/evaluator.md §7` to match (RI-20). The Evaluator
-detects the mismatch before running so it doesn't leave processes lying
-around.
+The expected tool names are the C1 set (`chainbench_init`, `chainbench_start`,
+`chainbench_status`, `chainbench_test_run`, `chainbench_report`,
+`chainbench_stop`). If the chainbench server is unregistered or its names
+drift, reconcile against `contract/agent-mcp.schema.json` (provider
+`chainbench`) and confirm §3.3/§4.4 prerequisites are built. The Evaluator
+detects the mismatch before running so it doesn't leak processes.
 
-### 9.7 `Filter engine error: patterns.json not found`
+### 9.7 `jira-gateway: patterns.json not found`
 
-The filter engines look for `shared/patterns.json` via:
-
-1. `PATTERNS_PATH` env var (jira-gateway) / `CKS_PATTERNS_PATH` (cks),
-2. relative paths derived from the binary location,
-3. `./shared/patterns.json` from cwd.
-
-If all three fail the engine fails closed — it returns `BLOCKED` rather
-than letting data through unscanned. Set the env var explicitly:
+The jira-gateway filter engine looks for `shared/patterns.json` via
+`PATTERNS_PATH`, then relative paths, then `./shared/patterns.json`. It fails
+closed (returns `BLOCKED`) rather than passing data unscanned. Set it
+explicitly:
 
 ```bash
 export PATTERNS_PATH="/absolute/path/to/coding-agent/shared/patterns.json"
-export CKS_PATTERNS_PATH="$PATTERNS_PATH"
 ```
+
+cks sanitization is separate — it is driven by `sanitize.rules_path` in
+`cks.yaml`, not by an env var.
 
 ### 9.8 Hooks not firing
 
-The hooks are best-effort logging. They never block the pipeline, and they
-fail open. If you don't see entries in `{workspace}/logs/impl.log`, check:
-
-- The hook scripts have the executable bit (`ls -l plugin/hooks/*.sh`).
-- The `${CLAUDE_PLUGIN_ROOT}` variable resolves to the plugin install
-  path in your Claude Code build.
-
-Hooks are documented as advisory — the pipeline works without them.
+The hooks are best-effort logging; they never block the pipeline. If you don't
+see entries in `{workspace}/logs/impl.log`, check the hook scripts have the
+executable bit (`ls -l plugin/hooks/*.sh`) and that `${CLAUDE_PLUGIN_ROOT}`
+resolves in your Claude Code build.
 
 ---
 
 ## 10. What to look at next
 
-- `docs/superpowers/specs/` — the canonical design documents
-- `docs/plan/REVIEW_ISSUES.md` — known limitations and how the pipeline
-  handles each one (RI-01..23)
-- `docs/plan/phase{1..7}-tasks.md` — granular task lists with current
-  status
-- `tools/{jira-gateway-mcp,cks-mcp}/README.md` — server-level documentation
+- `contract/agent-mcp.schema.json` — the C1 SSoT for every agent-facing tool
+- `docs/r1-refactor/` — the system contract + per-project refactor specs/plans
+- `tools/jira-gateway-mcp/README.md` — jira-gateway server documentation
+- the sibling `code-knowledge-system` and `chainbench` repos — cks and
+  chainbench server documentation
 
-When you're comfortable with the pipeline on a small ticket, you can scale
-up to larger features. The Orchestrator caps automatic retries at
-`max_eval_cycles` (default 3) so the pipeline never spins forever — see
-the BLOCKED state report and intervene manually when needed.
+When you're comfortable on a small ticket, scale up. The Orchestrator caps
+automatic retries at `max_eval_cycles` (default 3) so the pipeline never spins
+forever — see the BLOCKED state report and intervene manually when needed.
