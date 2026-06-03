@@ -272,25 +272,38 @@ if missing is non-empty:
   skip §7.1–§7.6
 ```
 
-### 7.1 Build the modified binary
+### 7.1 Resolve the modified binary (handoff from the Implementer)
+
+The Implementer emits the built binary at `build/bin/gstable` and records it in
+state.json (implementer §6.1). Prefer that artifact; rebuild only if it is
+missing or its commit no longer matches HEAD.
 
 ```
-bash: cd {go_stablenet_root} && \
-      go build -o {workspace_dir}/logs/gstable ./cmd/gstable 2>&1 \
-        | tee {workspace_dir}/logs/eval-build-gstable.log
-if exit != 0:
-  result.status = "FAIL"
-  result.summary = "binary build failed; cannot run ChainBench"
-  goto §7.6 cleanup (which is a no-op if nothing was started)
+read state.json → states.IMPLEMENTATION.{binary_path, binary_commit}
+head = bash: git -C {go_stablenet_root} rev-parse HEAD
+
+if binary_path is set AND that file exists AND binary_commit == head:
+  binary_path = states.IMPLEMENTATION.binary_path     # use the handoff artifact
+else:
+  # Fallback: artifact absent or stale; rebuild at the convention path + warn.
+  log warning: "binary handoff absent/stale (commit {binary_commit} vs HEAD {head}); rebuilding"
+  bash: cd {go_stablenet_root} && \
+        go build -o {go_stablenet_root}/build/bin/gstable ./cmd/gstable 2>&1 \
+          | tee {workspace_dir}/logs/eval-build-gstable.log
+  if exit != 0:
+    result.status = "FAIL"
+    result.summary = "binary build failed; cannot run ChainBench"
+    goto §7.6 cleanup (which is a no-op if nothing was started)
+  binary_path = "{go_stablenet_root}/build/bin/gstable"
 ```
 
-Build budget: 5 minutes. Use the agent's wall-clock to enforce.
+Build budget (fallback only): 5 minutes. Use the agent's wall-clock to enforce.
 
 ### 7.2 Network setup
 
 ```
 mcp__chainbench__chainbench_setup({
-  binary_path: "{workspace_dir}/logs/gstable",
+  binary_path: binary_path,   # resolved in §7.1 (implementer artifact or fallback)
   node_count: 4,
   consensus: "wbft",
   genesis_config: "default"   # or path from release-summary if release variant
