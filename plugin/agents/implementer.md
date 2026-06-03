@@ -1,6 +1,6 @@
 ---
 name: implementer
-model: sonnet-4.6
+model: claude-sonnet-4-6
 description: |
   Code implementation from plan + design documents. Branch isolation,
   per-step split commits, checkpoint recovery, build verification.
@@ -281,7 +281,48 @@ verify plan_progress: every step.status == "completed"
                       uncommitted_files is empty
                       `git status --porcelain` returns empty
 if any of the above fail: report and stop. Do NOT transition.
+```
 
+### 6.1 Build artifact (binary handoff to the Evaluator)
+
+The Evaluator's ChainBench stage runs the *modified* go-stablenet binary. The
+Implementer owns the build of that artifact (it built and verified the code), so
+it emits it at the convention path and records its provenance. This guarantees
+ChainBench never runs against a stale or default binary.
+
+```
+bash: cd {repo_root} && \
+      go build -o {repo_root}/build/bin/gstable ./cmd/gstable 2>&1 \
+        | tee {workspace_dir}/logs/impl-build-artifact.log
+if exit != 0:
+  state-machine.log_failure(workspace_dir, {
+    state: "IMPLEMENTATION", agent: "implementer", step: "build-artifact",
+    attempted_action: { description: "build go-stablenet binary",
+                        command: "go build -o build/bin/gstable ./cmd/gstable",
+                        modified_files: <git diff --name-only main...HEAD> },
+    expected_outcome: "binary at build/bin/gstable",
+    actual_outcome: { type: "build_error", summary: "<first error line>",
+                      details: "<truncated>", log_file: "logs/impl-build-artifact.log" },
+    agent_analysis: { root_cause_hypothesis: "...", confidence: "low|mid|high",
+                      suggested_fix: "..." },
+    resolution: { action: "user_intervention", transitioned_to: null, retry_count: 0 }
+  })
+  report to Orchestrator and stop. Do NOT transition.
+
+binary_commit = bash: git -C {repo_root} rev-parse HEAD
+states.IMPLEMENTATION.binary_path   = "{repo_root}/build/bin/gstable"
+states.IMPLEMENTATION.binary_commit = binary_commit
+states.IMPLEMENTATION.branch        = branch   # the feature branch from §2/§3
+write state.json
+```
+
+If `./cmd/gstable` is not the binary's main package in this go-stablenet layout,
+record the actual build target in `impl.log` and surface it — do not guess a
+different path silently.
+
+### 6.2 Transition
+
+```
 state-machine.transition(workspace_dir, "IMPLEMENTATION", "EVALUATION",
                          artifacts=[]) # commits are validated, not artifacts
 ```

@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-model: opus-4.7
+model: claude-opus-4-7
 description: |
   Pipeline state machine controller. Reads state.json, dispatches the
   appropriate sub-agent (planner/implementer/evaluator), and handles
@@ -130,8 +130,9 @@ When the Evaluator reports all stages green:
      ## Changes → for each step in plan_progress.steps:
                    "- Step {N}: {description} ({commit_hash})"
      ## Test Results → markdown table from test-report.md Summary
-     ## Impact → bullet list from related-code.json (ckg_impact.risk_level
-                  + affected modules)
+     ## Impact → bullet list from related-code.json impacts[].impact_analysis
+                  (coupling groups: callers/interface/type_users/distributed/
+                  concurrent) + affected modules
      ## Acceptance Criteria → ticket.parsed_template.fields.acceptance_criteria
 
    Run the pr-sanitize skill on the assembled body (P7-7):
@@ -160,7 +161,8 @@ When the Evaluator reports all stages green:
 5. Labels (best-effort; failures are warnings)
    bash: gh pr edit {pr_url} --add-label "auto-generated"
    Add per-type label: feature | bugfix
-   Add risk label when ckg_impact.risk_level in {"high","critical"}
+   Add risk label when any impacts[].impact_analysis has a non-empty
+     "concurrent" or "distributed" coupling group (high blast radius)
      → "needs-careful-review"
    Add module labels from related-code.json scope.
 

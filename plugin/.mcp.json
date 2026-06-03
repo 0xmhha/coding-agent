@@ -11,14 +11,13 @@
       }
     },
     "cks": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/../tools/cks-mcp/bin/cks-server",
-      "args": [],
+      "command": "${CKS_MCP_BIN}",
+      "args": ["-config", "${CKS_CONFIG}"]
+    },
+    "chainbench": {
+      "command": "chainbench-mcp",
       "env": {
-        "CKS_INDEX_PATH": "${CKS_INDEX_PATH}",
-        "CKS_PATTERNS_PATH": "${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json",
-        "OLLAMA_BASE_URL": "${OLLAMA_BASE_URL}",
-        "OLLAMA_EMBED_MODEL": "${OLLAMA_EMBED_MODEL}",
-        "CKS_DISABLE_OLLAMA": "${CKS_DISABLE_OLLAMA}"
+        "CHAINBENCH_DIR": "${CHAINBENCH_DIR}"
       }
     }
   }

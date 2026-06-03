@@ -1,6 +1,3 @@
 go 1.25.0
 
-use (
-	./tools/jira-gateway-mcp
-	./tools/cks-mcp
-)
+use ./tools/jira-gateway-mcp

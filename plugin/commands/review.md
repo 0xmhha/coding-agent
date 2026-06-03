@@ -194,7 +194,7 @@ PR 코드 리뷰 피드백을 읽고 수정 작업을 수행한다.
    
    ### File: consensus/wbft/finalize.go
    #### Line 89 [bug_fix / high]
-   > "이 부분에서 nil 체크가 빠져있습니다. GovStaking이 초기화되지 않은 상태에서 호출될 수 있습니다."
+   > "이 부분에서 nil 체크가 빠져있습니다. gov_validator가 초기화되지 않은 상태에서 호출될 수 있습니다."
    - reviewer: {user.login}
    - 분류 근거: {reasoning}
    
