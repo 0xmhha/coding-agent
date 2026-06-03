@@ -89,7 +89,7 @@ Persist the raw CKV result inside `related-code.json.ckv`.
 
 ### 3.3 Domain + complexity (stablenet-context skill)
 
-Use the stablenet-context skill:
+Use the stablenet-context skill for path-based module classification only:
 
 ```
 classify = stablenet-context.classify_domain(
@@ -101,6 +101,14 @@ complexity = stablenet-context.estimate_complexity(
   change_summary = parsed.summary + parsed.fields (concatenated)
 )
 ```
+
+Authoritative domain guidance — invariants, byzantine-fairness concerns,
+required tests, system-contract names — does NOT come from this skill (it only
+classifies by path). It comes from the cks `guidance` fields on
+`cks.context.get_for_task` / `cks.context.semantic_search` results (injected
+from ckv `policy/stablenet.yaml`) and from the always-on `stablenet-invariants`
+backstop. Carry those `guidance.watch_out` / `also_review` / `required_tests`
+values into analysis.md, not any hardcoded contract names.
 
 ### 3.4 CKG structural traversal
 

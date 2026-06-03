@@ -262,10 +262,10 @@ WBFT consensus의 Finalize 함수에서 nil pointer 발생
 
 ## 재현 방법
 1. 4노드 로컬 네트워크 시작
-2. GovStaking 미설정 상태에서 블록 생성
+2. gov_validator 미설정 상태에서 블록 생성
 
 ## 기대 동작
-GovStaking이 없으면 graceful skip
+gov_validator이 없으면 graceful skip
 
 ## 실제 동작
 panic: nil pointer dereference at consensus/wbft/finalize.go:89
@@ -290,9 +290,9 @@ panic: nil pointer dereference at consensus/wbft/finalize.go:89
     "summary": "WBFT consensus의 Finalize 함수에서 nil pointer 발생",
     "steps_to_reproduce": [
       "4노드 로컬 네트워크 시작",
-      "GovStaking 미설정 상태에서 블록 생성"
+      "gov_validator 미설정 상태에서 블록 생성"
     ],
-    "expected": "GovStaking이 없으면 graceful skip",
+    "expected": "gov_validator이 없으면 graceful skip",
     "actual": "panic: nil pointer dereference at consensus/wbft/finalize.go:89",
     "scope": {
       "modules": ["consensus"],
