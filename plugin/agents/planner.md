@@ -16,6 +16,7 @@ skills:
   - state-machine
   - template-parse
   - stablenet-context
+  - stablenet-invariants
 ---
 
 # Planner Agent

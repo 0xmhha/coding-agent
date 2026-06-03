@@ -17,6 +17,7 @@ tools:
   - mcp__chainbench__chainbench_stop
 skills:
   - state-machine
+  - stablenet-invariants
 ---
 
 # Evaluator Agent
