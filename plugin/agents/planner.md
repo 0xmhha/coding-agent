@@ -9,9 +9,18 @@ tools:
   - Write
   - Edit
   - Bash
-  - mcp__cks__ckv_search
-  - mcp__cks__ckg_query
-  - mcp__cks__ckg_impact
+  - mcp__cks__cks.context.semantic_search
+  - mcp__cks__cks.context.search_text
+  - mcp__cks__cks.context.find_symbol
+  - mcp__cks__cks.context.get_subgraph
+  - mcp__cks__cks.context.find_callers
+  - mcp__cks__cks.context.find_callees
+  - mcp__cks__cks.context.impact_analysis
+  - mcp__cks__cks.context.concurrency_impact
+  - mcp__cks__cks.context.change_history
+  - mcp__cks__cks.context.get_for_task
+  - mcp__cks__cks.ops.freshness
+  - mcp__cks__cks.ops.index
 skills:
   - state-machine
   - template-parse
@@ -73,20 +82,21 @@ write {workspace_dir}/ticket-parsed.json = parsed
 If `parsed.missing_fields` is non-empty, log a warning to the analysis but
 keep going — the Planner infers from context.
 
-### 3.2 CKV semantic search
+### 3.2 Semantic search (cks)
 
 ```
 keywords = parsed.summary + parsed.fields.requirements + parsed.fields.scope.modules
-results = mcp__cks__ckv_search(
+results = mcp__cks__cks.context.semantic_search(
   query = keywords joined,
-  top_k = 15,
-  filters = { package: first module in parsed.fields.scope.modules (optional) },
-  include_history = true,
-  rerank = true,
+  k = 15,
+  path_glob = first module in parsed.fields.scope.modules (optional, e.g. "consensus/**"),
+  language = "go",
 )
 ```
 
-Persist the raw CKV result inside `related-code.json.ckv`.
+`semantic_search` returns ckv (meaning) hits only — no history. If you need
+modification history for a hit, make a separate `cks.context.change_history`
+call. Persist the raw result inside `related-code.json.ckv`.
 
 ### 3.3 Domain + complexity (stablenet-context skill)
 
@@ -111,36 +121,69 @@ from ckv `policy/stablenet.yaml`) and from the always-on `stablenet-invariants`
 backstop. Carry those `guidance.watch_out` / `also_review` / `required_tests`
 values into analysis.md, not any hardcoded contract names.
 
-### 3.4 CKG structural traversal
+### 3.3b Freshness gate
+
+Before structural traversal, make sure the index reflects the current tree —
+otherwise graph/impact results miss recent changes:
 
 ```
-seeds = top symbols from CKV (deduped, qualified names preferred)
-graph = mcp__cks__ckg_query(
-  symbols = seeds,
-  depth = 2,
-  relation_types = ["calls", "implements", "uses_type", "embeds"],
-  include_history = true,
-  include_concurrency = true,
+fresh = mcp__cks__cks.ops.freshness()
+if fresh reports stale (indexed_head != current_head, or changed_files non-empty):
+  mcp__cks__cks.ops.index({ mode: "incremental" })   # refresh ckv + ckg
+```
+
+If `cks.ops.index` is unavailable or fails, record "index stale; analysis may
+miss recent changes" in analysis.md and continue best-effort.
+
+### 3.4 Structural traversal (cks graph)
+
+```
+seeds = top symbols from §3.2 (deduped, qualified names preferred)
+
+for each seed:
+  subgraph = mcp__cks__cks.context.get_subgraph(
+    symbol = seed,
+    depth = 2,
+    max_total = 200,
+  )
+  # When you specifically need caller direction (who calls this seed):
+  callers = mcp__cks__cks.context.find_callers(symbol = seed)   # as needed
+```
+
+**Stage-7 concurrency (required for concurrency-sensitive seeds).** For any seed
+whose path is under `consensus/**`, `core/txpool/**`, `core/state/**`,
+`miner/**`, or `systemcontracts/**`, also call:
+
+```
+conc = mcp__cks__cks.context.concurrency_impact(
+  symbol = seed,
+  depth = 3,          # channel reach is one hop deeper than calls
+  max_total = 200,
 )
 ```
 
-Persist as `related-code.json.ckg`.
+`concurrency_impact` returns the modules reached over goroutine/channel/lock
+edges (both directions) — the Evaluator reads this for its `-race` scope (RI-21).
 
-### 3.5 CKG impact (per modification candidate)
+Persist as `related-code.json.ckg` with the per-seed subgraphs under
+`ckg.subgraphs` and the concurrency results under `ckg.concurrency_impact`.
 
-For each top-3 seed symbol:
+### 3.5 Impact analysis (per modification candidate)
+
+For each top-3 seed symbol (skip for `release`):
 
 ```
-impact = mcp__cks__ckg_impact(
+impact = mcp__cks__cks.context.impact_analysis(
   symbol = <qualified name>,
-  change_type = inferred from work_type:
-                bugfix → "logic"
-                feature → "signature"
-                code_review → "logic" (informational only)
-                release → skip
+  depth = inferred from work_type:
+          bugfix → 2   (shallower — localized fix)
+          feature → 3  (deeper — signature/behavior change ripples wider)
+          code_review → 2 (informational only)
 )
 ```
 
+`impact_analysis` returns the reverse-dependency closure grouped by coupling
+category (callers / interface / type_users / distributed / concurrent / other).
 Persist all impacts in `related-code.json.impacts`.
 
 ### 3.6 Produce analysis.md
@@ -192,9 +235,9 @@ artifact completeness check).
 
 ```
 {
-  "ckv": [...ckv.results...],
-  "ckg": { "nodes": [...], "edges": [...], "history": [...], "concurrency_impact": [...] },
-  "impacts": [ {symbol, ckg_impact response} ... ]
+  "ckv": [...semantic_search hits...],
+  "ckg": { "subgraphs": [...per-seed get_subgraph...], "concurrency_impact": [...] },
+  "impacts": [ {symbol, impact_analysis response} ... ]
 }
 ```
 
@@ -397,11 +440,14 @@ must read them directly.
 For each modified file in the diffs:
 
 ```
-results = mcp__cks__ckv_search(
+results = mcp__cks__cks.context.semantic_search(
   query = test-report failure summary + modified file name + failure symbol,
-  top_k = 10,
+  k = 10,
 )
-graph = mcp__cks__ckg_query(symbols=affected_symbols, depth=2, include_concurrency=true)
+for each affected symbol:
+  subgraph = mcp__cks__cks.context.get_subgraph(symbol = <symbol>, depth = 2)
+  # concurrency-sensitive paths (consensus/txpool/state/miner/systemcontracts):
+  conc     = mcp__cks__cks.context.concurrency_impact(symbol = <symbol>)
 ```
 
 ### 6.4 Synthesize
