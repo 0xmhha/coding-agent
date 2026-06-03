@@ -13,6 +13,12 @@
     "cks": {
       "command": "${CKS_MCP_BIN}",
       "args": ["-config", "${CKS_CONFIG}"]
+    },
+    "chainbench": {
+      "command": "chainbench-mcp",
+      "env": {
+        "CHAINBENCH_DIR": "${CHAINBENCH_DIR}"
+      }
     }
   }
 }

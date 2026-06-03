@@ -10,10 +10,12 @@ tools:
   - Write
   - Edit
   - Bash
-  - mcp__chainbench__chainbench_setup
+  - mcp__chainbench__chainbench_init
   - mcp__chainbench__chainbench_start
   - mcp__chainbench__chainbench_status
-  - mcp__chainbench__chainbench_run_tests
+  - mcp__chainbench__chainbench_test_run
+  - mcp__chainbench__chainbench_report
+  - mcp__chainbench__chainbench_failure_context
   - mcp__chainbench__chainbench_stop
 skills:
   - state-machine
@@ -253,22 +255,21 @@ defensive coding, not data exfiltration.
 
 ### 7.0 Pre-flight: confirm tool interfaces (RI-20)
 
-The tool names below match the Phase 6 spec. Real names from the chainbench
-MCP may differ. Before the first call:
+Confirm the chainbench MCP exposes the C1 tool subset before the first call:
 
 ```
 list tools available to this Agent. Compare to the expected names:
-  expected = [chainbench_setup, chainbench_start, chainbench_status,
-              chainbench_run_tests, chainbench_stop]
+  expected = [chainbench_init, chainbench_start, chainbench_status,
+              chainbench_test_run, chainbench_report, chainbench_stop]
 missing = expected − available
 
 if missing is non-empty:
   result.status = "FAIL"
   result.summary = "ChainBench MCP interface mismatch: missing {missing}"
-  result.details = "Phase 6 spec assumed these tools (RI-20). Please run a
-                    one-time discovery step against the actual chainbench MCP
-                    and update {workspace_dir}/../../docs/superpowers/specs/
-                    phase6-evaluator-chainbench.md §7 before re-running."
+  result.details = "These names are the C1 contract. If the chainbench MCP is
+                    not registered or its names drift, reconcile against the
+                    SSoT at coding-agent/contract/agent-mcp.schema.json (provider
+                    'chainbench') before re-running."
   skip §7.1–§7.6
 ```
 
@@ -299,18 +300,19 @@ else:
 
 Build budget (fallback only): 5 minutes. Use the agent's wall-clock to enforce.
 
-### 7.2 Network setup
+### 7.2 Network init
 
 ```
-mcp__chainbench__chainbench_setup({
-  binary_path: binary_path,   # resolved in §7.1 (implementer artifact or fallback)
-  node_count: 4,
-  consensus: "wbft",
-  genesis_config: "default"   # or path from release-summary if release variant
+mcp__chainbench__chainbench_init({
+  profile: "default",          # default.yaml IS the go-stablenet/stablenet-adapter
+                               # profile; there is no "go-stablenet" profile.
+  binary_path: binary_path,    # resolved in §7.1 (implementer artifact or fallback)
+  project_root: go_stablenet_root,
 })
 ```
 
-Setup budget: 2 minutes.
+Node count, consensus engine, and genesis config come from the profile, not from
+init args. Setup budget: 2 minutes.
 
 ### 7.3 Start + stabilize
 
@@ -364,18 +366,37 @@ status = "PASS" if consistency_violations == 0 AND max_block_interval_ms < 5000
 
 ### 7.5 Transaction tests
 
+Run the built-in transaction test by its `category/name` catalog path (the tool
+validates the shape `^[a-zA-Z0-9_\-]+(\/[a-zA-Z0-9_\-]+)*$`):
+
 ```
-tests = mcp__chainbench__chainbench_run_tests("standard")
+mcp__chainbench__chainbench_test_run({ test: "basic/tx-send", format: "text" })
+```
 
-# tests is expected to be an array of:
-#   { name, status: PASS|FAIL, duration_ms, tx_hash?, error?, detail? }
+Run additional catalog tests as the ticket scope warrants (e.g.
+`basic/consensus` for block production, `basic/txpool-propagation`). The
+authoritative pass/fail comes from the report parse in §7.5b, not from scraping
+this text output.
 
-count_pass = sum status == "PASS"
-count_fail = sum status == "FAIL"
+### 7.5b Parse the JSON report (C4 loop-back)
+
+```
+report = mcp__chainbench__chainbench_report({ format: "json" })
+# C4 shape:
+#   { summary: { total_tests, passed, failed, assertions: { passed, failed } },
+#     tests: [ { status, pass, fail, ... } ] }
+
+count_pass = report.summary.passed
+count_fail = report.summary.failed
 
 stage4.status =
   "FAIL" if §7.4 status FAIL OR count_fail > 0 OR build failed
   "PASS" otherwise
+
+# On failure, capture diagnostics for the bug cycle:
+if count_fail > 0:
+  ctx = mcp__chainbench__chainbench_failure_context()   # per-node height, logs
+  save ctx into {workspace_dir}/logs/eval-chainbench-failure.json
 ```
 
 ### 7.6 Cleanup (always runs)
