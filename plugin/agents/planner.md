@@ -1,6 +1,6 @@
 ---
 name: planner
-model: opus-4.7
+model: claude-opus-4-7
 description: |
   Performs ANALYSIS → PLANNING → DESIGN phases for go-stablenet tickets.
   Handles "full", "code_review", "release", and "bugfix" modes.
