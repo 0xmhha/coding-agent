@@ -117,7 +117,18 @@ Jira 티켓 기반 자동화 작업을 시작한다.
 
 5.2. 기본: Jira Gateway MCP 호출
    mcp tool: jira_read_ticket(ticket_id={jira_id})
-   
+
+   호출 자체가 실패한 경우(MCP 미등록/미연결, 인증 실패, 네트워크 오류 —
+   즉 _filter_metadata 가 포함된 정상 응답이 아닌 경우):
+     유저에게 알림:
+       "jira-gateway MCP 호출에 실패했습니다: {error 요약}.
+        확인: (1) plugin/.mcp.json 에 jira-gateway 가 등록되어 있고
+        JIRA_BASE_URL/JIRA_API_TOKEN/JIRA_USER_EMAIL 가 환경에 설정되었는가,
+        (2) docs/SETUP.md §4.1 의 curl 검증이 통과하는가.
+        로컬 테스트는 `--local <ticket.json>` 로 Jira 없이 진행할 수 있습니다."
+     작업 폴더 정리: bash: rm -rf {workspace}
+     중단 (이 분기는 콘텐츠 스캔 결과 처리(5.3)와 별개 — 전송/인증 실패다)
+
    응답에는 _filter_metadata가 포함:
    {
      "ticket_id": "...",
