@@ -71,7 +71,11 @@ class TestCost(unittest.TestCase):
     def test_load_prices_override(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "prices.json"
-            p.write_text(json.dumps({"claude-opus-4-7": {"input": 1, "output": 1}}))
+            # _comment / metadata keys must be skipped, not parsed as a model.
+            p.write_text(json.dumps({
+                "_comment": "metadata, not a model",
+                "claude-opus-4-7": {"input": 1, "output": 1},
+            }))
             prices = load_prices(p)
             c = estimate_cost(CanonicalUsage(input=1_000_000), "claude-opus-4-7", "session", prices)
             self.assertAlmostEqual(c.amount_usd, 1.0, places=4)

@@ -109,6 +109,8 @@ def load_prices(path: str | Path | None) -> dict[str, ModelPrice]:
         return prices
     raw = json.loads(Path(path).read_text())
     for model, p in raw.items():
+        if model.startswith("_") or not isinstance(p, dict):
+            continue  # skip comments / metadata keys
         prices[model] = ModelPrice(
             input=Decimal(str(p["input"])),
             output=Decimal(str(p["output"])),
