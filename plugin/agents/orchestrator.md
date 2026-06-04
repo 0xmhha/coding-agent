@@ -42,6 +42,39 @@ report to the user and stop.
 
 ---
 
+## 2.0 MCP pre-flight (fail fast before a long run)
+
+Run once at the start of a `fresh` run, before the top-level loop. The
+Orchestrator only holds jira tool grants, so it does a **config-level** check
+(registration + env) and relies on point-of-use **live** checks downstream:
+jira at intake (`work.md` §5.2), cks at the Planner (`planner.md` §3.0
+`cks.ops.health`), chainbench at the Evaluator (`evaluator.md` §7.0 tool
+pre-flight).
+
+```
+1. Read plugin/.mcp.json (via ${CLAUDE_PLUGIN_ROOT}/.mcp.json). Confirm all
+   three servers are registered: jira-gateway, cks, chainbench.
+   Any missing → report which, point at docs/SETUP.md, and stop (the pipeline
+   cannot complete without them).
+2. Check the env the registered commands substitute are non-empty:
+   bash: for v in CKS_MCP_BIN CKS_CONFIG CHAINBENCH_DIR \
+                  JIRA_BASE_URL JIRA_API_TOKEN JIRA_USER_EMAIL; do
+           [ -n "${!v:-}" ] || echo "UNSET: $v"; done
+   Any UNSET → WARN the user (that server will fail to start). Hard-stop only
+   for the servers this run will actually use:
+     - jira vars: hard-stop unless --local mode.
+     - CHAINBENCH_DIR: WARN now; the Evaluator's §7.0 turns it into a Stage-4
+       FAIL later, so a long ANALYSIS→IMPLEMENTATION run isn't wasted only if
+       you'd rather fail fast — surface it here.
+3. Record the pre-flight result in state.json
+   states.TICKET_INTAKE.mcp_preflight = { servers_registered, env_unset[] }.
+```
+
+This catches the common "registered but unconfigured" failures before the
+LLM spends a full pipeline; it does not replace the downstream live checks.
+
+---
+
 ## 2. Top-level loop
 
 ```

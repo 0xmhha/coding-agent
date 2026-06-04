@@ -2,16 +2,20 @@
 # coding-agent — PostToolUse hook for the Agent tool.
 #
 # Fires after a sub-agent (orchestrator/planner/implementer/evaluator) finishes.
-# Reads the hook payload from stdin (Claude Code passes JSON), extracts the
-# tool result, and appends a structured log line to every active workspace
-# under .coding-agent/tickets/.
+# Reads the hook payload from stdin (Claude Code passes JSON) and writes two
+# things to every active workspace under .coding-agent/tickets/:
+#   1. impl.log         — a one-line human-readable marker (quick index).
+#   2. agent-transcript.jsonl — a transcript record carrying the VERBATIM
+#      sub-agent prompt (input) and response (output), so a run can be replayed
+#      and so input/output token+cost accounting can be derived after the fact
+#      (the substrate for the 3-way comparison report).
 #
 # The hook never fails the pipeline. It exits 0 even when logging is impossible
-# (e.g., outside a git repo) so the agent run is never blocked by hook errors.
+# (e.g., outside a git repo, no jq) so the agent run is never blocked by it.
 
 set -u
 
-# Read the JSON payload (best-effort; if jq isn't installed we use grep).
+# Read the JSON payload (best-effort).
 payload="$(cat 2>/dev/null || true)"
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
@@ -24,31 +28,52 @@ tickets_dir="${repo_root}/.coding-agent/tickets"
 
 ts="$(date -u +%FT%TZ)"
 
-# Try to extract the agent's subagent_type from the payload.
+have_jq=0
+command -v jq >/dev/null 2>&1 && have_jq=1
+
+# Extract subagent_type, the verbatim prompt, and the verbatim response.
 subagent_type="unknown"
-if command -v jq >/dev/null 2>&1; then
+transcript_line=""
+if [ "${have_jq}" -eq 1 ]; then
   extracted="$(printf '%s' "${payload}" | jq -r '.tool_input.subagent_type // empty' 2>/dev/null || true)"
   [ -n "${extracted}" ] && subagent_type="${extracted}"
+
+  # Build a compact JSONL record. tool_response may be a string or an object;
+  # keep it as-is. prompt/description are captured verbatim (no truncation) so
+  # token accounting is exact. Approx char counts are added as a cheap proxy.
+  transcript_line="$(printf '%s' "${payload}" | jq -c \
+    --arg ts "${ts}" \
+    '{
+       ts: $ts,
+       subagent_type: (.tool_input.subagent_type // "unknown"),
+       description: (.tool_input.description // null),
+       prompt: (.tool_input.prompt // null),
+       response: (.tool_response // null),
+       prompt_chars: ((.tool_input.prompt // "") | tostring | length),
+       response_chars: ((.tool_response // "") | tostring | length)
+     }' 2>/dev/null || true)"
 fi
 
-# Append to the impl.log of every active workspace.
-# A workspace is "active" if it has a state.json and current_state != COMPLETED.
+# Write to every active workspace (state.json present and not COMPLETED).
 for ws in "${tickets_dir}"/*/ ; do
   [ -d "${ws}" ] || continue
   state_file="${ws}state.json"
   [ -f "${state_file}" ] || continue
 
   current_state=""
-  if command -v jq >/dev/null 2>&1; then
+  if [ "${have_jq}" -eq 1 ]; then
     current_state="$(jq -r '.current_state // empty' "${state_file}" 2>/dev/null || true)"
   fi
-  if [ "${current_state}" = "COMPLETED" ]; then
-    continue
-  fi
+  [ "${current_state}" = "COMPLETED" ] && continue
 
   mkdir -p "${ws}logs"
   printf '%s [INFO] hook=on-agent-complete subagent=%s\n' \
     "${ts}" "${subagent_type}" >> "${ws}logs/impl.log" 2>/dev/null || true
+
+  # Transcript JSONL (append one record per agent completion).
+  if [ -n "${transcript_line}" ]; then
+    printf '%s\n' "${transcript_line}" >> "${ws}logs/agent-transcript.jsonl" 2>/dev/null || true
+  fi
 done
 
 exit 0

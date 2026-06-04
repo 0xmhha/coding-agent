@@ -19,6 +19,7 @@ tools:
   - mcp__cks__cks.context.concurrency_impact
   - mcp__cks__cks.context.change_history
   - mcp__cks__cks.context.get_for_task
+  - mcp__cks__cks.ops.health
   - mcp__cks__cks.ops.freshness
   - mcp__cks__cks.ops.index
 skills:
@@ -70,6 +71,25 @@ returns an error, the Planner reports the missing artifacts and stops.
 ---
 
 ## 3. ANALYSIS (modes: fresh, code_review, bugfix re-entry side)
+
+### 3.0 cks health check (record retrieval mode)
+
+Before any retrieval, check the backend so the analysis states its own
+confidence honestly:
+
+```
+health = mcp__cks__cks.ops.health()
+record in analysis.md "Retrieval backend" line:
+  - health.status == "ok"        → full retrieval (ckv semantic + ckg graph)
+  - health.status == "degraded"  → ckv embedder unavailable; semantic_search is
+                                    Smart-Dummy. Note "retrieval DEGRADED — design
+                                    confidence reduced; verify findings against code"
+                                    and lean harder on direct Read of the cited files.
+  - call fails / "down"          → note "cks unavailable; falling back to grep/Read"
+                                    and proceed best-effort (do NOT emit empty analysis).
+```
+
+This is a connectivity/quality signal, distinct from §3.3b freshness (staleness).
 
 ### 3.1 Load + parse the ticket
 
