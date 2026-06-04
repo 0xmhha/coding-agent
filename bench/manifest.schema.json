@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bench experiment manifest",
+  "description": "Defines a 3-way comparison experiment: tasks run under each information-regime mode. Consumed by the bench-orchestration skill; the measurement tool (compare.py) reads the resulting cells.",
+  "type": "object",
+  "required": ["experiment", "modes", "mode_agents", "tasks"],
+  "properties": {
+    "experiment": { "type": "string", "description": "Experiment id; also the dir name under .coding-agent/bench/." },
+    "modes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Mode ids to run (e.g. A_cks, B_code_only, C_code_skills). Cells = tasks x modes."
+    },
+    "mode_agents": {
+      "type": "object",
+      "description": "mode id -> the ANALYSIS/PLANNING/DESIGN agent for that mode.",
+      "additionalProperties": { "type": "string" }
+    },
+    "shared_agents": {
+      "type": "object",
+      "description": "Agents shared by every mode (implement, evaluate).",
+      "properties": {
+        "implement": { "type": "string" },
+        "evaluate": { "type": "string" }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "ticket"],
+        "properties": {
+          "id": { "type": "string" },
+          "ticket": { "type": "string", "description": "path to a ticket.json (the work item)" },
+          "oracle": {
+            "type": "object",
+            "description": "Correctness oracle hints (e.g. which chainbench test must pass).",
+            "properties": {
+              "chainbench_test": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "go_stablenet_root": { "type": "string", "description": "absolute path to the go-stablenet repo under test" },
+    "batch_size": { "type": "integer", "minimum": 1, "default": 1,
+      "description": "cells to run per /bench invocation (token-limit-aware)" }
+  }
+}

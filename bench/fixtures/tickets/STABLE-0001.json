@@ -1,0 +1,20 @@
+{
+  "ticket_id": "STABLE-0001",
+  "type": "Bug Fix",
+  "summary": "WBFT Finalize는 gov_validator 미초기화 시 nil 가드가 필요하다",
+  "description": "## 작업 유형: Bug Fix\n## 요약\nconsensus/wbft Finalize 경로가 gov_validator 시스템 컨트랙트가 아직 초기화되지 않은 상태에서 호출되면 nil pointer로 패닉한다.\n## 재현 방법\n1. 4노드 로컬 네트워크 시작\n2. gov_validator 미설정 상태에서 블록 생성\n## 기대 동작\ngov_validator가 없으면 graceful skip\n## 실제 동작\npanic: nil pointer dereference at consensus/wbft/finalize.go\n## 영향 범위\n- 모듈: consensus\n- 심각도: high\n## 수용 기준\n- [ ] nil guard 추가\n- [ ] regression unit test 추가\n- [ ] race test 통과\n- [ ] chainbench basic/consensus 통과",
+  "assignee": null,
+  "status": "To Do",
+  "status_category": "todo",
+  "labels": ["bug", "consensus"],
+  "created": "2026-06-04T00:00:00Z",
+  "updated": "2026-06-04T00:00:00Z",
+  "_filter_metadata": {
+    "scan_result": "CLEAN",
+    "redacted_count": 0,
+    "redacted_patterns": [],
+    "blocked_patterns": [],
+    "warnings": [],
+    "scanned_at": "2026-06-04T00:00:00Z"
+  }
+}
