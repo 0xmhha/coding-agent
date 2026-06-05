@@ -6,10 +6,10 @@
 | 항목 | 값 |
 |------|----|
 | 작성일 (최초) | 2026-05-29 |
-| 최종 갱신 | 2026-06-01 — code-level verification 보고서 반영 |
-| 마지막 커밋 | `9226b34 docs: add code-level implementation verification report` |
+| 최종 갱신 | 2026-06-05 — R1′ refactor 적용 + Step 1~9 + 후속 4개 PR(통합검증·MCP health·3-way bench·도메인 큐레이션 plan) 반영 |
+| 마지막 커밋 | `31e42da docs(r1-refactor): add the domain-knowledge curation plan (#4)` |
 | 브랜치 | `main` (origin과 동기화) |
-| 작업 진행률 | Phase 1·2·5·7 충실 구현. Phase 3·4·6에 코드 격차 발견 (§6.2·§7.1 F 참조). 문서/RI 상태와 코드 사이 일부 불일치 보정 진행 중 |
+| 작업 진행률 | R1′ Step 1~9 + 후속 PR #2/#3/#4 완료. 자체 cks shim 삭제 + 외부 cks/chainbench 위임 + 3-way bench harness + transcript observability. **남은 격차** = P0 도메인 콘텐츠 작성(외부 `code-knowledge-system` 저장소 소관) + 외부 03/04 출하 후 E2E 검증 |
 
 ---
 
@@ -19,11 +19,13 @@
 
 **대상 코드베이스**: `go-stablenet` — geth fork. WBFT consensus, ETH 대신 stable coin native, system contracts 다수.
 
-**기술 스택**: Claude Code Plugin (auto-discovery) + Go MCP servers (CKV/CKG + Jira Gateway) + Bash hooks + SQLite (modernc.org/sqlite, CGo-free) + 선택적 Ollama (nomic-embed-text).
+**기술 스택**: Claude Code Plugin (auto-discovery) + Jira Gateway Go MCP (in-tree) + **외부 cks/chainbench MCP** (R1′ 이후 sibling repos) + Bash hooks + Python 3-way bench harness (in-tree). 임베딩은 Ollama + `bge-m3` (다국어, 1024-dim, R1′ 필수).
 
 **핵심 보안 원칙**: 민감 정보(시크릿/사내 정보)는 LLM에 도달하기 전에 차단해야 한다 → 모든 외부 데이터는 **Proxy MCP Gateway** 패턴으로 필터링.
 
-**현재 상태**: 사양 + 구현 + RI 감사 + 셋업 가이드까지 완료. 실 환경 실증과 운영성(README, CI, 릴리즈)이 남음.
+**R1′ 이후 아키텍처 원칙**: **Binary = deterministic, Session = LLM**. 외부 백엔드(ckv/ckg/cks/chainbench) 바이너리는 결정론(임베딩·그래프·검증). 모든 LLM 작업은 coding-agent 세션 레이어에 거주.
+
+**현재 상태**: R1′ Step 1~9 + 후속 PR(통합검증·MCP health pre-flight·transcript observability·3-way bench harness·도메인 큐레이션 plan) 적용 완료. **남은 잠금 작업** = (1) 외부 cks 저장소의 도메인 entry 작성·verified 승격 (P0, 외부), (2) 외부 03(real cks)/04(chainbench D1) 출하 대기, (3) E2E 검증.
 
 ---
 
@@ -72,6 +74,7 @@ ticket.json (Jira description ADF→Markdown + 민감정보 필터링)
 - `/review <PR#>`: PR 코멘트 수집 → 7유형 × 4심각도 분류 → review-feedback-{N}.md → bugfix 모드로 ANALYSIS 재진입
 - `/merge <PR#>`: 5단계 전제조건 검증 → squash merge → Jira 완료 처리
 - `/status [JIRA-ID]`: 활성 워크스페이스 또는 단일 티켓 상세 확인
+- **`/bench <manifest> | <experiment-id> --continue`** (R1′ 후속, PR #3): 동일 태스크를 A(cks)/B(code-only)/C(code+skills) 3 정보 regime으로 자율 실행. 결정론적 도구 `bench/compare.py`가 토큰·비용·정확성·안전성 비교. token limit 인지 배치+재개. `bench-orchestration` skill이 오케스트레이션 계약 보유
 
 **파이프라인 변종 (RI-18, RI-19)**:
 - `feature` (기본): 위의 풀 사이클
@@ -99,63 +102,65 @@ ticket.json (Jira description ADF→Markdown + 민감정보 필터링)
 ```
 coding-agent/
 ├── HANDOFF.md                       ← 이 문서. 새 세션 진입점
-├── go.work                          ← 두 Go module 통합
+├── go.work                          ← jira-gateway-mcp 단일 멤버 (R1′로 cks-mcp 멤버 삭제)
 ├── shared/
 │   └── patterns.json                ← 14개 민감정보 패턴 (CRITICAL/HIGH/MEDIUM + entropy)
+├── contract/                        ← R1′ Step 1 신규
+│   ├── agent-mcp.schema.json        ← C1 SSoT — 26 tools (13 cks + 7 chainbench + 6 jira)
+│   └── lint-tool-names.sh           ← agent/command 마크다운의 도구 참조 vs schema drift 검출
 ├── plugin/                          ← Claude Code Plugin 본체
 │   ├── .claude-plugin/plugin.json   ← Plugin manifest
-│   ├── .mcp.json                    ← jira-gateway / cks 서버 등록
+│   ├── .mcp.json                    ← 3개 서버: jira-gateway (in-tree), cks/chainbench (외부)
 │   ├── commands/
-│   │   ├── work.md                  ← /work — 메인 진입점 (--local 지원)
+│   │   ├── work.md                  ← /work — 메인 진입점 (--local 지원, jira 실패 분기)
 │   │   ├── review.md                ← /review — PR 코멘트 수집/분류
 │   │   ├── status.md                ← /status — 활성/단일 티켓 상태
-│   │   └── merge.md                 ← /merge — squash merge + post-merge
+│   │   ├── merge.md                 ← /merge — squash merge + post-merge
+│   │   └── bench.md                 ← /bench — 3-way harness (R1′ PR #3)
 │   ├── agents/
-│   │   ├── orchestrator.md          ← 상태 전이 dispatch + 파이프라인 변종 분기
-│   │   ├── planner.md               ← ANALYSIS/PLANNING/DESIGN (4 modes)
-│   │   ├── implementer.md           ← 브랜치 관리 + per-step 구현 + checkpoint
-│   │   └── evaluator.md             ← 4-stage 검증 (unit/lint/security/chainbench)
+│   │   ├── orchestrator.md          ← 상태 전이 dispatch + §2.0 MCP pre-flight (R1′ PR #2)
+│   │   ├── planner.md               ← ANALYSIS/PLANNING/DESIGN (4 modes) + §3.0 cks.ops.health
+│   │   ├── implementer.md           ← 브랜치 관리 + per-step 구현 + §6.1 build/bin/gstable
+│   │   ├── evaluator.md             ← 4-stage 검증 (unit/lint/security/chainbench), C1 도구 이름
+│   │   ├── bench-planner-codeonly.md   ← bench mode B (grep/read만, no cks) (R1′ PR #3)
+│   │   └── bench-planner-skills.md     ← bench mode C (grep/read + comprehension skills) (R1′ PR #3)
 │   ├── skills/
-│   │   ├── state-machine/SKILL.md   ← state.json 읽기/쓰기/get_resume_point/transition guards
-│   │   ├── template-parse/SKILL.md  ← 4가지 work-type 파싱 (ADF 참고 주석 포함)
-│   │   ├── stablenet-context/SKILL.md ← 도메인 분류 + 복잡도 + impact graph
-│   │   └── pr-sanitize/SKILL.md     ← outbound 민감정보 스크러버
+│   │   ├── state-machine/SKILL.md       ← state.json 읽기/쓰기/get_resume_point/transition guards
+│   │   ├── template-parse/SKILL.md      ← 4가지 work-type 파싱 (ADF 참고)
+│   │   ├── stablenet-context/SKILL.md   ← path→module 경량 분류기로 deprecate (R1′ Step 3)
+│   │   ├── stablenet-invariants/SKILL.md ← L3 always-on 비잔틴 공정성 invariant (R1′ Step 4)
+│   │   ├── pr-sanitize/SKILL.md         ← outbound 민감정보 스크러버
+│   │   └── bench-orchestration/SKILL.md ← 3-way harness 오케스트레이션 (R1′ PR #3)
 │   └── hooks/
 │       ├── hooks.json               ← PostToolUse 매핑
-│       ├── on-agent-complete.sh     ← 서브에이전트 종료 로깅 (fail-open)
+│       ├── on-agent-complete.sh     ← verbatim prompt/response → agent-transcript.jsonl (R1′ PR #2)
 │       └── on-commit.sh             ← 커밋 hash/subject/stat을 impl.log 기록
-├── tools/                           ← MCP 서버 실제 구현 (Go)
-│   ├── jira-gateway-mcp/            ← Phase 2
-│   │   ├── go.mod (modernc-free)
-│   │   ├── cmd/server/main.go
-│   │   └── internal/
-│   │       ├── jira/                 ← client.go, adf.go, adf_test.go
-│   │       ├── filter/               ← engine.go, patterns.go, entropy.go, redactor.go + tests
-│   │       ├── server/server.go      ← 6개 tool 등록 (3 read + 3 write)
-│   │       └── types/types.go
-│   └── cks-mcp/                     ← Phase 3+4
+├── tools/                           ← in-tree MCP 서버 (jira-gateway만 남음)
+│   └── jira-gateway-mcp/            ← Phase 2 (43 tests pass, R1′ 변경 없음)
 │       ├── go.mod
-│       ├── cmd/server/main.go        ← CKV+CKG 공유 SQLite 경로
-│       └── internal/
-│           ├── ckv/                  ← chunker, embedder, store, bm25, reranker, search, indexer
-│           ├── ckg/                  ← relations(Tier1/Tier2), history, concurrency, store, traversal, query, indexer
-│           ├── filter/               ← sensitive filter (jira-gateway 포팅, CKS_PATTERNS_PATH 우선)
-│           ├── server/server.go      ← 5개 tool (ckv_search, ckv_index, ckg_query, ckg_impact, ckg_index)
-│           └── types/types.go
+│       ├── cmd/server/main.go
+│       └── internal/{jira, filter, server, types}/
+├── bench/                           ← R1′ PR #3 — 3-way 비교 harness (Python)
+│   ├── compare.py                   ← A/B/C 결정론적 비교 + report 생성
+│   ├── lib/{capture,collect,report,usage}.py
+│   ├── manifest.schema.json         ← 실험 manifest 스키마
+│   ├── manifests/example.json
+│   ├── fixtures/tickets/STABLE-0001.json
+│   ├── prices.json                  ← 모델별 토큰 단가
+│   └── tests/test_{report,usage}.py
 └── docs/
-    ├── SETUP.md                     ← 10-section 설치/실행 가이드 (RI-16)
-    ├── superpowers/specs/           ← 8개 설계 문서
-    │   ├── 2026-05-27-coding-agent-plugin-design.md   ← 전체 시스템 설계
-    │   ├── phase1-plugin-skeleton-state-machine.md
-    │   ├── phase2-jira-gateway-mcp-sensitive-filter.md
-    │   ├── phase3-cks-mcp-ckv.md
-    │   ├── phase4-cks-mcp-ckg.md
-    │   ├── phase5-agent-pipeline.md
-    │   ├── phase6-evaluator-chainbench.md
-    │   └── phase7-pr-review-cycle.md
+    ├── SETUP.md                     ← R1′ Step 9 재작성: bge-m3 필수, CKS_MCP_BIN/CKS_CONFIG/CHAINBENCH_DIR
+    ├── r1-refactor/                 ← R1′ 설계 문서 (다른 세션이 작성)
+    │   ├── 00-system-contract.md    ← keystone spec
+    │   ├── 01-ckg-refactor.md ~ 05-coding-agent-refactor.md
+    │   ├── 06-integration-verification.md  ← 2026-06-04 5-저장소 감사 보고서
+    │   ├── 07-domain-knowledge-curation.md ← 7-persona 도메인 큐레이션 plan (P0)
+    │   └── plans/                   ← 01~05의 상세 구현 plan
+    ├── superpowers/specs/           ← 8개 Phase 설계 문서 (역사 기록 보존)
     └── plan/
-        ├── WORK_BREAKDOWN.md        ← Phase별 작업 수 + 통계
-        ├── REVIEW_ISSUES.md         ← 23개 RI + 최종 감사 (2026-05-29 모두 RESOLVED)
+        ├── WORK_BREAKDOWN.md
+        ├── REVIEW_ISSUES.md         ← 23개 RI (증거 경로 R1′ 적용 후 일부 stale, 작업 별도)
+        ├── IMPLEMENTATION_VERIFICATION.md ← 2026-05-31 스냅샷 (R1′가 흡수, Superseded)
         ├── common-tasks.md
         └── phase{1..7}-tasks.md
 ```
@@ -168,128 +173,143 @@ coding-agent/
 
 | 결정 | Why | 위치 |
 |------|-----|------|
-| **MCP 서버 언어 = Go** | 처음 TypeScript로 시작 → 사용자가 "다른 TS 사용처 없는데 Go로 충분하지 않냐"고 지적. Go는 단일 바이너리, CGo-free, 빠른 시작, geth 생태계와 동일 언어 | `tools/*/go.mod` |
+| **Jira Gateway MCP 언어 = Go** | 처음 TypeScript로 시작 → 사용자가 "다른 TS 사용처 없는데 Go로 충분하지 않냐"고 지적. 단일 바이너리, 빠른 시작, geth 생태계 동일 언어 | `tools/jira-gateway-mcp/go.mod` |
 | **B+C 하이브리드 아키텍처** | A(B-only)는 LLM 호출 분리 어려움, C(C-only)는 컨텍스트 손실 시 복원 불가. 둘 다 채택 — 상태는 파일, 실행은 에이전트 격리 | `docs/superpowers/specs/2026-05-27-*.md` §2 |
-| **Proxy MCP Gateway 패턴** | Sensitive check skill로 처리 시 이미 LLM에 데이터가 도달 → 무용. MCP 서버 내부에서 outbound 전에 filter. | `tools/jira-gateway-mcp/internal/filter/` |
-| **modernc.org/sqlite (CGo-free)** | sqlite-vss는 C 확장이라 CGo 강제. 크로스 플랫폼 빌드 복잡. brute-force cosine for ~20K chunks × 768d = 10–50ms이므로 MVP 충분 | `tools/cks-mcp/internal/ckv/store.go:17` 주석 |
-| **BM25 폴백 (Tier 2)** | Ollama 미설치 환경에서도 CKV 사용 가능하도록. `engine` 필드로 클라이언트가 fallback 사용 여부 식별 | `tools/cks-mcp/internal/ckv/bm25.go` |
-| **Tier-1 typed + Tier-2 AST-only 폴백** | `packages.Load` 실패 (빌드 환경 미비) 시에도 관계 추출 가능하도록. confidence 등급으로 신뢰도 표면화 | `tools/cks-mcp/internal/ckg/relations.go:27` |
-| **code_hash 캐시** | incremental indexing 시 변경 안 된 청크는 임베딩 재계산 스킵 → Ollama 호출 비용 절감 | `tools/cks-mcp/internal/ckv/store.go` chunks.code_hash 컬럼 |
+| **Proxy MCP Gateway 패턴** | Sensitive check skill로 처리 시 이미 LLM에 데이터가 도달 → 무용. MCP 서버 내부에서 outbound 전에 filter | `tools/jira-gateway-mcp/internal/filter/` |
+| **R1′ Binary = deterministic / Session = LLM** | 외부 백엔드(ckv/ckg/cks/chainbench) 바이너리에 LLM 호출 0. 모든 LLM 작업은 coding-agent 세션 레이어 | `docs/r1-refactor/00-system-contract.md §2.2` |
+| **R1′ cks가 유일한 agent-facing 검색 MCP** | ckv(의미→키워드) + ckg(키워드→코드)는 cks가 in-process로 컴포지션. agent는 13개 `cks.context.*`/`cks.ops.*` 도구만 사용. ckv/ckg MCP는 dev-only build tag | `docs/r1-refactor/00-system-contract.md §3 C1` + `contract/agent-mcp.schema.json` |
+| **C1 SSoT JSON Schema + 도구 이름 lint** | 자체 cks shim의 5 도구 → 외부 cks의 13 도구로 명명 drift 방지. 모든 agent/command 도구 참조를 schema와 lint script로 결정론적 검증 | `contract/lint-tool-names.sh` (EXIT 0 = drift 없음) |
+| **자체 cks-mcp shim 폐기** | R1′ Step 6: 자체 in-tree 구현이 외부 cks와 표면이 불일치. 외부 cks가 더 풍부한 도메인 시스템을 제공하므로 in-tree 코드 통째 삭제 + `${CKS_MCP_BIN}` 외부 바이너리 위임 | `plugin/.mcp.json` (`cks` 항목), `go.work` 멤버 1개 |
 | **ADF→Markdown 자체 구현 (Option B)** | Option A(HTML 경유)는 HTML 변환 라이브러리 추가 의존. Option B(ADF 직접 파싱)가 의존성 그래프 가벼움 | `tools/jira-gateway-mcp/internal/jira/adf.go` |
 | **transition 3-tier lookup (RI-05)** | Jira workflow의 transition name은 프로젝트별로 다름. name → status name → statusCategory key 순으로 case-insensitive 매칭 → 별도 설정 파일 없이 흡수 | `tools/jira-gateway-mcp/internal/jira/client.go:140 TransitionIssue` |
-| **patterns.json 공유 = env 주입** | 빌드 시 embed 또는 symlink는 빌드 의존성 생성. env (`PATTERNS_PATH`, `CKS_PATTERNS_PATH`) 주입 + 폴백 경로 탐색이 가장 단순 | `plugin/.mcp.json` env block |
+| **patterns.json 공유 = env 주입** | 빌드 시 embed 또는 symlink는 빌드 의존성 생성. env (`PATTERNS_PATH`) 주입 + 폴백 경로 탐색이 가장 단순 | `plugin/.mcp.json` env block |
+| **bge-m3 (다국어, 1024-dim)** | nomic 모델은 영어 전용. 사용자가 한국어 사용 → 다국어 임베더 필요. 1024-dim은 bge-large와 동일 → 향후 swap 시 스키마 마이그레이션 없음 | `docs/SETUP.md §4.3` + R1′ `02-ckv-refactor.md` |
+| **MCP pre-flight 3-layer** (R1′ PR #2) | 단일 SessionStart hook 부재 → 3 위치에서 분담: orchestrator §2.0 (config-level), work.md §5.2 (jira 실패 분기), planner §3.0 (`cks.ops.health`), evaluator §7.0 (chainbench 도구 lint) | `plugin/agents/{orchestrator,planner,evaluator}.md` |
+| **L3 invariant backstop을 skill로** (R1′ Step 4) | Claude Code SessionStart 주입 없음 → planner+evaluator에 grant된 `stablenet-invariants` skill로 ~500토큰 invariant block을 always-on | `plugin/skills/stablenet-invariants/SKILL.md` |
+| **stablenet-context 정적 deprecate** (R1′ Step 3) | 정적 contract 이름(`GovStaking` 등)은 시간에 따라 drift → path→module 분류기로만 축소. 도메인 지식은 cks 라이브 검색 + `stablenet-invariants` backstop | `plugin/skills/stablenet-context/SKILL.md` |
+| **implementer→evaluator binary handoff (S6)** (R1′ Step 5) | 자체 빌드 시 stale tree 위험. implementer가 `build/bin/gstable` + state.json 기록, evaluator는 commit 일치 시 그것을 사용, 아니면 fallback 빌드 | `plugin/agents/implementer.md §6.1` + `evaluator.md §7.1` |
+| **3-way bench Python harness** (R1′ PR #3) | 결정론적 측정은 Python (Go agent와 분리). 모드 A(cks)/B(code-only)/C(code+skills) 격리, 모델은 `claude-opus-4-7`로 고정 — 정보 regime만 비교 | `bench/compare.py` + `plugin/skills/bench-orchestration/SKILL.md` |
+| **transcript-grade observability** (R1′ PR #4 of PRs / Step PR #2) | 06 보고서 P4: agent-transcript.jsonl에 verbatim prompt/response + char counts → 토큰/비용 사후 계산 가능. 3-way bench의 substrate | `plugin/hooks/on-agent-complete.sh` |
 | **/merge body 2-tier 전략 (RI-14)** | step ≤10 → 전체 나열 / 11+ → [Interface, Implementation, Tests, Docs, Misc] 5-카테고리 버킷 | `plugin/commands/merge.md §4.2` |
 | **commit 분할 (atomic / reviewable / verifiable)** | Planner가 step을 단일 책임 단위로 쪼개고, Implementer가 step당 1커밋. 리뷰어 시점에서 reasoning 추적 가능 | `plugin/agents/planner.md §4` + `implementer.md §4` |
-| **race detector scope 제한 (RI-21)** | 전체 -race는 시간 폭발. CKG concurrency_impact에서 위험 패키지만 race_pkgs로 추출해 그쪽만 실행 | `plugin/agents/evaluator.md §4.4` |
+| **race detector scope 제한 (RI-21)** | 전체 -race는 시간 폭발. CKG `concurrency_impact`에서 위험 패키지만 race_pkgs로 추출해 그쪽만 실행 | `plugin/agents/evaluator.md §4.4` |
 | **release 변종에서 tag/push는 사용자 확인 게이트** | 자동 태깅·푸시는 되돌리기 어려움. orchestrator에 "Never tag or push tags without user confirmation" 명시 | `plugin/agents/orchestrator.md §6 safety policies` |
 
 ---
 
 ## 6. 완료한 작업 (검증된 사실)
 
-### 6.1 Phase 단위 (2026-06-01 보정)
+### 6.1 Phase 단위 (R1′ 흡수 후, 2026-06-05 보정)
 
-| Phase | 작업 수 | 상태 | 주요 산출물 / 격차 |
-|-------|---------|------|-----------|
-| Phase 1 (Skeleton + State Machine) | 10 | ✅ 충실 (초과) | plugin manifest, 4 commands, state-machine/template-parse/stablenet-context skills, hooks 동작 스크립트 |
-| Phase 2 (Jira Gateway MCP) | 7 | ✅ 충실 (43 tests pass) | Go MCP server, 자체 ADF 변환, 6 tools, sensitive filter + fail-safe. **누락**: `logs/sensitive-block-*.log` 감사파일, server/jira HTTP 단위 테스트 |
-| Phase 3 (CKV) | 10 | ⚠️ 동작하나 격차 (22 tests pass) | AST chunker / Ollama probe / BM25 / brute-force cosine / reranker / indexer 구현됨. **격차**: 배치 임베딩 누락(P3-3 수용 기준), "하이브리드"가 점수 융합이 아닌 단순 폴백, 구조체 >50필드 분할 미구현, 통합 테스트 부재 |
-| Phase 4 (CKG) | 9 | ⚠️ 정확도 미달 (9 tests pass, -race clean) | 4테이블 store, 7 관계, history+분류, 동시성 분석, BFS+impact 구현. **격차**: `calls`가 `_ = info`로 타입 무시한 이름 기반 매칭 (relations.go:657) → 동명 함수 오연결·interface→구현 엣지 없음. `channels`가 producer→consumer 매칭 없는 셀프루프 (relations.go:631). `code_snippet` 항상 빈 값, const/var 노드 미생성, `ckg_index` incremental 모드 없음, CKV+CKG 단일 AST 패스 통합 미달 |
-| Phase 5 (Agent Pipeline) | 9 | ✅ 충실 | Orchestrator + Planner(4 modes) + Implementer + checkpoint + hooks. **이슈**: 모든 에이전트가 비표준 모델 ID(`opus-4.7`/`sonnet-4.6`) 사용 — 런타임 resolve 실패 가능 |
-| Phase 6 (Evaluator) | 7 | ⚠️ Evaluator 사양만 완비 | Stage 1~3(unit+race/lint/security)는 spec 충실. **격차**: ChainBench 구현체 0건, `plugin/.mcp.json`에 chainbench 서버 미등록 → `mcp__chainbench__*` 호출 영구 resolve 실패 → Stage 4는 RI-20 §7.0 pre-flight에서 항상 BLOCKED |
-| Phase 7 (PR + Review + Merge) | 7 | ✅ 충실 | PR body 조립, pr-sanitize, /review 7×4 분류, /merge 5-precondition + size-aware body. **소소한 이탈**: 재리뷰가 `gh pr ready` 대신 `--add-reviewer`, 산출물명 `plan-review-{N}` → `plan-fix-{N}` |
-| 공통 | 4 | ✅ (Q-1/Q-2 부분만 별도 분리 가능) | patterns.json, workspace 패턴, safeguards, evaluator logs |
+| Phase | 작업 수 | 상태 | 비고 |
+|-------|---------|------|------|
+| Phase 1 (Skeleton + State Machine) | 10 | ✅ 충실 | R1′ 변경 없음 (state-machine/template-parse 유지) |
+| Phase 2 (Jira Gateway MCP) | 7 | ✅ 충실 (43 tests pass) | R1′ 변경 없음. 단 work.md §5.2에 jira 호출 실패 분기 추가 (PR #2) |
+| Phase 3·4 (자체 CKV·CKG) | 19 | 🗑️ **삭제** (R1′ Step 6) | `tools/cks-mcp/` 통째 폐기. 외부 `code-knowledge-system`(cks)이 ckv+ckg를 in-process로 컴포지션. 우리 Phase 3·4 코드의 격차(F-2/F-3/F-4/F-6/F-8)는 외부 cks/ckg/ckv 저장소가 흡수 |
+| Phase 5 (Agent Pipeline) | 9 | ✅ R1′로 강화 | 도구 이름 C1으로 rename(Step 7), 모델 ID GA(Step 2), implementer→evaluator binary handoff(Step 5), planner §3.0 `cks.ops.health`(PR #2), orchestrator §2.0 pre-flight(PR #2) |
+| Phase 6 (Evaluator) | 7 | ✅ R1′로 해소 | `chainbench_init/test_run/report` 이름 수정(Step 8), `.mcp.json` chainbench 등록(Step 6), `summary.failed` 파싱(Step 8). 04 D1 출하 대기 (텍스트 vs JSON 응답) |
+| Phase 7 (PR + Review + Merge) | 7 | ✅ 충실 | R1′ 변경 없음 |
+| 공통 (4) | 4 | ✅ | R1′ 변경 없음 |
+| **R1′ Step 1~9** | 9 | ✅ 완료 (commit `76a285d`) | C1 SSoT 스키마 + lint, 모델 ID, stablenet-context deprecate, L3 invariant skill, binary handoff, cks shim 삭제, planner rewiring, evaluator rewiring + chainbench 등록, SETUP 재작성 |
+| **R1′ 후속 PR #2** (commit `386e1a9`) | — | ✅ | MCP pre-flight (orchestrator §2.0 + work.md §5.2 + planner §3.0) + transcript-grade observability (`on-agent-complete.sh`) |
+| **R1′ 후속 PR #3** (commit `725c22e`) | — | ✅ | `/bench` 명령 + `bench/` Python harness + `bench-orchestration` skill + 2개 bench planner agent |
+| **R1′ 후속 PR #4** (commit `31e42da`) | — | ✅ | `docs/r1-refactor/07-domain-knowledge-curation.md` plan 추가. 실 entry 작성은 외부 cks 저장소 소관 (P0) |
 
-> 격차의 상세 코드 위치와 권고는 `docs/plan/IMPLEMENTATION_VERIFICATION.md` (2026-05-31 검증 보고서) 참조. 이 문서가 발견한 격차는 §7.1 F (코드 격차 수정) 카테고리로 분류됨.
+### 6.2 Review Issue 감사 (R1′ 흡수 후, 2026-06-05 재평가)
 
-### 6.2 Review Issue 감사 (2026-06-01 재평가)
+`docs/plan/REVIEW_ISSUES.md`의 23개 RI 중 R1′가 처리한 항목:
 
-`docs/plan/REVIEW_ISSUES.md` §"최종 감사 (2026-05-29)"에서는 23개 모두 `RESOLVED` 선언. 2026-05-31 코드 검증 보고서가 일부 항목을 보정해야 함을 발견:
+| RI | 2026-06-01 상태 | 2026-06-05 실제 상태 | 처리 경로 |
+|----|--------------|------------------|---------|
+| RI-09 (인덱싱 시간) | PARTIALLY RESOLVED | **외부 ckv로 이관** | 자체 코드 삭제. 외부 `code-knowledge-vector` 02-plan Part D #4가 throughput 후속으로 다룸 |
+| RI-10 (AST Tier-1 typed) | PARTIALLY RESOLVED | **외부 ckg로 이관** | 자체 코드 삭제. 외부 `code-knowledge-graph` `statements.go:206`이 이미 `types.Info` 사용 |
+| RI-20 (ChainBench) | OPEN | **RESOLVED (구조)** | `.mcp.json`에 chainbench 등록(Step 6), evaluator §7.0 도구 이름 C1 정렬(Step 8). 단 04 D1(`report{format:"json"}` 실 JSON 반환)은 외부 출하 대기 |
 
-| RI | 기존 상태 | 보정 후 실제 상태 | 사유 |
-|----|----------|-----------------|------|
-| RI-10 (AST Tier-1 typed) | RESOLVED | **PARTIALLY RESOLVED** | Tier-1 진입은 하지만 `calls` 추출에서 `_ = info`로 타입 정보 무시하고 이름 기반 lookup. "타입 기반 정확 추출" 주장 미달 |
-| RI-20 (ChainBench 인터페이스) | RESOLVED (사양 단계 완료) | **OPEN (코드 격차)** | Pre-flight 사양만 있고 `.mcp.json`에 chainbench 미등록 → tool 호출 자체가 영구 resolve 실패 |
-| RI-09 (인덱싱 시간) | RESOLVED | **PARTIALLY RESOLVED** | code_hash 캐시는 구현됐지만 배치 임베딩(P3-3 수용 기준) 미구현으로 worst-case 시간 미해소 |
+증거 경로 갱신 필요 (10개 RI: 01/07/08/09/10/11/15/20/22/23): 본문은 유효하지만 `tools/cks-mcp/...` 코드 경로가 부재. → 별도 작업으로 분리 (REVIEW_ISSUES.md 갱신).
 
-런타임 실증 잔존 (사용자 환경 종속):
-- **RI-08, 부분 RI-09**: Ollama 가용성. BM25 폴백 + code_hash 캐시로 worst-case 부분 흡수
+### 6.3 SETUP.md (R1′ Step 9 재작성)
 
-### 6.3 SETUP.md (RI-16)
+R1′ 토폴로지(3 서버: jira-gateway in-tree, cks·chainbench 외부) + bge-m3 필수 + 환경변수(`CKS_MCP_BIN`/`CKS_CONFIG`/`CHAINBENCH_DIR`) 반영.
 
-10개 섹션. 새 머신에서 실행 시 첫 참조 문서: prerequisites → clone → build → env vars → plugin install → 첫 인덱싱 → smoke test (--local) → real workflow → troubleshooting → next reading.
+### 6.4 06 통합 검증 보고서 (commit `feeecc6`)
 
-### 6.4 통합 검증 발견 사항 (해결됨)
+5 저장소 read-only 감사. 10 case 중 **6 DONE, 3 PARTIAL, 1 MISSING**. 3 격차:
+- **P0 도메인 콘텐츠 비어 있음** — 23 entries 0 verified, 마커 0건. 도메인 지식 운영 view가 런타임에 inert (최고 leverage)
+- **P2 MCP health 부분적** — chainbench만 pre-flight, `cks.ops.health` 정의되어 있으나 호출 안 됨 → PR #2로 해소
+- **P1 3-way 비교 harness 부재** — 단일-모드 eval만 있고 A/B/C 비교 없음 → PR #3로 해소
+- **P4 transcript observability** — sub-agent prompt/response verbatim 누락 → PR #2로 해소
 
-- **MCP go-sdk v1.6.1 jsonschema 태그 panic**: `jsonschema:"required,description=..."` 형식이 panic. v1.6.1은 `jsonschema:"description text"` 형식만 허용 (required는 omitempty 부재로 암시). 두 server.go 모두 수정. 커밋 `ebfe5eb`.
+### 6.5 R1′ 흡수의 정량적 영향
+
+- **삭제**: `tools/cks-mcp/` 디렉토리 (15 Go 파일 + go.mod/go.sum/README/.env.example)
+- **추가**: `contract/` (2 파일), `bench/` (15 파일), `plugin/skills/{stablenet-invariants, bench-orchestration}/`, `plugin/agents/bench-planner-*` (2), `plugin/commands/bench.md`, `docs/r1-refactor/` (12 파일)
+- **변경**: `plugin/.mcp.json` (3 서버 등록), `go.work` (멤버 1), `plugin/agents/{orchestrator,planner,implementer,evaluator}.md` (전면 rewiring), `plugin/skills/stablenet-context/SKILL.md` (309→93줄), `plugin/hooks/on-agent-complete.sh`, `plugin/commands/work.md`, `docs/SETUP.md` (409줄 갱신)
+- **lint script EXIT 0**: 45 도구 참조 모두 C1 schema의 26 도구에 일치
 
 ---
 
 ## 7. 남은 작업 (Roadmap)
 
-분류는 우선순위가 아니라 작업 성격. §7.5에 권장 순서.
+분류는 우선순위가 아니라 작업 성격. §7.6에 권장 순서.
 
-### 7.1 F. 코드 격차 수정 (2026-06-01 추가, 최우선)
+### 7.1 F. 코드 격차 수정 — R1′가 흡수 (대부분 종결)
 
-`docs/plan/IMPLEMENTATION_VERIFICATION.md`가 빌드/테스트와 코드 대조로 발견. 우리 문서가 "RESOLVED"라 선언했지만 코드 레벨로는 미달인 항목들.
+| ID | 원래 작업 | R1′ 처리 | 잔존? |
+|----|---------|---------|------|
+| F-1 ChainBench 등록 | `.mcp.json` 추가 | ✅ R1′ Step 6/8 — chainbench 등록 + evaluator 도구 이름 C1 | 종결 |
+| F-2 CKG calls 타입 기반 | `tools/cks-mcp` 수정 | ✅ 자체 코드 삭제. 외부 ckg가 이미 typed (`statements.go:206`) | 종결 |
+| F-3 CKG channels 페어 | `tools/cks-mcp` 수정 | ✅ 자체 코드 삭제. 외부 ckg가 이미 producer/consumer | 종결 |
+| F-4 CKV 배치 임베딩 | `tools/cks-mcp` 수정 | ⚠️ 자체 코드 삭제로 우리 저장소 영향 없음. 외부 ckv도 미해결 (02-plan Part D #4) | **외부 ckv 후속** |
+| F-5 모델 ID | 4 frontmatter | ✅ R1′ Step 2 — claude-opus-4-7 / claude-sonnet-4-6 | 종결 |
+| F-6 CKG incremental | `tools/cks-mcp` 수정 | ✅ 자체 코드 삭제. 외부 ckg 소관 | 종결 |
+| F-7 문서 TS 잔재 정리 | `common-tasks.md`, RI-15/22 | ❌ 미처리 (이 동기화 작업에 포함) | **이 commit에 흡수** |
+| F-8 code_snippet/const-var | `tools/cks-mcp` 수정 | ✅ 자체 코드 삭제. 외부 ckg는 `blobs` 테이블 사용 | 종결 |
 
-| ID | 작업 | 코드 위치 / 근거 | 영향받는 RI |
-|----|------|----------------|------------|
-| F-1 | **ChainBench MCP 등록 또는 외부 설정 안내** | `plugin/.mcp.json`에 `chainbench` 서버 항목 추가하거나 SETUP.md §5에 "사용자가 별도 등록해야 함"을 명시. 현재는 evaluator의 `mcp__chainbench__*` 호출이 영구 resolve 실패 | RI-20 OPEN으로 |
-| F-2 | **CKG `calls` 타입 기반 재구현** | `tools/cks-mcp/internal/ckg/relations.go:641-684 resolveCallEdge` — 이미 로드한 `types.Info`를 사용해 `*types.Func` resolve. `_ = info` 제거. interface dispatch 시 `types.Implements` 활용 | RI-10 PARTIALLY → RESOLVED 복원 |
-| F-3 | **CKG `channels` producer→consumer 매칭** | `tools/cks-mcp/internal/ckg/relations.go:619-639 chanEdge` — 셀프루프 대신 같은 채널 변수에 대한 send/recv 짝 매칭. AST 패스에서 채널 식별자 추적 |  |
-| F-4 | **CKV 배치 임베딩** | `tools/cks-mcp/internal/ckv/indexer.go:158` — 단건 호출 대신 N개 청크 묶어 `embedder.EmbedBatch` 추가. Ollama `/api/embed`는 배치 지원. P3-3 수용 기준 | RI-09 PARTIALLY → RESOLVED 복원 |
-| F-5 | **모델 ID 정정** | `plugin/agents/{orchestrator,planner,implementer,evaluator}.md` frontmatter의 `opus-4.7` → `claude-opus-4-7`, `sonnet-4.6` → `claude-sonnet-4-6` (또는 환경의 실제 alias로 검증) | 런타임 안전성 |
-| F-6 | **CKG incremental + 단일 AST 패스 통합** | `ckg/indexer.go`에 incremental 모드 추가, CKV indexer와 AST 패스 공유 | spec §9 통합 검색 흐름 |
-| F-7 | **문서 TypeScript 잔재 정리** | `docs/plan/common-tasks.md` (COMMON-1), `REVIEW_ISSUES.md` RI-15/RI-22 본문 일부 — Go 기준으로 갱신 | 문서 정확도 |
-| F-8 | **`code_snippet` 채우기, const/var 노드 생성** | CKG store에서 코드 스니펫 컬럼 활용, const/var 선언도 노드 생성 |  |
+### 7.2 P. 06 통합 검증 보고서 잔존 격차 (외부/콘텐츠 의존)
 
-### 7.2 A. 품질 향상 (선택적)
+| ID | 작업 | 차단 요인 | 비고 |
+|----|------|---------|------|
+| **P0** | **도메인 entry 작성·verified 승격** | 외부 `code-knowledge-system` 저장소 + 도메인 전문가 세션 | 23 entry 0 verified → `cks-domain-sync`가 빈 출력. 가장 큰 leverage. 07 plan이 7-persona × 2-tier 전략 제공 |
+| P1 | 3-way bench harness 운영 | bge-m3 인덱싱 (~10시간) + 외부 cks 출하 | ✅ 구조 구현 (R1′ PR #3 — `bench/`, `/bench`, bench-orchestration skill). 실 사용은 외부 환경 의존 |
+| P2 | MCP health pre-flight | — | ✅ R1′ PR #2 — orchestrator §2.0 + planner §3.0 + work.md §5.2 |
+| P3 | `ops.index --policy-file` + 사용 doc | 외부 `code-knowledge-system` `internal/mcp/ops_index.go` | 외부 작업 — `cks.ops.index` 호출 시 governance 엣지 자동 빌드 안 됨 |
+| P4 | transcript observability | — | ✅ R1′ PR #2 — `on-agent-complete.sh`가 agent-transcript.jsonl 기록 |
+
+### 7.3 외부 03/04 출하 의존 (E2E 게이트)
+
+| ID | 차단 요인 | 영향 |
+|----|---------|------|
+| X-1 | **03: 실 cks-mcp 바이너리 + `policies/cks.yaml.example`** | `.mcp.json`의 `${CKS_MCP_BIN}`/`${CKS_CONFIG}` resolve, planner의 cks 도구 13개 호출 |
+| X-2 | **04 D1: `chainbench_report{format:"json"}` 실 JSON 반환** | evaluator §7의 `summary.failed` 파싱. 텍스트면 silent mis-parse |
+| X-3 | 04: `test:"basic/tx-send"` catalog 존재 | evaluator `:373` 호출 — 부재 시 이름 수정 필요 |
+
+### 7.4 A. 품질 향상 (선택적, R1′ 무관)
 
 | ID | 작업 | 범위 | 차단 요인 |
 |----|------|------|---------|
 | Q-1 | `workspace-helper` skill 추출 | 현재 `/work`, `/status`, `/review`, `/merge`에 4중 복제된 `.coding-agent/tickets/{id}_*` 패턴을 단일 skill로 추출 | 없음. 순수 리팩토링 |
 | Q-2 | 에이전트별 통일 로깅 | 현재 evaluator만 `{ws}/logs/eval-*.log` 출력. orchestrator/planner/implementer도 `{ws}/logs/{agent}.log` 패턴 적용 | 없음. SKILL/agent 문서 수정만 |
 
-### 7.3 B. 런타임 실증
+### 7.5 C. 운영성 / 배포
 
 | ID | 작업 | 범위 | 차단 요인 |
 |----|------|------|---------|
-| R-1 | 실 Jira 인스턴스 E2E | jira-gateway MCP 실 호출 + ADF 다양 노드(color/inline card/mention)에서 누락 케이스 확인 | JIRA_BASE_URL + JIRA_API_TOKEN + 실 STABLE-xxxx 티켓 |
-| R-2 | go-stablenet full indexing | CKV full index 시간 측정, BM25 폴백 정확도 검증, CKG relations 추출 신뢰도 확인 | go-stablenet 로컬 clone + (선택) Ollama |
-| R-3 | ChainBench MCP §7.0 pre-flight 실측 | 실제 tool 이름과 spec의 [chainbench_setup, chainbench_start, chainbench_status, chainbench_run_tests, chainbench_stop] 일치 검증. 불일치 시 evaluator.md §7.0 fallback 메시지에 spec 보정 안내 | ChainBench MCP 인스턴스 |
-| R-4 | /work → /review → /merge 풀 사이클 1회 | 단일 STABLE 티켓으로 end-to-end. 누락된 엣지 케이스 노출 | 실 Jira + go-stablenet PR 권한 + ChainBench |
+| O-1 | `README.md` | 프로젝트 1페이지 요약 (SETUP.md는 절차서) | 없음 |
+| O-2 | `LICENSE` | Apache-2.0 또는 MIT 권장 | 사용자 선택 |
+| O-3 | GitHub Actions CI | jira-gateway-mcp 빌드+테스트 + `bash contract/lint-tool-names.sh` + `python -m pytest bench/tests/` | 없음 |
+| O-4 | v0.1.0 첫 릴리즈 | jira-gateway 바이너리 Releases 첨부 + plugin 메타 v0.1.0 | O-3 통과 후 |
 
-### 7.4 C. 운영성 / 배포
+### 7.6 권장 진행 순서 (2026-06-05 재조정)
 
-| ID | 작업 | 범위 | 차단 요인 |
-|----|------|------|---------|
-| O-1 | `README.md` | 프로젝트 1페이지 요약. SETUP.md는 절차서이므로 별도 | 없음 |
-| O-2 | `LICENSE` | Apache-2.0 또는 MIT 권장 (사용자 확인 필요) | 사용자 선택 |
-| O-3 | GitHub Actions CI | 두 MCP 서버 빌드 + `go test ./...` + `go vet` | 없음 |
-| O-4 | v0.1.0 첫 릴리즈 | 빌드된 두 바이너리를 Releases에 첨부 → SETUP.md "Build from source" 스킵 가능 | O-3 통과 후 |
+이전 "모두 홀드" 지시 잔존 — R1′ 외 작업은 사용자 명시 승인 후에만 진행. 그 가정 위에서:
 
-### 7.5 D. 후속 확장 (Out of scope, 후순위)
-
-- 다중 ticket 동시 처리 (현재 single workspace 락 가정)
-- GitLab/Gitea 지원 (현재 `gh` CLI/GitHub PR API 종속)
-- 다른 geth fork 지원 (stablenet-context skill 일반화)
-
-### 7.6 권장 진행 순서 (2026-06-01 재조정)
-
-코드 격차가 운영성보다 먼저. "외부 공개 전에 진짜 동작하는지부터" 원칙:
-
-1. **F-5 모델 ID 정정** — 5분. 미수정 시 런타임 에이전트 디스패치 자체가 실패할 수 있음. 가장 먼저
-2. **F-1 ChainBench 등록 또는 안내** — 30분. evaluator Stage 4가 영구 BLOCKED인 현 상황 해소. SETUP.md §9에 트러블슈팅 보강
-3. **O-3 CI** — 1-2시간. 후속 변경 회귀 방지. F-2 이후 작업의 안전망
-4. **F-2 CKG calls 타입 기반** — 3-4시간. CKG 정확도의 핵심. 이미 `types.Info` 로드 중이라 활용만 하면 됨
-5. **F-4 CKV 배치 임베딩** — 2-3시간. Ollama API는 배치 지원
-6. **F-7 문서 TS 잔재 정리** — 30분. 신뢰성 확보
-7. **O-1 README** — 1시간. F-1~F-5 보정 후 정확한 현황 반영
-8. **F-3, F-6, F-8** — Phase 4 정확도 추가 개선
-9. **Q-1, Q-2** — 리팩토링
-10. **O-2 LICENSE, O-4 v0.1.0** — 외부 공개 단계
-11. **R-1, R-2, R-3, R-4** — 실 환경 의존
+1. **이 commit: HANDOFF/REVIEW_ISSUES/IMPLEMENTATION_VERIFICATION 동기화 + F-7 흡수** — 현 작업
+2. **F-4 외부 ckv 이슈 제기** — 사용자 명시 위임 후. 외부 저장소 GitHub issue
+3. **외부 03/04 출하 대기** — 다른 세션 소관
+4. **P0 도메인 entry 작성** — 외부 `code-knowledge-system` + 도메인 전문가
+5. **(03/04 출하 후) X-1/X-2/X-3 검증** — `.mcp.json` 환경변수 실측 + chainbench D1 응답 형식 확인
+6. **E2E 풀 사이클** — `/work` → `/review` → `/merge` + `/bench` 첫 실행
+7. **O-3 CI, O-1 README, Q-1/Q-2, O-2/O-4** — R1′ 외 운영성/품질. 사용자 명시 승인 시
 
 ---
 
@@ -298,97 +318,100 @@ coding-agent/
 ### 8.1 최소 읽기 순서 (15분 안에 컨텍스트 확보)
 
 1. **이 문서** (HANDOFF.md) — 전체 그림
-2. **`docs/plan/IMPLEMENTATION_VERIFICATION.md`** — 2026-05-31 빌드/테스트 기반 검증 보고서. 코드와 문서 사이 실제 격차의 진실 소스. §7.1 F 작업의 근거
-3. **`docs/SETUP.md`** — 실행/빌드/디버깅 방법
-4. **`docs/superpowers/specs/2026-05-27-coding-agent-plugin-design.md`** — 시스템 설계 원본
-5. **`docs/plan/REVIEW_ISSUES.md`** — 모든 의사결정 근거 + 트레이드오프 (단, §6.2 표를 먼저 보고 보정된 상태로 해석)
-6. **`plugin/agents/orchestrator.md`** — 상태 전이의 진실 소스 (state machine 그림)
+2. **`docs/r1-refactor/00-system-contract.md`** — R1′ keystone spec. C1~C5 contract, "Binary=deterministic / Session=LLM" 원칙
+3. **`docs/r1-refactor/06-integration-verification.md`** — 2026-06-04 5-저장소 감사 보고서. 실 격차의 진실 소스. P0~P4 우선순위 근거
+4. **`docs/r1-refactor/07-domain-knowledge-curation.md`** — P0 도메인 콘텐츠 작성 plan (7-persona × 2-tier)
+5. **`docs/SETUP.md`** — 실행/빌드/디버깅 방법 (R1′ Step 9 재작성)
+6. **`docs/plan/REVIEW_ISSUES.md`** — RI 의사결정 근거 (단, §6.2 표를 먼저 보고 보정된 상태로 해석)
+7. **`plugin/agents/orchestrator.md`** — 상태 전이의 진실 소스 (state machine + R1′ §2.0 pre-flight)
+8. **`docs/superpowers/specs/2026-05-27-coding-agent-plugin-design.md`** — 시스템 설계 원본 (역사 기록)
 
 세부 작업 진입 시:
-- 에이전트 사양 변경 → `plugin/agents/*.md` + 해당 Phase spec
-- MCP 서버 변경 → `tools/{jira-gateway-mcp,cks-mcp}/internal/server/server.go`
-- 새 RI 발견 → `docs/plan/REVIEW_ISSUES.md`에 RI-24 형태로 추가
+- 에이전트 사양 변경 → `plugin/agents/*.md` + `docs/r1-refactor/05-coding-agent-refactor.md` + `docs/r1-refactor/plans/05-coding-agent-plan.md`
+- jira-gateway 변경 → `tools/jira-gateway-mcp/internal/...`
+- C1 도구 이름 변경 → **반드시 `contract/agent-mcp.schema.json` 먼저 갱신**, 그 후 `bash contract/lint-tool-names.sh`로 검증
+- 새 RI 발견 → `docs/plan/REVIEW_ISSUES.md`에 RI-24+ 형태로 추가
+- 외부 cks/ckg/ckv/chainbench 변경 필요 → 우리 저장소가 아니라 sibling repo 작업
 
 ### 8.2 환경 재구축 절차
 
-```bash
-# 1. clone
-git clone <repo-url> coding-agent && cd coding-agent
-
-# 2. Build MCP binaries
-cd tools/jira-gateway-mcp && go build -o bin/jira-gateway-mcp ./cmd/server && cd -
-cd tools/cks-mcp           && go build -o bin/cks-server        ./cmd/server && cd -
-
-# 3. Test
-cd tools/jira-gateway-mcp && go test ./... && cd -
-cd tools/cks-mcp           && go test ./... && cd -
-
-# 4. Plugin install — SETUP.md §5 참조
-```
+**`docs/SETUP.md`로 위임** (R1′ Step 9에서 재작성됨). 요점:
+1. Prerequisites: Go ≥1.25, Node ≥18, Ollama+`bge-m3`, C 툴체인 (cks sqlite-vec용), `gh` CLI
+2. Clone sibling repos: `code-knowledge-system`, `chainbench`
+3. Build: jira-gateway (in-tree), 외부 cks `bin/cks-mcp`, 외부 chainbench `mcp-server/dist/index.js`
+4. Env: `CKS_MCP_BIN`, `CKS_CONFIG`, `CHAINBENCH_DIR`, `JIRA_*`
+5. Plugin install: `claude mcp add` 또는 plugin 자동 발견
 
 ### 8.3 새 세션 첫 prompt 예시
 
-> 이 저장소 루트의 `HANDOFF.md`를 먼저 읽고 §7.5 권장 순서대로 진행해줘. 작업 시작 전 §2 사용자 규칙 준수 여부를 확인하고, uncommitted 변경사항이 있으면 커밋 여부를 먼저 물어봐.
+> 이 저장소 루트의 `HANDOFF.md`를 먼저 읽고 §7.6 권장 순서대로 진행해줘. 작업 시작 전 §2 사용자 규칙 준수 여부를 확인하고, uncommitted 변경사항이 있으면 커밋 여부를 먼저 물어봐. R1′ 이후 외부 작업(03/04 출하, P0 도메인)이 차단된 상태일 수 있으니 작업 시작 전 사용자에게 진행 가능 여부 확인.
 
 ### 8.4 멘탈 모델 점검
 
 새 세션이 다음 질문에 답할 수 있어야 함:
-- Q: 왜 MCP 서버가 두 개인가?
-  - A: 책임 분리. jira-gateway = inbound 외부 데이터 필터링, cks = 코드 지식 (CKV semantic + CKG structural).
+- Q: 왜 agent-facing MCP 서버가 3개인가? (jira-gateway / cks / chainbench)
+  - A: 책임 분리. jira-gateway=inbound 외부 데이터 필터링 (이 저장소 in-tree), cks=코드 지식 컴포저 (외부, ckv+ckg in-process), chainbench=결정론적 테스트 실행 (외부, TS+Go). C1 SSoT는 `contract/agent-mcp.schema.json`
+- Q: 왜 자체 cks-mcp 코드를 삭제했나?
+  - A: R1′ Step 6. 자체 in-tree 구현이 외부 cks의 표면(13 dotted tools, in-process ckv+ckg)과 불일치. 외부 cks가 더 풍부한 도메인 시스템 보유 → in-tree 코드 통째 폐기 + `${CKS_MCP_BIN}` 외부 바이너리 위임
 - Q: 왜 LLM이 patterns.json을 직접 안 보는가?
-  - A: §3.3 보안 모델. LLM에 도달하기 전에 차단해야 함.
+  - A: §3.3 보안 모델. LLM에 도달하기 전에 차단해야 함
 - Q: state.json이 손상되면?
-  - A: state-machine SKILL.md §2.6 get_resume_point — sub_status (fresh/partial/review_pending) 복구. 아티팩트 파일(analysis.md/plan.md/design-v{N}.md)이 있으면 그쪽이 우선.
-- Q: BM25 폴백은 언제 동작하나?
-  - A: `OLLAMA_BASE_URL` 미설정 또는 `CKS_DISABLE_OLLAMA=1` 또는 임베딩 호출 실패. 응답의 `engine` 필드로 식별.
+  - A: state-machine SKILL.md §2.6 get_resume_point — sub_status(fresh/partial/review_pending) 복구. 아티팩트 파일이 있으면 그쪽이 우선
+- Q: cks가 degraded 모드일 때 어떻게 되나?
+  - A: bge-m3/Ollama 미가용 → `cks.ops.health`가 `degraded` 반환 → planner §3.0이 analysis.md에 "DEGRADED" 기록 + 직접 Read 의존. 파이프라인 크래시 없이 계속 (`00 §C2 / §6` Smart Dummy fallback)
+- Q: 3-way bench는 무엇을 비교하나?
+  - A: 동일 태스크를 A=cks 검색 / B=code-only(grep/read만) / C=code+comprehension skills 3 정보 regime으로 자율 실행 → `bench/compare.py`가 {정확성, 토큰, 비용, 지연, 안전성} 결정론 비교. 모델은 `claude-opus-4-7`로 고정 — 정보 regime만 격리
 
 ---
 
 ## 9. 환경 변수 / 외부 의존성
 
-### 9.1 필수
+### 9.1 필수 (R1′ 후)
 
 | 변수 | 용도 | 비고 |
 |------|------|------|
-| `JIRA_BASE_URL` | `https://yourorg.atlassian.net` | jira-gateway-mcp |
+| `JIRA_BASE_URL` | `https://yourorg.atlassian.net` | jira-gateway-mcp. `--local` 모드 시 생략 가능 |
 | `JIRA_API_TOKEN` | Atlassian API token | 절대 커밋 금지 |
 | `JIRA_USER_EMAIL` | API 토큰 발급 계정 | |
-| `CKS_INDEX_PATH` | SQLite 인덱스 파일 절대 경로 | CKV + CKG 공유 |
+| `CKS_MCP_BIN` | 외부 cks-mcp 바이너리 절대 경로 | sibling repo `code-knowledge-system`에서 빌드 |
+| `CKS_CONFIG` | 외부 cks의 `cks.yaml` 절대 경로 | ckv/ckg 데이터 경로, ollama URL, embed model 명시 |
+| `CHAINBENCH_DIR` | 외부 chainbench 체크아웃 절대 경로 | `mcp-server/dist/index.js`와 Go wire 바이너리 위치 base |
 
-### 9.2 선택 (있으면 동작 모드 변경)
+### 9.2 선택 / 옵션
 
 | 변수 | 효과 |
 |------|------|
-| `OLLAMA_BASE_URL` (예: `http://localhost:11434`) | Ollama 임베딩 사용. 미설정 시 BM25 폴백 |
-| `OLLAMA_EMBED_MODEL` (예: `nomic-embed-text`) | 임베딩 모델 |
-| `CKS_DISABLE_OLLAMA=1` | 강제 BM25 모드 |
 | `PATTERNS_PATH` | jira-gateway-mcp의 patterns.json override |
-| `CKS_PATTERNS_PATH` | cks-mcp의 patterns.json override (PATTERNS_PATH보다 우선) |
 | `CUSTOM_PATTERNS_PATH` | 사용자 커스텀 패턴 merge |
+| (cks.yaml 내부) Ollama URL/`bge-m3` 모델명 | cks degraded 모드 분기점 — 부재 시 Smart Dummy 임베더로 폴백, `cks.ops.health`가 `degraded` 보고 |
 
 ### 9.3 외부 도구
 
-- `go` 1.22+ (modernc/x/tools/go/packages 호환)
-- `git` (history analyzer가 `git log -L` 호출)
-- `gh` CLI (PR 생성/병합)
-- (선택) `golangci-lint`, `gofmt`, `goimports`, `gosec`, `go vet` — evaluator stages
-- (선택) `ollama` + `nomic-embed-text` — semantic embedding
-- (필수, evaluator §7) ChainBench MCP — Stage 4 통합 테스트
+- `go` ≥1.25 (jira-gateway-mcp + 외부 cks/ckg/ckv 빌드)
+- C 툴체인 (cc/clang) — 외부 cks의 sqlite-vec CGO
+- Node ≥18 + npm — 외부 chainbench MCP server
+- `git` ≥2.40
+- `gh` CLI ≥2.50 (PR 생성/병합)
+- Ollama + `bge-m3` (다국어, 1024-dim) — **cks 정상 동작 필수** (없으면 degraded)
+- Python 3 — `bench/` harness + `lint-tool-names.sh` 호출 시 ad-hoc JSON inspection
+- (선택, evaluator stages) `golangci-lint`, `gofmt`, `goimports`, `gosec`
 
 ---
 
 ## 10. 알려진 위험 / 미실증 가정
 
-새 세션이 의심해야 할 가정들:
+새 세션이 의심해야 할 가정들 (2026-06-05 R1′ 후):
 
-1. **ChainBench MCP가 실제로 호출 가능하다는 가정**: ❌ 사실이 아님. `.mcp.json`에 미등록 + 구현체 0건. evaluator Stage 4 영구 BLOCKED. **F-1로 해결 예정**.
-2. **CKG `calls` 관계가 타입 기반 정확 매칭이라는 가정**: ❌ 사실이 아님. `_ = info`로 타입 정보 무시, 이름 기반 lookup. 동명 함수 오연결 가능. **F-2로 해결 예정**.
-3. **에이전트 모델 ID가 런타임에 resolve된다는 가정**: ❌ 의심됨. `opus-4.7`/`sonnet-4.6`는 환경 알림에 명시된 `claude-opus-4-7` 형식과 다름. **F-5로 해결 예정**.
-4. **ADF 변환기가 모든 노드 타입을 커버한다는 가정**: 8+ 노드 타입 테스트했지만 color/inline card/mention/emoji 등 누락 가능. 실 Jira 인스턴스로 R-1 실증 필요.
-5. **`packages.Load`가 go-stablenet 전체 트리에서 성공한다는 가정**: 실증 안 됨. 실패 시 Tier 2 폴백 자동 동작하지만 confidence 등급 저하.
-6. **Ollama 임베딩 시간 추정 (RI-09)**: 청크당 200ms 기준 ~67분 (20K 청크). 실 측정 안 됨 + 배치 미구현으로 실측 시간이 더 길 가능성. **F-4로 단축 예정**.
-7. **/merge가 squash로만 동작한다는 가정**: merge commit / rebase 지원 안 함. 사용자 합의 결정 — 뒤집지 말 것.
-8. **state.json 구조의 후방 호환성**: 현재 스키마 변경 시 마이그레이션 로직 없음. 명시적으로 RI-2X로 등록되지 않은 상태. 큰 변경 전에 사용자 확인 필요.
+1. **ChainBench 도구 호출이 작동한다는 가정**: ⚠️ 구조는 해결(R1′ Step 6/8 — `.mcp.json` 등록 + C1 이름), 단 **04 D1 출하 대기**. `chainbench_report{format:"json"}`이 실 JSON 반환하는지 미검증 → 텍스트면 silent mis-parse (X-2)
+2. **외부 cks 바이너리가 우리 `.mcp.json` 인자(`-config ${CKS_CONFIG}`)와 호환된다는 가정**: ⚠️ 03 출하 대기. 외부 `cmd/cks-mcp/main.go`의 실 flag/env 이름 확인 필요 (X-1)
+3. **에이전트 모델 ID가 런타임에 resolve된다는 가정**: ✅ R1′ Step 2 — `claude-opus-4-7` / `claude-sonnet-4-6` 채택. 실 GA alias가 다르면 별도 확인 필요
+4. **`bge-m3`가 외부 ckv 임베더로 정확 동작한다는 가정**: ⚠️ Ollama 설치 + `bge-m3` pull 필요. 부재 시 cks `degraded` 모드 — pipeline 크래시 안 함, 단 retrieval 품질 저하 (`cks.ops.health` 보고)
+5. **ADF 변환기가 모든 노드 타입을 커버한다는 가정**: 8+ 노드 타입 테스트했지만 color/inline card/mention/emoji 등 누락 가능. 실 Jira 인스턴스로 검증 필요
+6. **bge-m3 풀 인덱싱 시간 (~10시간 추정, 02-plan Part D #4)**: 26K 청크 × 0.74 청크/s. CI 부적합 — overnight run. F-4 (배치 임베딩)은 외부 ckv 후속
+7. **도메인 entry가 LLM에 도달한다는 가정**: ❌ 사실이 아님. 23 entries 0 verified → `cks-domain-sync`가 빈 출력. P0 (외부 cks + 도메인 전문가) 작성 전까지 inert
+8. **`test:"basic/tx-send"`가 chainbench catalog에 존재한다는 가정**: ⚠️ 04 출하 시 확인 필요 (X-3)
+9. **/merge가 squash로만 동작한다는 가정**: merge commit / rebase 지원 안 함. 사용자 합의 결정 — 뒤집지 말 것
+10. **state.json 구조의 후방 호환성**: 스키마 변경 시 마이그레이션 로직 없음. 큰 변경 전 사용자 확인 필요
 
 ---
 
@@ -417,7 +440,15 @@ cd tools/cks-mcp           && go test ./... && cd -
 | 2026-05-29 | `2d9cec6` | 23개 RI 최종 감사 + 모두 RESOLVED 선언 |
 | 2026-05-29 | `a8cab77` | HANDOFF.md 초안 작성 |
 | 2026-05-31 | `9226b34` | (다른 머신) code-level implementation verification 보고서 추가. Phase 3/4/6 격차 발견 |
-| 2026-06-01 | (이 커밋) | HANDOFF.md §6.1·§6.2·§7.1 F·§7.6·§8·§10 보정. 보고서 발견을 작업 계획에 통합 |
+| 2026-06-01 | `f0c0f38` | HANDOFF.md §6.1·§6.2·§7.1 F·§7.6·§8·§10 보정. 보고서 발견을 작업 계획에 통합 |
+| 2026-06-01 | `4d9335b` | (다른 세션) R1′ system contract (00) + per-project refactor specs (01-05) 작성 |
+| 2026-06-02 | `65d6dfc` | (다른 세션) R1′ live-code implementation plans (plans/01-05) 작성 |
+| 2026-06-02 | `76a285d` (PR #1) | (다른 세션) R1′ Step 1~9 완료 — C1 SSoT 스키마 + lint, 모델 ID, stablenet-context deprecate, L3 invariant skill, binary handoff, **cks shim 삭제**, planner/evaluator rewiring, SETUP 재작성 |
+| 2026-06-04 | `feeecc6` | (다른 세션) `06-integration-verification.md` 추가 — 5 저장소 read-only 감사. P0~P4 격차 식별 |
+| 2026-06-04 | `386e1a9` (PR #2) | (다른 세션) MCP health pre-flight + transcript observability — orchestrator §2.0, planner §3.0, work.md §5.2, `on-agent-complete.sh` verbatim 캡처 |
+| 2026-06-04 | `725c22e` (PR #3) | (다른 세션) 3-way bench harness — `bench/` Python, `/bench` 명령, `bench-orchestration` skill, 2 bench planner agents |
+| 2026-06-05 | `31e42da` (PR #4) | (다른 세션) `07-domain-knowledge-curation.md` — 7-persona × 2-tier 도메인 큐레이션 plan (P0) |
+| 2026-06-05 | (이 커밋) | HANDOFF.md 전면 동기화 — R1′ Step 1~9 + 후속 PR #2/#3/#4 반영, F-7 TS 잔재 흡수, 디렉토리 트리 / 결정 표 / Phase 표 / RI 보정 / §7 F·P·X·A·C·D 재구성 / §8 읽기 순서 / §9 환경 변수 / §10 위험 / §12 이력 |
 
 ---
 
