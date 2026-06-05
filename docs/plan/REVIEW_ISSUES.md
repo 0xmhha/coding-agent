@@ -11,9 +11,11 @@
 | `RESOLVED` | 해결 완료 (해결 방법 + 커밋/문서 참조) |
 | `DEFERRED` | 의도적으로 후순위 (이유 명시) |
 
-## 최종 감사 (2026-05-29) — 보정 (2026-06-01)
+## 최종 감사 (2026-05-29) — 보정 (2026-06-01) — R1′ 재평가 (2026-06-05)
 
-> ⚠️ 2026-05-31 `docs/plan/IMPLEMENTATION_VERIFICATION.md` (코드 빌드/테스트 검증 보고서)가 일부 RI의 RESOLVED 선언이 코드 레벨로 미달임을 발견. 아래 표는 2026-05-29 시점 선언이며, 보정된 상태는 각 RI 항목의 본문 참조.
+> ⚠️ 본 문서의 RI 본문 다수가 `tools/cks-mcp/...` 코드 경로를 *증거*로 인용함. 2026-06-02 R1′ Step 6 (commit `76a285d`)이 그 디렉토리를 **통째로 삭제**(자체 cks shim 폐기, 외부 `code-knowledge-system`으로 위임)함으로써 *증거 경로*는 부재 상태가 됨. RI의 **결정·근거·해결 내용은 그대로 유효**하지만, 후속 검증은 외부 sibling repo (`code-knowledge-graph`, `code-knowledge-vector`, `code-knowledge-system`)에서 수행해야 함. 본 문서 RI별 갱신은 별도 작업으로 분리.
+
+### 2026-05-29 → 2026-06-01 보정
 
 | RI | 2026-05-29 선언 | 2026-06-01 실제 | 보정 작업 |
 |----|---------------|---------------|---------|
@@ -22,7 +24,18 @@
 | RI-20 | RESOLVED (사양 단계 완료) | OPEN | F-1 chainbench 등록/안내 |
 | 나머지 20개 | RESOLVED | RESOLVED 유지 | 해당 없음 |
 
-전체 23개 RI 중 20개 `RESOLVED`, 2개 `PARTIALLY RESOLVED`, 1개 `OPEN`. Phase 1~7 구현 + Phase 8 셋업 가이드 완료 기준.
+### 2026-06-01 → 2026-06-05 R1′ 재평가
+
+| RI | 2026-06-01 상태 | 2026-06-05 R1′ 후 | 경로 |
+|----|--------------|----------------|------|
+| RI-09 | PARTIALLY | **외부 ckv로 이관** | 자체 코드 삭제. 외부 `code-knowledge-vector` 02-plan Part D #4가 throughput 후속 추적 (`F-4 외부 이슈`) |
+| RI-10 | PARTIALLY | **외부 ckg로 이관** | 자체 코드 삭제. 외부 `code-knowledge-graph` `statements.go:206`이 이미 typed (`types.Info` 사용) |
+| RI-20 | OPEN | **RESOLVED (구조)** | R1′ Step 6: `.mcp.json` chainbench 등록. Step 8: evaluator §7.0 도구 이름 C1 정렬. 단 04 D1 (`chainbench_report{format:"json"}` 실 JSON) 출하 대기 |
+| RI-15 (TS 잔재) | RESOLVED | **본문 갱신** | F-7 정리 — TypeScript 서술을 Go 기준으로 명시 |
+| RI-22 (TS 잔재) | RESOLVED | **본문 갱신** | F-7 정리 — 동일 |
+| 나머지 18개 | RESOLVED | RESOLVED 유지 | 증거 경로 stale 표시는 본 §최종 감사에 단일 안내로 처리 |
+
+R1′ 이후 전체 23개 RI 중 18개 RESOLVED (그대로), 2개 외부 이관 (RI-09/10), 1개 RESOLVED 구조 완료 (RI-20), 2개 본문 갱신 (RI-15/22).
 
 | 범주 | 항목 |
 |------|------|
@@ -354,7 +367,7 @@
 
 ## RI-15. MCP 서버 설정 파일 [공통]
 
-**상태**: `RESOLVED` — RI-01과 동일 해결. `plugin/.mcp.json`이 빌드 산출물(`tools/.../bin/...`)을 직접 가리키도록 구성됨. TypeScript `npx tsx` 경로 대신 Go 바이너리로 전환(이유: 단일 실행 파일·CGo-free·빠른 시작). ChainBench MCP는 별도 사용자 설정으로 분리. 커밋 `c1a92cc` + `d41684e`.
+**상태**: `RESOLVED` — `plugin/.mcp.json`이 빌드 산출물을 직접 가리키도록 구성됨. **언어 선택은 처음부터 Go**(이 RI 작성 시점에는 TypeScript 안도 고려했으나 채택하지 않음 — 단일 실행 파일·CGo-free·빠른 시작·geth 생태계 동일 언어). ChainBench MCP는 별도 사용자 설정으로 분리. 커밋 `c1a92cc` + `d41684e`. **R1′ Step 6 (2026-06-02, `76a285d`) 후**: cks 항목은 자체 `tools/cks-mcp/bin/...`에서 외부 `${CKS_MCP_BIN}` 바이너리로 전환됨. chainbench 항목도 R1′ Step 6에서 등록(`chainbench-mcp` 명령). 자세한 현 구성은 `HANDOFF.md §4 저장소 레이아웃` + `docs/SETUP.md §4.2/§5` 참조.
 
 **문제**: 프로젝트에 `.mcp.json`이 없다. Jira Gateway MCP, CKS MCP, ChainBench MCP를 Claude Code에서 사용하려면 MCP 서버 등록이 필요하다.
 
@@ -366,8 +379,7 @@
   {
     "mcpServers": {
       "jira-gateway": {
-        "command": "npx",
-        "args": ["tsx", "tools/jira-gateway-mcp/src/index.ts"],
+        "command": "${CLAUDE_PLUGIN_ROOT}/../tools/jira-gateway-mcp/bin/jira-gateway-mcp",
         "env": {
           "JIRA_BASE_URL": "",
           "JIRA_API_TOKEN": "",
@@ -375,15 +387,12 @@
         }
       },
       "cks": {
-        "command": "go",
-        "args": ["run", "./tools/cks-mcp/cmd/cks-server"],
-        "env": {
-          "CKS_PROJECT_ROOT": "",
-          "CKS_INDEX_PATH": ".coding-agent/index"
-        }
+        "command": "${CKS_MCP_BIN}",
+        "args": ["-config", "${CKS_CONFIG}"]
       },
       "chainbench": {
-        // 기존 ChainBench MCP 서버 설정 참조
+        "command": "chainbench-mcp",
+        "env": { "CHAINBENCH_DIR": "${CHAINBENCH_DIR}" }
       }
     }
   }
@@ -539,15 +548,15 @@
 
 ## RI-22. patterns.json 공유 전략 미확정 [공통]
 
-**상태**: `RESOLVED` — 환경변수 기반 경로 주입으로 통일. `plugin/.mcp.json`의 env: `PATTERNS_PATH=${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json` (jira-gateway), `CKS_PATTERNS_PATH=${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json` (cks). 양쪽 모두 `resolvePatternsPath()` 헬퍼에서 env → project-root probe → cwd/shared 순으로 폴백. `plugin/skills/pr-sanitize/SKILL.md §3.1`도 동일 패턴(env → repo_root → plugin_root). 빌드 의존성 없음. 커밋 `6d1b700` + `292e7dc` + `459a7ad`.
+**상태**: `RESOLVED` — 환경변수 기반 경로 주입으로 통일. `plugin/.mcp.json`의 env: `PATTERNS_PATH=${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json` (jira-gateway, Go), `CKS_PATTERNS_PATH=${CLAUDE_PLUGIN_ROOT}/../shared/patterns.json` (자체 cks-mcp, Go). 양쪽 모두 `resolvePatternsPath()` 헬퍼에서 env → project-root probe → cwd/shared 순으로 폴백. `plugin/skills/pr-sanitize/SKILL.md §3.1`도 동일 패턴(env → repo_root → plugin_root). 빌드 의존성 없음. 커밋 `6d1b700` + `292e7dc` + `459a7ad`. **R1′ Step 6 (2026-06-02, `76a285d`) 후**: 자체 cks-mcp 폐기로 `CKS_PATTERNS_PATH`는 더 이상 사용 안 함. outbound 패턴(pr-sanitize)만 `PATTERNS_PATH` 환경변수로 운영. 외부 cks는 자체 도메인 시스템(`policy/stablenet.yaml`)을 가짐.
 
-**문제**: shared/patterns.json을 Jira Gateway MCP(TypeScript)와 CKS MCP(Go) 양쪽에서 사용해야 한다. 현재 파일은 프로젝트 루트의 shared/에 있지만, 각 MCP 서버 프로젝트에서 이 파일에 접근하는 방법(symlink, 빌드 시 복사, embed)이 정의되지 않았다.
+**문제**: shared/patterns.json을 Jira Gateway MCP와 (자체 시점의) CKS MCP 양쪽 Go 서버에서 사용해야 한다. 현재 파일은 프로젝트 루트의 shared/에 있지만, 각 MCP 서버 프로젝트에서 이 파일에 접근하는 방법(symlink, 빌드 시 복사, embed)이 정의되지 않았다.
 
 **영향**: MCP 서버 빌드/실행 시 patterns.json 경로 불일치 가능.
 
 **해결 방향**:
-- **Jira Gateway MCP (TypeScript)**: 런타임에 `../../shared/patterns.json` 상대 경로로 로드. 또는 .mcp.json의 env로 경로 주입
-- **CKS MCP (Go)**: `//go:embed ../../shared/patterns.json` 으로 빌드 시 내장. 또는 런타임 환경변수 `CKS_PATTERNS_PATH`
+- **Jira Gateway MCP (Go)**: 런타임 환경변수 `PATTERNS_PATH`로 절대 경로 주입. 부재 시 project-root → cwd/shared 폴백
+- **자체 시점의 CKS MCP (Go, R1′ 후 폐기)**: 동일 패턴, 환경변수 `CKS_PATTERNS_PATH`가 `PATTERNS_PATH`보다 우선
 - **권장**: 환경변수 기반 경로 주입 (`.mcp.json`의 env에서 설정). 빌드 의존성 없음.
 
 **해결 시점**: Phase 2 (P2-1) + Phase 3 (P3-1) 각각 구현 시

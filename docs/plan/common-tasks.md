@@ -6,7 +6,7 @@
 
 **상태**: ✅ 완료
 
-14개 민감정보 패턴 정의. Jira Gateway MCP(TS)와 CKS MCP(Go) 양쪽에서 공유.
+14개 민감정보 패턴 정의. Jira Gateway MCP(Go)와 (R1′ 이전 자체 시점의) CKS MCP(Go) 양쪽에서 공유. **R1′ Step 6 (2026-06-02) 후**: 자체 cks-mcp 폐기로 outbound 사용처는 jira-gateway-mcp + `pr-sanitize` skill 두 곳.
 
 커스텀 패턴 merge 로직은 P2-7에서 구현.
 
