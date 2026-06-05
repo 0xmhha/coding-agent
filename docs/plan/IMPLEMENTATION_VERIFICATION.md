@@ -1,5 +1,7 @@
 # 구현 vs 계획 검토 보고서 (Implementation Verification)
 
+> **Status (2026-06-05)**: **Superseded by R1′ refactor** (commit `76a285d`, 2026-06-02) + 후속 통합 검증 보고서 `docs/r1-refactor/06-integration-verification.md` (commit `feeecc6`, 2026-06-04). 본문은 R1′ 진입 시점의 빌드/테스트 기반 스냅샷으로 보존 — 모델 ID 권고(F-5), ChainBench 등록 권고(F-1)는 R1′ Step 2/6/8에서 처리됨. Phase 3/4 코드 격차는 R1′ Step 6의 자체 cks shim 삭제로 자연 소멸 (외부 `code-knowledge-graph` / `code-knowledge-vector` 저장소로 이관). 후속 검증·신규 격차는 06 문서 + `HANDOFF.md §6 / §7.2 P` 참조.
+>
 > 작성일: 2026-05-31
 > 대상: `docs/plan/`, `docs/superpowers/specs/` 의 계획·설계 문서 vs 실제 코드
 > 방법: Phase별 코드레벨 대조. Go 모듈(Phase 2·3·4)은 `go build`/`go test` 실행 검증, 플러그인(Phase 1·5·6·7)은 마크다운 정의·프론트매터·문서 정합성 대조.
