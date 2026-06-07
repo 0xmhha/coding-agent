@@ -31,6 +31,43 @@ diff 판정 시 이 목록을 기준으로 본다.
    proposer 선정 변경은 validator 집합 전체에 대한 장기 공정성을 보존해야 한다
    (RoundRobin 과 Sticky 는 공정성 프로파일이 다르다).
 
+6. **INSTANT FINALITY / INERT REORG.** WBFT의 Commit-quorum 블록은 **즉시 최종**
+   이다. geth의 `forker`/TotalDifficulty 코드(`core/forkchoice.go`,
+   `core/blockchain.go`의 `bc.forker`)는 트리에 남아 있지만 inert(비활성) 잔재다.
+   StableNet 로직으로 이 경로를 확장하거나 `TotalDifficulty`/`ReorgNeeded`에 의존
+   하지 말 것. consensus-관련 fork-choice 변경은 `consensus/wbft/`에 한정한다.
+
+7. **BASE FEE REDISTRIBUTION (NOT burned).** Ethereum EIP-1559와 달리 base fee는
+   **소각하지 않고 validator에게 재분배**된다(WBFT Finalize 경로). 수수료/보상
+   코드에서 EIP-1559 burn 의도를 도입하면 WKRC 공급 무결성과 validator 인센티브
+   계약을 모두 깬다. Finalize의 정상 호출 경로를 우회하는 fast-path 금지.
+
+8. **WKRC ≠ ETH.** 네이티브 자산은 **WKRC**(KRW 페그 스테이블코인)이며
+   symbol/name=`WKRC`, currency=`KRW`, decimals=18이다. `Ether`/`wei` 식별자는
+   geth 잔재일 뿐 실제 단위는 WKRC-wei다. 네이티브 mint/burn은 GovMinter +
+   NativeCoinManager 정밀 경로의 은행-백킹 이벤트이지 프로토콜 발행이 아니다 —
+   block reward로 native 발행을 절대 추가하지 말 것.
+
+9. **CHERRY-PICK PRINCIPLE.** StableNet 고유 로직은 **새 파일**에 둔다 (예:
+   `eth/handler_istanbul.go`, `core/types/tx_fee_delegation.go`). geth 원본
+   파일(`eth/handler.go`, `core/blockchain.go`, `core/types/transaction_signing.go`
+   등)에 StableNet 분기를 인라인하면 upstream cherry-pick이 깨진다. geth 파일에는
+   최소 dispatch glue / 인터페이스 만족만 허용한다. 파일 경계의 권위는
+   `.claude/docs/build-source-files.md`의 'StableNet 고유' 컬럼이다.
+
+10. **FEEPAYER SIGHASH PAYLOAD.** 수수료 위임 트랜잭션(`0x16`)의 feepayer 서명은
+    **`[[inner-tx-incl-sender-V/R/S], FeePayer]`** 위에 이루어진다 — 내부 tx만
+    해시하거나 FeePayer를 trailing field에서 누락하면 feepayer 교체 공격이
+    가능해진다. sigHash 페이로드 모양(내부 VRS 포함 + FeePayer 후행)은 consensus
+    contract의 일부이며 byte-단위로 보존해야 한다.
+
+11. **CONCURRENCY DISCIPLINE.** (a) `consensus/wbft/core/core.go`의 `c.current`
+    는 `currentMutex`(RWMutex) 안에서만 읽고 쓴다 — `priorState`의 별도 mutex는
+    대체재가 아니다. (b) txpool 맵(`pending`/`queue`/`all`)은 `pool.loop()`
+    goroutine 안에서만 변경한다 — RPC/sealer/p2p에서 직접 mutate 금지, 이벤트로
+    enqueue한다. 두 규율 중 하나라도 깨지면 데이터 레이스 → 비결정적 합의 또는
+    tx 손실/중복.
+
 ---
 
 합의 엔진 = **WBFT** (QBFT 계열, RPC namespace = `istanbul`). System contract 의
