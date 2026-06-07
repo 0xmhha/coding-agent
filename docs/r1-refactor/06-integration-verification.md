@@ -218,3 +218,77 @@ with domain-expert input; it unblocks the *quality* the rest of the system measu
 | Opinion | Verifying the entries is the single highest-leverage action — it activates the whole domain-delivery path. | High |
 | Opinion | The 3-way comparison is the largest unbuilt capability and the keystone of a self-improving system; existing evals contribute only retrieval-metric primitives. | High |
 | Opinion | Case-5 hardening is cheap and worth doing before any unattended/automated runs. | Mid |
+
+---
+
+## 4. 2026-06-07 갱신 (post-session integration)
+
+> **Date:** 2026-06-07 · **Scope:** §1 케이스 verdict 재평가 + §2 우선순위 표 갱신 + §3 본 세션 신규 발견·해결 결함 + 갱신된 Fact/Opinion. 원본(2026-06-04) 본문은 보존; 본 섹션이 권위 있는 최신 상태.
+
+### 4.1 Case-level verdict 재평가
+
+| Case | 원본 (06-04) | 갱신 (06-07) | 근거 |
+|---|---|---|---|
+| Case 1 (cks↔ckv/ckg) | DONE | DONE+ | 실제 26k chunks 인덱스 + cks.context.semantic_search 한국어 검색 작동 검증 |
+| Case 2 (외부 e2e) | DONE (defaults to Smart Dummy) | **DONE (real backends)** | cks.yaml 작성 + cks.ops.health=ok 검증, Smart Dummy 우회 |
+| Case 3 (cks MCP) | DONE (usage doc gap) | DONE | usage doc gap은 P3 미완으로 잔여 |
+| Case 4 (dataset build) | DONE / content-gated | **DONE / partially activated** | ckv 26,047 chunks + ckg 256k nodes 빌드. cks-domain-sync에서 governs[] qualifier fix(Task #16/#21) 후 ckg policy_nodes=7 / **governed_by_edges=30** (이전 0). 채널 ② 활성화 (domain 카테고리 196 chunks) |
+| Case 5 (existence/health) | PARTIAL | **DONE (already implemented)** | orchestrator.md §2.0 'MCP pre-flight'(3-서버 registration + env vars UNSET 검증 + state.json 기록) + work.md §5.2(jira 호출 실패 → 진단+cleanup+중단) 모두 06-04 이후 구현됨. design은 분산 헬스 체크 (downstream live: planner §3.0 cks.ops.health + evaluator §7.0 chainbench pre-flight) |
+| Case 6 (Claude Code plugin) | DONE | DONE | 변경 없음 |
+| Case 7 (autonomous) | PARTIAL | PARTIAL | 변경 없음 (scheduler/daemon 미구현 그대로) |
+| Case 8 (pipeline) | DONE (9/9; 2 PARTIAL) | DONE | 변경 없음 |
+| Case 8 (domain depth) | SCAFFOLD / CONTENT absent | **SCAFFOLD / CONTENT partial** | 신규 13 entries 작성 (A12/A13/A14 subsystem + T2 trap 9 + theory 4); go-stablenet에 `// INVARIANT:/CONSENSUS:/SECURITY:` 마커 10건 시딩(8 anchors); stablenet-invariants SKILL이 5→11 invariants로 보강; cks-domain-sync 산출물에 신규 entries 포함. **잔여**: 16+13=29 needs_verification → verified 승격(도메인 전문가 세션). |
+| Case 9 (logging) | PARTIAL | PARTIAL | 변경 없음 (transcript-grade 미완) |
+| Case 10 (3-way harness) | MISSING | MISSING | 변경 없음 |
+
+### 4.2 본 세션 신규 발견 + 해결된 R1' 통합 결함 (06-04 보고서에 없음)
+
+원본 §1의 case별 분석에 포함되지 않은 **결함 3건**이 본 세션 검증 과정에서 신규 발견 → 모두 해결:
+
+| # | 결함 | 측정값 (해결 후) |
+|---|---|---|
+| #17 | **ckv `--ckg` alignment 미구현** (옵션은 flag로 노출되지만 build pipeline에 전달되지 않음, ckg_node_id 0/26,036) | 새 패키지 `internal/ckgalign` + Builder.Options.CKGPath wiring. **23,213/26,036 (89.2%) 채워짐**. symbol chunks 기준 91.9%. 무작위 100 sample file_path 일치율 100% |
+| #18 | **cks composer가 chunk metadata 미활용** (ckvclient가 contract.Hit으로 변환 시 symbol_name/ckg_node_id 버림 → extractKeywords가 file basename만 사용) | `contract.Hit{Symbol, CKGNodeID}` 추가 + ckvclient 변환 보강 + stage1 extractKeywords가 hit.Symbol 우선 사용. 영향 패키지 4/4 테스트 PASS. semantic_search 결과 모든 hit에 ckg_id 노출 검증 |
+| #16 | **`governs[]` qname mismatch** (cks-domain-sync가 `DefaultAnzeonConfig`만 emit, ckg는 `params.DefaultAnzeonConfig`로 저장 → 27건 'no code node found') | `qualifyGovernsSymbol(file, symbol) → "<pkg>.<symbol>"` 추가 (file 디렉토리 마지막 segment → 패키지명 추정). unit test 7/7 PASS. ckg full rebuild 후 **governed_by 0 → 30** edges |
+
+> 이 3건은 모두 plans/02-ckv-plan.md, plans/03-cks-plan.md spec에 명시되지 않은 신규 통합 결함이다. R1' 시스템의 핵심 정합성을 깨는 결함이었고, 사용자 질문("ckv↔ckg qname 규칙 적용?")으로 발견되었다.
+
+### 4.3 우선순위 표 갱신
+
+| 원본 | 작업 | 상태 (06-07) |
+|---|---|---|
+| P0 | Populate + verify domain knowledge | **부분 완료**: 13 신규 entries + 8 anchors marker 시딩 + stablenet-invariants 보강. **잔여**: 29 verified 승격 (도메인 전문가) + glossary `-status verified` 재생성 |
+| P1 | 3-way comparison harness | 그대로 (큰 net-new build, 별도 세션) |
+| ~~P2~~ | MCP existence/health pre-flight | ✅ **이미 구현 확인됨** (work.md §5.2 + orchestrator.md §2.0). 추가 작업 불필요 |
+| P3 | Index-pipeline + usage-doc fixes | 부분 완료: cks.yaml에 `backends.ckg.policy_file` 명시(cks.ops.index full mode 시 forward됨). 미완: README 11→13 tools 업데이트, coding-agent-mcp-mapping.md tools 카운트 |
+| P4 | Transcript-grade observability | 변경 없음 |
+
+**4.3.1 신규 후속 작업 (06-04 시점 미식별)**
+
+| 신규 # | 작업 | 비고 |
+|---|---|---|
+| (R1' 보강) | alignment 9% 실패 chunks 원인 분석 | 자동 생성 코드/멤버 redeclaration 패턴 추정. coverage 91.9 → 95%+ 가능 |
+| (R1' 보강) | ckg→ckv 역참조 alignment (ckg nodes에 chunk_id) | 양방향 cross-reference |
+| (검증) | cks 13 tools 전체 응답 형식 검증 | 본 세션은 health/freshness/semantic_search/impact_analysis만 실측 |
+
+### 4.4 추가 회귀 방지 (본 세션 신규)
+
+| 추가 가드 | 위치 |
+|---|---|
+| ckg `pkg/store/score_contract_test.go` (외부 store_test): `TestSearchFTS_ScoreContract` + `TestBuildGoStablenetSmoke_M2D` | plans/01 Step 2/12 요건 충족. CKG_GSN_GRAPH 환경변수 opt-in |
+| chainbench `tests/unit/tests/adapter-mapping.sh` (06-04 이후 추가됨) | plans/04 M1 매핑 검증 |
+
+### 4.5 갱신된 Fact / Opinion
+
+| Type | Statement | Confidence |
+|---|---|---|
+| Fact | 36 domain entries (기존 23 + 신규 13). verified=7, needs_verification=29. cks-inventory-check 통과 (0 errors, 0 warnings) | None |
+| Fact | go-stablenet에 `// INVARIANT:/CONSENSUS:/SECURITY:` 마커 10건 시딩 (8 파일, ckv invariant chunks 162→172) | None |
+| Fact | ckv index: 26,047 chunks / bge-m3 / 1024-dim / indexed_head=9978930ba. ckg_node_id 채워진 비율 89.2%. 무작위 100 sample 정확도 100%. Tier-2 마커 추출 100% (10/10) | None |
+| Fact | ckg index: 256k nodes / 2M edges / 587MB / **policy_nodes=7, governed_by_edges=30** (이전 0) | None |
+| Fact | `.mcp.json` 3 servers + orchestrator.md §2.0 사전체크 + work.md §5.2 jira 실패 분기 모두 구현됨. case 5 PARTIAL → DONE 갱신 | None |
+| Fact | 신규 발견 R1' 결함 3건(#17/#18/#16) 모두 본 세션에서 해결 (plans/02/03 spec에 미명시) | None |
+| Opinion | 원본의 P0(domain content)가 여전히 가장 큰 잔여 항목 — 13 신규 entries 작성으로 구조는 채워졌으나 verified 승격 + glossary 활성화가 retrieval quality의 ceiling | High |
+| Opinion | 본 세션 해결한 R1' 결함 3건은 **plans/02/03 작성 시점에 미식별된 통합 결함** — 향후 plans/spec 작성 시 cross-module data flow 점검 단계 추가 권장 | High |
+| Opinion | P1 (3-way harness)는 본 세션의 정확도 측정 한계(retrieval recall/MRR 부재 — ground-truth 셋 없음)를 해결할 유일한 경로. ground-truth 셋 작성이 사전 조건 | High |
+| Opinion | Case 5는 06-04 시점에는 PARTIAL이었지만, 그 사이 work.md/orchestrator.md가 보강되어 DONE. 06 작성 후 ~3일 만에 처리된 패턴은 다른 PARTIAL/MISSING도 산발적으로 해결될 수 있음을 시사 — 정기 재검증 필요 | Mid |
