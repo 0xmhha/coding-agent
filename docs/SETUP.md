@@ -221,7 +221,8 @@ Claude Code's plugin loader discovers `plugin/.claude-plugin/plugin.json`,
 ### 5.2 Verify Claude Code picks it up
 
 Restart Claude Code and run `/help`; you should see `/coding-agent:work`,
-`/coding-agent:review`, `/coding-agent:status`, `/coding-agent:merge`.
+`/coding-agent:analyze`, `/coding-agent:review`, `/coding-agent:status`,
+`/coding-agent:merge`.
 
 Open the MCP status panel; **`jira-gateway`, `cks`, and `chainbench`** should
 all show as connected. If a server fails to start, check the launching
@@ -310,6 +311,32 @@ Then in Claude Code:
 You should see the Orchestrator pick up `TEST-1`, the Planner produce an
 `analysis.md`, and the pipeline halt politely when it can't find real code to
 modify (or when it asks you to confirm).
+
+### 7.1b Free-text autonomous entry — `/analyze` (no Jira)
+
+`/coding-agent:analyze` runs the same planner→implementer→evaluator pipeline from a
+plain requirement string — no Jira ticket, no `--local` JSON. It synthesizes a
+`ticket.json` internally and runs with `requirement_source: "local"`.
+
+```
+/coding-agent:analyze "consensus Finalize 의 nil pointer 패닉을 graceful skip 으로 고쳐줘"
+```
+
+Autonomy (set automatically for `/analyze`; see state.config.autonomy):
+- **mode=auto** — no permission/decision prompts: entry-recovery, sanitize-REDACTED,
+  branch/rebase conflicts, and design-revision/eval-cycle limits all auto-resolve
+  (escalate → simplified retry → graceful `BLOCKED-summary.md`, never a silent halt).
+- **auto_merge=false (default)** — autonomy stops at PR creation; the squash-merge to
+  `main` stays the manual `/coding-agent:merge`. Pass `--auto-merge` to let the pipeline
+  merge/tag/push autonomously — its §3 safety preconditions (APPROVED / CI green /
+  MERGEABLE) and destructive-git guards are **never** bypassed.
+
+For true hands-off runs, launch Claude Code from a shell/project where
+`permissions.defaultMode: bypassPermissions` is set (see the go-stablenet
+`scripts/coding-agent.sh` launcher) so tool-use itself also never prompts.
+
+> `/work` remains the Jira-driven entry (interactive: prompts on BLOCKED recovery,
+> sensitive content, etc.). `/analyze` is the autonomous, Jira-free entry.
 
 ### 7.2 Status check
 
