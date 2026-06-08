@@ -94,8 +94,12 @@ bash: git checkout -b {branch}
 ```
 
 If the branch already exists and is unrelated to this ticket (no commits
-referencing ticket_id), abort and ask the user how to proceed. NEVER
-force-delete or force-reset an existing branch.
+referencing ticket_id):
+- `state.config.autonomy.mode == "auto"`: do NOT ask. Pick a fresh, non-colliding
+  name `{branch}-{YYYYMMDD_HHMMSS}` (UTC), set `states.IMPLEMENTATION.branch` to it,
+  and `git checkout -b {new_branch}`. Log the rename to impl.log.
+- otherwise: abort and ask the user how to proceed.
+NEVER force-delete or force-reset an existing branch (in either mode).
 
 ### 3.2 Resume
 
@@ -105,8 +109,13 @@ bash: git checkout {branch}
 bash: git pull --rebase origin {branch}     # if remote exists; otherwise skip
 ```
 
-If pull --rebase fails because of conflicts, do not auto-resolve. Surface
-the conflict to the user and stop.
+If pull --rebase fails because of conflicts:
+- `state.config.autonomy.mode == "auto"`: do NOT ask. `git rebase --abort` to restore
+  a clean state, then continue on the local branch as-is (skip the remote sync for
+  this step) and log "rebase conflict — proceeded on local branch (autonomy)". The
+  push at COMPLETION (Orchestrator §4) will surface any real divergence then, where
+  push is already gated. Never auto-resolve conflict markers or force-push.
+- otherwise: do not auto-resolve. Surface the conflict to the user and stop.
 
 ### 3.3 Safety guard
 

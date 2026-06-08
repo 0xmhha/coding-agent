@@ -408,9 +408,17 @@ read what was just written → review for:
 if issues found:
   states.DESIGN.revision += 1
   if revision > max_design_revisions (default 3):
-    state-machine.transition(workspace_dir, current_state, "BLOCKED")
-    explain to user: too many design revisions, manual review needed
-    STOP
+    if state.config.autonomy.mode == "auto":
+      # Autonomous: do not BLOCK on design churn. Finalize the best draft so far
+      # and let EVALUATION be the real arbiter (it can still trigger a bug cycle).
+      pick the latest design-v{N}.md as final; append to design-changelog.md:
+        "vN finalized under autonomy (max_design_revisions reached); residual
+         concerns: {1-line list} — deferred to EVALUATION."
+      proceed to §5.4 Transition (DESIGN → IMPLEMENTATION). Do NOT block.
+    else:
+      state-machine.transition(workspace_dir, current_state, "BLOCKED")
+      explain to user: too many design revisions, manual review needed
+      STOP
   write design-v{revision+1}.md with corrections
   append to design-changelog.md:
     "v{N} → v{N+1}: {one-line reason}; fixed: {list of issues}"

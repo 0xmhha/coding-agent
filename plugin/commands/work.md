@@ -68,14 +68,19 @@ Jira 티켓 기반 자동화 작업을 시작한다.
          continue → 다음 폴더 확인 (또는 새 작업 생성)
        
        "BLOCKED":
-         사용자에게 질문:
-           "이전 작업이 BLOCKED 상태입니다 (workspace: {existing_workspace}).
-            원인: {state.failure_summary 요약}
-            재개하시겠습니까? (y/n) 또는 새 작업을 시작하시겠습니까? (new)"
-         답변에 따라:
-           y → 복구 모드로 진행 (5단계로 점프, workspace = existing_workspace)
-           new → 새 작업 (4단계로 진행)
-           n 또는 기타 → 중단
+         자율 모드 분기 (existing state.config.autonomy.mode):
+           == "auto":
+             묻지 않고 새 작업으로 진행 (4단계). 이전 BLOCKED 워크스페이스는 보존.
+             로그: "이전 BLOCKED 작업 발견 — 자율 모드라 새 작업으로 진행합니다."
+           그 외 ("interactive"):
+             사용자에게 질문:
+               "이전 작업이 BLOCKED 상태입니다 (workspace: {existing_workspace}).
+                원인: {state.failure_summary 요약}
+                재개하시겠습니까? (y/n) 또는 새 작업을 시작하시겠습니까? (new)"
+             답변에 따라:
+               y → 복구 모드로 진행 (5단계로 점프, workspace = existing_workspace)
+               new → 새 작업 (4단계로 진행)
+               n 또는 기타 → 중단
        
        그 외 (in_progress 상태들):
          사용자에게 알림: "진행 중인 작업이 있습니다 ({existing_workspace}). 복구합니다."

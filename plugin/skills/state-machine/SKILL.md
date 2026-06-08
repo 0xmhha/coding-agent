@@ -43,7 +43,12 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
     "max_design_revisions": 3,
     "max_eval_cycles": 3,
     "impl_model": "sonnet-4.6",
-    "planning_model": "opus-4.7"
+    "planning_model": "opus-4.7",
+    "autonomy": {
+      "mode": "interactive",     // "interactive" (default) | "auto"
+      "on_blocked": "halt",      // "halt" (default) | "escalate" — what to do at BLOCKED/limits
+      "auto_merge": false        // false → PR 생성까지만 자율, merge/push/tag 는 게이트 유지(권장)
+    }
   }
 }
 ```
@@ -141,6 +146,11 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 2. 위의 "데이터 모델" 섹션의 state.json 기본 스키마를 사용하여 객체 구성:
    - `ticket_id`, `workspace_dir`, `ticket_type`, `pipeline_variant`를 입력값으로 채움
    - `requirement_source`를 입력값으로 채움 (미지정 시 "jira")
+   - `config.autonomy`를 `requirement_source`로부터 유도:
+     - `"local"`  → `{ mode: "auto",        on_blocked: "escalate", auto_merge: false }`
+     - `"jira"`   → `{ mode: "interactive", on_blocked: "halt",     auto_merge: false }`
+     - (호출자가 autonomy 를 명시 전달하면 그 값을 우선한다. auto_merge 기본은 항상 false —
+        merge/push/tag 는 별도 게이트 유지.)
    - `created_at`을 현재 시각으로 설정
    - `current_state`는 `"TICKET_INTAKE"`
    - 모든 `states[*].status`는 `"pending"`

@@ -139,7 +139,9 @@ it as a stuck pipeline and report.
 | COMPLETED         | Report summary (PR URL, merge commit if present).    |
 +-------------------+------------------------------------------------------+
 | BLOCKED           | Report failure_summary + recurring_patterns.         |
-|                   | Wait for user input — do not auto-recover.           |
+|                   | autonomy.on_blocked=="halt": wait for user input.    |
+|                   | =="escalate": reached only after §5 escalation pass; |
+|                   | write BLOCKED-summary.md and STOP gracefully (no prompt). |
 +-------------------+------------------------------------------------------+
 ```
 
@@ -183,8 +185,11 @@ When the Evaluator reports all stages green:
         the suggested action ("edit the source artifact and re-run").
         Do NOT advance state.
      if result.scan_result == "REDACTED":
-        confirm with the user before proceeding (prefer fixing the source
-        per pr-sanitize §4).
+        if state.config.autonomy.mode == "auto":
+           proceed — the redaction is already applied to `body` (no prompt).
+        else:
+           confirm with the user before proceeding (prefer fixing the source
+           per pr-sanitize §4).
      body = result.text
 
    Sanitize the title separately:
@@ -272,15 +277,35 @@ advances it to `"completed"` is `/coding-agent:merge`.
 2. Compare to cycles:
    max_cycles = state.config.max_eval_cycles  (default 3)
    if eval_failures >= max_cycles:
-     state-machine.transition(workspace_dir, current_state, "BLOCKED")
-     report:
-       title: "BLOCKED: max_eval_cycles ({max_cycles}) exceeded"
-       body:
-         - failure_summary (total, by_state, by_type)
-         - recurring_patterns (if any)
-         - last 3 failure_log entries summarized
-         - suggestion: 사용자 개입이 필요합니다.
-     STOP.
+     if state.config.autonomy.on_blocked == "escalate":
+       # Autonomous: do not wait for a human. Take ONE final escalation pass.
+       if no escalation pass taken yet (no failure_log entry tagged escalation=true):
+         state-machine.transition(workspace_dir, "EVALUATION", "ANALYSIS")
+         dispatch Planner mode="bugfix" with directive:
+           "FINAL escalation: simplify scope — address ONLY the failing acceptance
+            criteria; defer non-essential steps. This is the last cycle."
+         (tag the next failure_log entry, if any, escalation=true)
+         continue the loop.
+       else:
+         # escalation pass already failed → finalize gracefully (no prompt)
+         state-machine.transition(workspace_dir, current_state, "BLOCKED")
+         write {workspace}/BLOCKED-summary.md:
+           - failure_summary (total, by_state, by_type)
+           - recurring_patterns (if any)
+           - last 3 failure_log entries summarized
+           - recommended next action (for a human to pick up later)
+         return that summary and STOP gracefully (no user prompt).
+     else:
+       # interactive (halt)
+       state-machine.transition(workspace_dir, current_state, "BLOCKED")
+       report:
+         title: "BLOCKED: max_eval_cycles ({max_cycles}) exceeded"
+         body:
+           - failure_summary (total, by_state, by_type)
+           - recurring_patterns (if any)
+           - last 3 failure_log entries summarized
+           - suggestion: 사용자 개입이 필요합니다.
+       STOP.
 
 3. Otherwise enter bug cycle:
    state-machine.transition(workspace_dir, "EVALUATION", "ANALYSIS")
