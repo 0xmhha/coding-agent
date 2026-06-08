@@ -1,0 +1,21 @@
+{
+  "experiment": "gsn-retrieval-abc-phase1",
+  "modes": ["A_cks", "B_code_only", "C_code_skills"],
+  "mode_agents": {
+    "A_cks": "planner",
+    "B_code_only": "bench-planner-codeonly",
+    "C_code_skills": "bench-planner-skills"
+  },
+  "shared_agents": {
+    "implement": "implementer",
+    "evaluate": "evaluator"
+  },
+  "tasks": [
+    {
+      "id": "STABLE-0001",
+      "ticket": "bench/fixtures/tickets/STABLE-0001.json"
+    }
+  ],
+  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/go-stablenet",
+  "batch_size": 1
+}
