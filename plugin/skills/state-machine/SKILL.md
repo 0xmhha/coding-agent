@@ -21,6 +21,7 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
   "workspace_dir": ".coding-agent/tickets/STABLE-1234_20260528_000000",
   "ticket_type": "feature",
   "pipeline_variant": "full",
+  "requirement_source": "jira",   // "jira" (default) | "local" (free-text /analyze entry)
 
   "current_state": "TICKET_INTAKE",
   "current_agent": null,
@@ -118,15 +119,17 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 
 ## 2. 제공 함수
 
-### 2.1 init_state(ticket_id, ticket_type, workspace_dir, pipeline_variant)
+### 2.1 init_state(ticket_id, ticket_type, workspace_dir, pipeline_variant, requirement_source)
 
 **역할**: state.json을 새로 생성하고 TICKET_INTAKE 상태로 초기화.
 
 **입력**:
-- `ticket_id` (string): 예 "STABLE-1234"
+- `ticket_id` (string): 예 "STABLE-1234" (free-text 진입 시 "LOCAL-{timestamp}")
 - `ticket_type` (string): "feature" | "bugfix" | "code_review" | "release"
 - `workspace_dir` (string): 작업 폴더 절대 경로
 - `pipeline_variant` (string): "full" | "review_only" | "release"
+- `requirement_source` (string, optional): "jira" (기본) | "local". `/coding-agent:analyze`
+  자유 텍스트 진입은 "local". orchestrator가 이 값으로 Jira pre-flight/종료 동기화를 분기한다.
 
 **절차**:
 
@@ -137,6 +140,7 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 
 2. 위의 "데이터 모델" 섹션의 state.json 기본 스키마를 사용하여 객체 구성:
    - `ticket_id`, `workspace_dir`, `ticket_type`, `pipeline_variant`를 입력값으로 채움
+   - `requirement_source`를 입력값으로 채움 (미지정 시 "jira")
    - `created_at`을 현재 시각으로 설정
    - `current_state`는 `"TICKET_INTAKE"`
    - 모든 `states[*].status`는 `"pending"`

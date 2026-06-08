@@ -51,18 +51,23 @@ jira at intake (`work.md` §5.2), cks at the Planner (`planner.md` §3.0
 `cks.ops.health`), chainbench at the Evaluator (`evaluator.md` §7.0 tool
 pre-flight).
 
+First read `state.requirement_source` (state.json). When it is `"local"` (free-text
+`/coding-agent:analyze` entry) jira-gateway is NOT used by this run — skip every jira
+check below (registration + env). cks + chainbench remain required.
+
 ```
-1. Read plugin/.mcp.json (via ${CLAUDE_PLUGIN_ROOT}/.mcp.json). Confirm all
-   three servers are registered: jira-gateway, cks, chainbench.
-   Any missing → report which, point at docs/SETUP.md, and stop (the pipeline
-   cannot complete without them).
+1. Read plugin/.mcp.json (via ${CLAUDE_PLUGIN_ROOT}/.mcp.json). Confirm the servers
+   this run uses are registered:
+     - always: cks, chainbench
+     - jira-gateway: only when requirement_source != "local"
+   Any required one missing → report which, point at docs/SETUP.md, and stop.
 2. Check the env the registered commands substitute are non-empty:
-   bash: for v in CKS_MCP_BIN CKS_CONFIG CHAINBENCH_DIR \
-                  JIRA_BASE_URL JIRA_API_TOKEN JIRA_USER_EMAIL; do
-           [ -n "${!v:-}" ] || echo "UNSET: $v"; done
+   bash: vars="CKS_MCP_BIN CKS_CONFIG CHAINBENCH_DIR"
+         [ "{requirement_source}" != "local" ] && vars="$vars JIRA_BASE_URL JIRA_API_TOKEN JIRA_USER_EMAIL"
+         for v in $vars; do [ -n "${!v:-}" ] || echo "UNSET: $v"; done
    Any UNSET → WARN the user (that server will fail to start). Hard-stop only
    for the servers this run will actually use:
-     - jira vars: hard-stop unless --local mode.
+     - jira vars: hard-stop unless requirement_source == "local" (then jira is unused).
      - CHAINBENCH_DIR: WARN now; the Evaluator's §7.0 turns it into a Stage-4
        FAIL later, so a long ANALYSIS→IMPLEMENTATION run isn't wasted only if
        you'd rather fail fast — surface it here.
@@ -159,6 +164,8 @@ When the Evaluator reports all stages green:
 
 3. Assemble PR body (sections appended in order; sanitize each)
      ## Jira → {JIRA_BASE_URL}/browse/{ticket_id}
+              (requirement_source == "local" → omit this line; instead add
+               "## Requirement → (local) {ticket.summary}")
      ## Summary → first paragraph of analysis.md
      ## Changes → for each step in plan_progress.steps:
                    "- Step {N}: {description} ({commit_hash})"
@@ -200,6 +207,8 @@ When the Evaluator reports all stages green:
    Add module labels from related-code.json scope.
 
 6. Jira updates (failures are warnings, not fatal)
+   SKIP this entire step when requirement_source == "local" (no Jira ticket).
+   Otherwise:
    mcp__jira-gateway__jira_add_comment(ticket_id,
      "PR created: {pr_url}")
    mcp__jira-gateway__jira_update_status(ticket_id, "In Review")
@@ -288,6 +297,10 @@ advances it to `"completed"` is `/coding-agent:merge`.
 ## 6. Pipeline variant branching (RI-18, RI-19)
 
 state.pipeline_variant determines which loop the Orchestrator runs.
+
+> When `requirement_source == "local"`, skip every `jira_*` terminal call in this
+> section (post-comment / update-status). The local artifacts (review-report.md,
+> CHANGELOG, tag) are still produced; only the Jira sync is omitted.
 
 ### "review_only" (Code Review tickets)
 
