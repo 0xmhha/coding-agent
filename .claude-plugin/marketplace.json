@@ -1,0 +1,15 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "coding-agent",
+  "owner": {
+    "name": "mhha"
+  },
+  "description": "go-stablenet Jira-driven automated development pipeline (cks + chainbench MCP).",
+  "plugins": [
+    {
+      "name": "coding-agent",
+      "source": "./plugin",
+      "description": "go-stablenet Jira-driven automated development pipeline"
+    }
+  ]
+}
