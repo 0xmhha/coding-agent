@@ -11,6 +11,12 @@ Jira and the local workspace.
 This command is the only one in the plugin that touches `main`, so the
 preconditions are strict and every external action is logged.
 
+The §3 preconditions (PR APPROVED + required checks green + MERGEABLE) are a
+HARD safety gate and are **never** bypassed — not even when
+`state.config.autonomy.auto_merge == true`. auto_merge only governs whether the
+pipeline reaches this command without a human typing `/coding-agent:merge` and
+whether sanitize REDACTED prompts (§4.3); it never relaxes the merge safety checks.
+
 ---
 
 ## 1. Argument validation
@@ -130,8 +136,11 @@ details below. Do not touch git state.
      if not result.ok:
        abort with the pr-sanitize block message; do NOT continue to merge.
      if result.scan_result == "REDACTED":
-       confirm with the user before continuing (prefer source fixes per the
-       pr-sanitize caller guidance).
+       if state.config.autonomy.auto_merge == true:
+         continue — redaction is already applied to body (no prompt).
+       else:
+         confirm with the user before continuing (prefer source fixes per the
+         pr-sanitize caller guidance).
      body = result.text
 ```
 

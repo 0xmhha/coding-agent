@@ -227,6 +227,14 @@ When the Evaluator reports all stages green:
 
 If step 2 (push) fails, the Orchestrator must NOT advance the state.
 
+> **auto_merge gate.** By default (`autonomy.auto_merge == false`) the pipeline
+> STOPS here at COMPLETION (status `in_progress`); the squash-merge to `main` is a
+> separate, user-invoked `/coding-agent:merge` (PR-only autonomy). When
+> `autonomy.auto_merge == true` the Orchestrator MAY proceed autonomously to the
+> merge flow, but ONLY if `/coding-agent:merge` §3 preconditions all pass (PR
+> APPROVED + required checks green + MERGEABLE). Those safety preconditions are
+> never bypassed by auto_merge — it only removes the human "type /merge" step.
+
 ### 4.1 Variant: review_cycle re-publish (after /review fix loop)
 
 When the pipeline reached EVALUATION_PASS via a review_cycle (mode came in
@@ -361,11 +369,15 @@ Differences from "full":
 - COMPLETION terminal handler:
 
   ```
-  1. Confirm version with the user before tagging — this is a destructive
-     external action; never tag without explicit confirmation.
+  1. Version confirmation gate (destructive external action):
+     - state.config.autonomy.auto_merge == true → proceed without prompting
+       (autonomous release explicitly enabled).
+     - otherwise (default) → confirm version with the user before tagging;
+       never tag without explicit confirmation.
   2. bash: git tag v{version}
-     bash: git push origin v{version}   (user confirmation required again
-     because push is visible publicly)
+     bash: git push origin v{version}
+     Same gate as step 1: auto_merge==true proceeds; otherwise this public
+     push requires user confirmation.
   3. Update CHANGELOG.md (entry per included STABLE-xxx from
      release-summary.md).
   4. jira_update_status(ticket_id, "Done")
@@ -403,8 +415,10 @@ this pipeline: state transitions must be serialized.
   stop.
 - Never overwrite a sub-agent's failure_log entry. log_failure is append-only.
 - Never call destructive git operations (force-push, reset --hard, branch -D
-  on a non-feature branch) without user confirmation.
-- Never tag or push tags without user confirmation (release variant).
+  on a non-feature branch) without user confirmation — even when
+  autonomy.auto_merge==true (these are never auto-approved).
+- Never tag or push tags without user confirmation (release variant), UNLESS
+  state.config.autonomy.auto_merge == true (explicit opt-in for autonomous release).
 - Always re-read state.json after a sub-agent returns — sub-agents may have
   changed fields the Orchestrator did not anticipate.
 - If a sensitive_check result transitions to BLOCKED at any time, immediately
