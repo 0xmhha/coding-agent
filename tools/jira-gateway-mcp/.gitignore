@@ -4,3 +4,4 @@
 .env.local
 *.log
 coverage.out
+/server
