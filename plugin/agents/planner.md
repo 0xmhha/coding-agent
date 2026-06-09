@@ -98,7 +98,8 @@ returns an error, the Planner reports the missing artifacts and stops.
 load on demand — if a call says the tool is unknown, run ToolSearch once to load
 them, then call normally:
 `ToolSearch "select:mcp__plugin_coding-agent_cks__cks_ops_health,mcp__plugin_coding-agent_cks__cks_context_semantic_search,mcp__plugin_coding-agent_cks__cks_context_get_subgraph,mcp__plugin_coding-agent_cks__cks_context_impact_analysis,mcp__plugin_coding-agent_cks__cks_context_concurrency_impact,mcp__plugin_coding-agent_cks__cks_ops_freshness,mcp__plugin_coding-agent_cks__cks_context_find_callers,mcp__plugin_coding-agent_cks__cks_context_get_for_task"`.
-Do NOT silently fall back to grep/Read while cks is healthy — cks is the primary retrieval path.
+cks (via `get_for_task`, §3.1b) is the primary retrieval path; targeted grep/Read is a
+fine *complement* (§3.1c), but do not replace a healthy cks with a blind grep sweep.
 
 Before any retrieval, check the backend so the analysis states its own
 confidence honestly:
@@ -128,7 +129,46 @@ write {workspace_dir}/ticket-parsed.json = parsed
 If `parsed.missing_fields` is non-empty, log a warning to the analysis but
 keep going — the Planner infers from context.
 
-### 3.2 Semantic search (cks)
+### 3.1b Primary retrieval — get_for_task (token-budgeted EvidencePack)
+
+**Default to ONE `get_for_task` call, not a sweep of granular tools.** It returns a
+sanitized, token-budgeted EvidencePack with citations AND code bodies for the task
+(typically <1.5k tokens) — far cheaper than `semantic_search` + `get_subgraph` +
+`impact_analysis` + per-file `Read`.
+
+```
+pack = mcp__plugin_coding-agent_cks__cks_context_get_for_task(
+  prompt = ticket.summary + " " + key requirements + " " + scope.modules)
+```
+
+Persist as `related-code.json.pack`. **Cite the bodies the pack already returned
+directly in analysis.md — do NOT re-`Read` those files.** Re-reading a span cks
+already gave you is the #1 source of wasted tokens (benchmarked: it makes cks cost
+MORE than a grep pass with no accuracy gain). `Read` a file only for a span the
+pack did not include.
+
+### 3.1c Complexity gate — spend cks where it pays
+
+Run `stablenet-context.estimate_complexity(...)` (§3.3) first, then:
+
+- **localized / simple** (single module, the symbols are named in the ticket, the
+  §3.1b pack already pinned the root cause): STOP retrieval here. The EvidencePack
+  plus at most 1–2 targeted `find_symbol`/grep calls is enough. **Skip §3.4 graph
+  traversal and §3.5 impact analysis** — on a localized bug they add tokens without
+  changing the design (benchmarked: A/B/C tied, cks cost ~1.5× tokens).
+- **cross-module / concurrency-sensitive / complex**: proceed to §3.2–§3.5 for the
+  graph / impact / concurrency evidence cks is uniquely good at — still obeying the
+  "don't re-Read what the pack returned" rule, and preferring one `impact_analysis`
+  /`concurrency_impact` over many `get_subgraph` probes.
+
+cks's contract is **fewer tokens AND higher accuracy**. If a run ends up costing more
+tokens than a grep pass would, the retrieval was used wrong — prefer the pack, gate
+the graph work by complexity.
+
+### 3.2 Semantic search (cks) — targeted follow-up (complex tasks only; see §3.1c)
+
+Skip on localized tasks (the §3.1b pack already covers them). Use when the pack
+missed a meaning-based hit you still need:
 
 ```
 keywords = parsed.summary + parsed.fields.requirements + parsed.fields.scope.modules
@@ -413,11 +453,44 @@ function signatures, types, and error returns.)
 - [ ] Is concurrent safety preserved? (Reference CKG concurrency_impact.)
 - [ ] Are there new shared resources that need protection?
 - [ ] Does any caller assume the old behavior?
+- [ ] Does this introduce derived/parallel state — an aggregate, cache, index,
+      counter, or map that mirrors another structure? If yes, §5.2b is REQUIRED.
 
 #### Tests
 - Existing tests that must still pass: ...
 - New tests to add: ...
 ```
+
+### 5.2b Derived-state / write-site completeness (REQUIRED when §5.2 flags derived state)
+
+A new aggregate / cache / index / counter that mirrors an existing structure
+must be maintained at **every** site that mutates the underlying structure — not
+only the sites that are semantically "about" the feature. This is the single
+most common side-effect miss: the new state is updated at the obvious add/remove
+paths and silently drifts at an unrelated path (capacity eviction, reorg,
+truncation, GC), because that path's vocabulary (e.g. "GlobalSlots", "spammers",
+"truncate") never mentions the feature — so a semantic search never surfaces it.
+
+Do NOT rely on `semantic_search` here; it ranks by feature similarity. Use the
+graph to enumerate write-sites exhaustively:
+
+1. Identify the structure your new state mirrors (the field/method whose
+   lifecycle yours must track — e.g. `pending`, `list.totalcost`, `Cap`).
+2. `cks_context_find_callers(symbol=<structure or its mutators>)` **and**
+   `cks_context_impact_analysis(symbol=<structure>)` — list ALL mutation sites,
+   explicitly including capacity/eviction/reorg/GC paths.
+3. In the design, render a table: each mutation site × the maintenance action
+   your new state needs there (add / sub / rebuild / none — with a reason). An
+   empty action cell is a design hole, not a default.
+4. Prefer **co-locating** the new state inside the structure it mirrors (so it is
+   maintained automatically) over a separate map maintained by scattered edits.
+   If co-location is impractical, REQUIRE a **self-checking invariant**: a
+   `recompute-from-source == aggregate` assertion wired into a debug/test path,
+   plus a test that drives the adversarial path (eviction/truncation/reorg).
+   Name the invariant and the test in this step's "New tests to add".
+
+Carry the write-site table and the invariant/test names into the design doc so
+the Implementer mirrors every site and the Evaluator can verify the invariant.
 
 ### 5.3 Self-review loop
 
@@ -428,6 +501,7 @@ read what was just written → review for:
   - inconsistent function signatures
   - missing nil/error checks
   - side-effect checklist items left unanswered
+  - derived state (§5.2b) flagged but missing its write-site table or invariant/test
   - dependencies between steps that contradict plan.md
   - violation of CKG concurrency hints
 
