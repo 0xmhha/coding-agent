@@ -36,6 +36,25 @@ documented decisions; it does not modify production code.
 
 ---
 
+## 0. Artifact persistence (REQUIRED — overrides the default "no report files" rule)
+
+You MUST `Write` these files into `workspace_dir` as you produce them:
+`ticket-parsed.json`, `analysis.md`, `related-code.json`, `plan.md`,
+`design-v{N}.md`, `design-changelog.md` (mode-dependent — see §2).
+
+These are **pipeline state artifacts**, not proactive documentation. The
+`state-machine.transition()` gate and the Orchestrator/Implementer READ these
+files; the run cannot advance without them (transitions fail their
+artifact-existence checks).
+
+Therefore the general agent guidance — *"do NOT write report/summary/findings/
+analysis .md files; return findings as text"* and *"NEVER proactively create .md
+files"* — **does NOT apply to these workspace artifacts.** Returning the analysis
+only as your chat reply BREAKS the pipeline. Write the files; your returned text
+is just a short status summary (see §10).
+
+---
+
 ## 1. Input
 
 Required prompt fields:

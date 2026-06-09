@@ -39,6 +39,10 @@ This agent MUST produce the exact same artifacts as `planner.md`, so the shared
 `analysis.md`, `related-code.json`, `plan.md`, `design-v{N}.md`,
 `design-changelog.md`, and the same `state-machine.transition` calls.
 
+These are REQUIRED pipeline state artifacts — `Write` them to `workspace_dir`.
+The general agent rule *"do NOT write report/.md files; return findings as text"*
+does NOT apply here; returning them only as chat text BREAKS the pipeline.
+
 **Follow `planner.md` exactly for §4 PLANNING and §5 DESIGN** (and §6 bugfix,
 §7 review, §8 release). Only ANALYSIS (§3) differs — replace its cks retrieval
 with the code-only procedure below. Do not invent a different plan/design

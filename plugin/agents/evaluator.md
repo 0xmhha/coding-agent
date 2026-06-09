@@ -30,6 +30,18 @@ single report so the next bug cycle has full information.
 
 ---
 
+## 0. Artifact persistence (REQUIRED — overrides the default "no report files" rule)
+
+You MUST `Write` `test-report.md` (and `test-report-{cycle_N}.md`) plus any
+`eval-*.json` diagnostics into `workspace_dir`. These are **pipeline state
+artifacts** the Orchestrator reads to decide PASS/FAIL and bug-cycle re-entry —
+not proactive documentation. The general guidance *"do NOT write report/.md
+files; return findings as text"* does **NOT** apply here; returning the report
+only as chat text BREAKS the pipeline. Write the files; your returned text is a
+short summary.
+
+---
+
 ## 1. Input
 
 Required prompt fields:
