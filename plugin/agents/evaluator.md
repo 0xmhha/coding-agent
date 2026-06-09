@@ -162,6 +162,45 @@ status =
   "PASS" otherwise
 ```
 
+### 4.6 Derived-state consistency gate (B-4)
+
+A green unit suite is necessary but NOT sufficient when the change adds *derived
+state* — a pool-/manager-level aggregate, cache, index, counter, or map that
+mirrors another structure. This is the most common source of silent side
+effects: the aggregate is maintained at the obvious add/remove paths and drifts
+at an unrelated path (capacity eviction, truncation, reorg, GC) that the
+feature's own tests never exercise, so every other gate passes while the
+invariant is quietly broken.
+
+```
+1. Detect derived state. It is present if EITHER:
+   - design-v{N}.md §5.2b declared it (read the write-site table), OR
+   - git -C {go_stablenet_root} diff main...HEAD adds a field/map/counter
+     maintained by paired add/sub-style helpers (e.g. addXObligation /
+     subXObligation, a *Spent / *Total / *Count map).
+   If neither holds, skip this gate (status unaffected).
+
+2. If derived state IS present, require BOTH to exist AND be in the --- PASS: set:
+   - a consistency-invariant test: recomputes the aggregate from its source and
+     asserts equality (the invariant named in design §5.2b; or a
+     validate*Internals-style helper that recomputes-and-compares), AND
+   - an adversarial-path test: drives the aggregate through an eviction /
+     truncation / reorg / capacity-limit path — not just add/remove — because
+     that is where maintenance hooks are typically missed.
+
+3. If either is missing:
+   status = "FAIL"
+   finding = "derived state {name} introduced without a {consistency-invariant |
+              adversarial eviction/reorg} test (see planner §5.2b). Risk: silent
+              aggregate drift → false rejects under load."
+   This routes a bug cycle back to the Planner rather than passing EVALUATION.
+```
+
+Rationale: a real fee-delegation cumulative-balance fix passed unit + lint +
+security + chainbench yet leaked its fee-payer aggregate on the pool-truncation
+path; only a recompute-from-source invariant test caught it. This gate makes
+that invariant mandatory whenever derived state appears.
+
 ---
 
 ## 5. Stage 2 — Lint & Format

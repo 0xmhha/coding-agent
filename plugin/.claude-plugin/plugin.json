@@ -1,6 +1,6 @@
 {
   "name": "coding-agent",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "go-stablenet Jira-driven automated development pipeline",
   "author": {
     "name": "mhha"
