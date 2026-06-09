@@ -147,28 +147,43 @@ already gave you is the #1 source of wasted tokens (benchmarked: it makes cks co
 MORE than a grep pass with no accuracy gain). `Read` a file only for a span the
 pack did not include.
 
-### 3.1c Complexity gate — spend cks where it pays
+### 3.1c Right-size retrieval — optimize TOTAL cost-to-correct-fix, not this turn's tokens
 
-Run `stablenet-context.estimate_complexity(...)` (§3.3) first, then:
+The metric is NOT this analysis turn's token count — it is the **total tokens to a
+CORRECT, side-effect-free fix**: Σ(analysis + implementation + evaluation) across every
+bug cycle until EVALUATION passes. An analysis that misses an affected caller, a
+write-site, or a second failure path ships a bad fix → `EVALUATION_FAIL` → a full bug
+cycle (re-analyze + re-implement + re-evaluate), which costs far more than any retrieval
+it "saved". cks's value is exactly this completeness — enumerate every affected site so
+ONE design handles them all.
 
-- **localized / simple** (single module, the symbols are named in the ticket, the
-  §3.1b pack already pinned the root cause): STOP retrieval here. The EvidencePack
-  plus at most 1–2 targeted `find_symbol`/grep calls is enough. **Skip §3.4 graph
-  traversal and §3.5 impact analysis** — on a localized bug they add tokens without
-  changing the design (benchmarked: A/B/C tied, cks cost ~1.5× tokens).
-- **cross-module / concurrency-sensitive / complex**: proceed to §3.2–§3.5 for the
-  graph / impact / concurrency evidence cks is uniquely good at — still obeying the
-  "don't re-Read what the pack returned" rule, and preferring one `impact_analysis`
-  /`concurrency_impact` over many `get_subgraph` probes.
+Therefore:
 
-cks's contract is **fewer tokens AND higher accuracy**. If a run ends up costing more
-tokens than a grep pass would, the retrieval was used wrong — prefer the pack, gate
-the graph work by complexity.
+- **ALWAYS gather completeness evidence** for any change that touches shared/derived
+  state, a public symbol, or a symbol with more than one call site:
+  - `impact_analysis` (reverse-dependency closure — who assumes the old behaviour), and
+  - for `consensus/**` / `core/txpool/**` / `core/state/**` / `miner/**` /
+    `systemcontracts/**`: `concurrency_impact`.
+  This is the evidence that prevents the rework cycle and feeds §5.2b's write-site table
+  and the evaluator §4.6 derived-state gate. **Do not skip it to save this turn's tokens.**
+- **TRIM only REDUNDANT retrieval, never completeness:** don't re-`Read` spans the pack
+  already returned; prefer ONE `impact_analysis` / `concurrency_impact` over many
+  `get_subgraph` probes; skip a `semantic_search` for hits the pack already covered.
+- **Genuinely trivial fixes** (one private function, `find_callers` confirms a single
+  call site, no shared/derived state) may stop at the pack + that one `find_callers`
+  check.
 
-### 3.2 Semantic search (cks) — targeted follow-up (complex tasks only; see §3.1c)
+cks's contract is **fewer tokens AND higher accuracy — measured end-to-end**. A run that
+looks token-heavy this turn but lands a complete, side-effect-free fix in one cycle beats
+a cheap-looking analysis that misses a site and triggers a rework cycle. Never minimise
+this turn's tokens at the cost of completeness.
 
-Skip on localized tasks (the §3.1b pack already covers them). Use when the pack
-missed a meaning-based hit you still need:
+### 3.2 Semantic search (cks) — targeted follow-up
+
+Use when the §3.1b pack missed a meaning-based hit you still need (e.g. a sibling
+implementation, a mirrored code path). Don't repeat it for hits the pack already
+returned. (This is retrieval refinement, distinct from the completeness analysis in
+§3.1c, which is never skipped.)
 
 ```
 keywords = parsed.summary + parsed.fields.requirements + parsed.fields.scope.modules
