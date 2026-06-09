@@ -204,7 +204,11 @@ func (c *Client) SearchIssues(ctx context.Context, jql string, maxResults int) (
 	q.Set("jql", jql)
 	q.Set("maxResults", fmt.Sprintf("%d", maxResults))
 	q.Set("fields", "summary,description,issuetype,status,assignee,labels,created,updated")
-	path := "/rest/api/3/search?" + q.Encode()
+	// Atlassian removed the legacy GET /rest/api/3/search endpoint (HTTP 410,
+	// CHANGE-2046). The replacement is the bounded /search/jql resource, which
+	// takes the same jql/maxResults/fields query params and still returns an
+	// "issues" array (plus a nextPageToken we don't page through here).
+	path := "/rest/api/3/search/jql?" + q.Encode()
 	var resp struct {
 		Issues []issueRaw `json:"issues"`
 	}
