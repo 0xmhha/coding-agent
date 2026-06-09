@@ -10,13 +10,13 @@ tools:
   - Write
   - Edit
   - Bash
-  - mcp__chainbench__chainbench_init
-  - mcp__chainbench__chainbench_start
-  - mcp__chainbench__chainbench_status
-  - mcp__chainbench__chainbench_test_run
-  - mcp__chainbench__chainbench_report
-  - mcp__chainbench__chainbench_failure_context
-  - mcp__chainbench__chainbench_stop
+  - mcp__plugin_coding-agent_chainbench__chainbench_init
+  - mcp__plugin_coding-agent_chainbench__chainbench_start
+  - mcp__plugin_coding-agent_chainbench__chainbench_status
+  - mcp__plugin_coding-agent_chainbench__chainbench_test_run
+  - mcp__plugin_coding-agent_chainbench__chainbench_report
+  - mcp__plugin_coding-agent_chainbench__chainbench_failure_context
+  - mcp__plugin_coding-agent_chainbench__chainbench_stop
 skills:
   - state-machine
   - stablenet-invariants
@@ -255,6 +255,11 @@ defensive coding, not data exfiltration.
 
 ### 7.0 Pre-flight: confirm tool interfaces (RI-20)
 
+**Load the chainbench tools first (deferred plugin MCP tools).** They are exposed
+as `mcp__plugin_coding-agent_chainbench__*` with schemas that load on demand. Run
+ToolSearch once before the pre-flight check:
+`ToolSearch "select:mcp__plugin_coding-agent_chainbench__chainbench_init,mcp__plugin_coding-agent_chainbench__chainbench_start,mcp__plugin_coding-agent_chainbench__chainbench_status,mcp__plugin_coding-agent_chainbench__chainbench_test_run,mcp__plugin_coding-agent_chainbench__chainbench_report,mcp__plugin_coding-agent_chainbench__chainbench_failure_context,mcp__plugin_coding-agent_chainbench__chainbench_stop"`.
+
 Confirm the chainbench MCP exposes the C1 tool subset before the first call:
 
 ```
@@ -303,7 +308,7 @@ Build budget (fallback only): 5 minutes. Use the agent's wall-clock to enforce.
 ### 7.2 Network init
 
 ```
-mcp__chainbench__chainbench_init({
+mcp__plugin_coding-agent_chainbench__chainbench_init({
   profile: "default",          # default.yaml IS the go-stablenet/stablenet-adapter
                                # profile; there is no "go-stablenet" profile.
   binary_path: binary_path,    # resolved in §7.1 (implementer artifact or fallback)
@@ -317,7 +322,7 @@ init args. Setup budget: 2 minutes.
 ### 7.3 Start + stabilize
 
 ```
-mcp__chainbench__chainbench_start()
+mcp__plugin_coding-agent_chainbench__chainbench_start()
 
 # Poll for stabilization. Budget: 60 seconds for the first block,
 # then 60 seconds of continuous block production.
@@ -325,7 +330,7 @@ ok_first_block = false
 ok_steady = false
 
 for t in 0..60s, step=2s:
-  status = mcp__chainbench__chainbench_status()
+  status = mcp__plugin_coding-agent_chainbench__chainbench_status()
   if status.height >= 1: ok_first_block = true; break
 
 if not ok_first_block:
@@ -335,7 +340,7 @@ if not ok_first_block:
 
 baseline = status.height
 for t in 0..60s, step=5s:
-  status = mcp__chainbench__chainbench_status()
+  status = mcp__plugin_coding-agent_chainbench__chainbench_status()
   # Steady if height grows and all nodes agree on the head
   if status.height > baseline AND status.consensus_consistency == true:
     ok_steady = true; break
@@ -370,7 +375,7 @@ Run the built-in transaction test by its `category/name` catalog path (the tool
 validates the shape `^[a-zA-Z0-9_\-]+(\/[a-zA-Z0-9_\-]+)*$`):
 
 ```
-mcp__chainbench__chainbench_test_run({ test: "basic/tx-send", format: "text" })
+mcp__plugin_coding-agent_chainbench__chainbench_test_run({ test: "basic/tx-send", format: "text" })
 ```
 
 Run additional catalog tests as the ticket scope warrants (e.g.
@@ -381,7 +386,7 @@ this text output.
 ### 7.5b Parse the JSON report (C4 loop-back)
 
 ```
-report = mcp__chainbench__chainbench_report({ format: "json" })
+report = mcp__plugin_coding-agent_chainbench__chainbench_report({ format: "json" })
 # C4 shape:
 #   { summary: { total_tests, passed, failed, assertions: { passed, failed } },
 #     tests: [ { status, pass, fail, ... } ] }
@@ -395,7 +400,7 @@ stage4.status =
 
 # On failure, capture diagnostics for the bug cycle:
 if count_fail > 0:
-  ctx = mcp__chainbench__chainbench_failure_context()   # per-node height, logs
+  ctx = mcp__plugin_coding-agent_chainbench__chainbench_failure_context()   # per-node height, logs
   save ctx into {workspace_dir}/logs/eval-chainbench-failure.json
 ```
 
@@ -403,7 +408,7 @@ if count_fail > 0:
 
 ```
 try:
-  mcp__chainbench__chainbench_stop()
+  mcp__plugin_coding-agent_chainbench__chainbench_stop()
 finally:
   # Defensive: kill any leftover processes named gstable or wbft-node.
   # This is best-effort and never fails the run.

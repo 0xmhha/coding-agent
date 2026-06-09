@@ -27,67 +27,67 @@
       "server": "cks",
       "namespace": "cks.",
       "tools": {
-        "cks.context.get_for_task": {
+        "cks_context_get_for_task": {
           "owner": "cks",
           "description": "Compose a budgeted evidence pack for a development task (the primary planning entrypoint): intent -> semantic -> keyword/graph -> budget -> sanitize.",
           "input": { "properties": { "prompt": { "type": "string" }, "max_citations": { "type": "number" }, "budget_tokens": { "type": "number" } }, "required": ["prompt"] }
         },
-        "cks.context.semantic_search": {
+        "cks_context_semantic_search": {
           "owner": "cks",
           "description": "Vector (meaning) search over the indexed corpus. Hits carry source=ckv.",
           "input": { "properties": { "query": { "type": "string" }, "k": { "type": "number" }, "language": { "type": "string" }, "path_glob": { "type": "string" }, "kinds": { "type": "array" } }, "required": ["query"] }
         },
-        "cks.context.search_text": {
+        "cks_context_search_text": {
           "owner": "cks",
           "description": "BM25 keyword (exactness) search over the indexed corpus. Hits carry source=ckg.",
           "input": { "properties": { "query": { "type": "string" }, "k": { "type": "number" }, "language": { "type": "string" }, "path_glob": { "type": "string" } }, "required": ["query"] }
         },
-        "cks.context.find_symbol": {
+        "cks_context_find_symbol": {
           "owner": "cks",
           "description": "Resolve a symbol name to its definition citation(s).",
           "input": { "properties": { "name": { "type": "string" }, "language": { "type": "string" }, "kinds": { "type": "array" } }, "required": ["name"] }
         },
-        "cks.context.find_callers": {
+        "cks_context_find_callers": {
           "owner": "cks",
           "description": "List the callers of a symbol (reverse call edges).",
           "input": { "properties": { "symbol": { "type": "string" }, "depth": { "type": "number" }, "max_total": { "type": "number" } }, "required": ["symbol"] }
         },
-        "cks.context.find_callees": {
+        "cks_context_find_callees": {
           "owner": "cks",
           "description": "List the callees of a symbol (forward call edges).",
           "input": { "properties": { "symbol": { "type": "string" }, "depth": { "type": "number" }, "max_total": { "type": "number" } }, "required": ["symbol"] }
         },
-        "cks.context.get_subgraph": {
+        "cks_context_get_subgraph": {
           "owner": "cks",
           "description": "Return all nodes/edges within depth hops of a symbol, all edge types.",
           "input": { "properties": { "symbol": { "type": "string" }, "depth": { "type": "number" }, "max_total": { "type": "number" } }, "required": ["symbol"] }
         },
-        "cks.context.impact_analysis": {
+        "cks_context_impact_analysis": {
           "owner": "cks",
           "description": "Reverse-dependency closure of a symbol, grouped by coupling category (callers/interface/type_users/distributed/concurrent/other).",
           "input": { "properties": { "symbol": { "type": "string" }, "depth": { "type": "number" }, "max_total": { "type": "number" } }, "required": ["symbol"] }
         },
-        "cks.context.concurrency_impact": {
+        "cks_context_concurrency_impact": {
           "owner": "cks",
           "description": "Concurrency blast radius of a symbol: goroutines/channels/locks it spawns/sends-to/acquires and modules reached over concurrency edges, both directions.",
           "input": { "properties": { "symbol": { "type": "string" }, "depth": { "type": "number" }, "max_total": { "type": "number" } }, "required": ["symbol"] }
         },
-        "cks.context.change_history": {
+        "cks_context_change_history": {
           "owner": "cks",
           "description": "PR refs (provenance) and/or BM25-ranked hunk evidence for a symbol or intent.",
           "input": { "properties": { "intent": { "type": "string" }, "symbol": { "type": "string" }, "k": { "type": "number" }, "max_count": { "type": "number" } } }
         },
-        "cks.ops.health": {
+        "cks_ops_health": {
           "owner": "cks",
           "description": "Backend reachability + version pins. Reports degraded when ckv (embedder) is unavailable.",
           "input": { "properties": {} }
         },
-        "cks.ops.freshness": {
+        "cks_ops_freshness": {
           "owner": "cks",
           "description": "Index-vs-HEAD staleness: indexed head, current head, changed files.",
           "input": { "properties": {} }
         },
-        "cks.ops.index": {
+        "cks_ops_index": {
           "owner": "cks",
           "description": "Refresh the ckv + ckg indexes (maintenance op). mode=incremental|full.",
           "input": { "properties": { "mode": { "type": "string" }, "since_commit": { "type": "string" } } }

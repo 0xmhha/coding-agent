@@ -183,14 +183,14 @@ warnings — the user keeps the merged code either way.
 
 ```
 6.1. Jira: status → Complete
-     mcp__jira-gateway__jira_update_status(ticket_id, "Complete")
+     mcp__plugin_coding-agent_jira-gateway__jira_update_status(ticket_id, "Complete")
      On failure: print warning + suggestion to update Jira manually.
 
 6.2. Jira: comment with the merge hash
      comment_body = "Merged. Commit: {merge_hash}\nBranch: {branch} (deleted)"
      # Sanitize the comment too.
      result = pr-sanitize.scan(text=comment_body, context="jira_merge_comment")
-     mcp__jira-gateway__jira_add_comment(ticket_id, result.text)
+     mcp__plugin_coding-agent_jira-gateway__jira_add_comment(ticket_id, result.text)
 
 6.3. Local branch sync
      bash: git -C {repo_root} checkout main

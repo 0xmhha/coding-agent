@@ -9,19 +9,19 @@ tools:
   - Write
   - Edit
   - Bash
-  - mcp__cks__cks.context.semantic_search
-  - mcp__cks__cks.context.search_text
-  - mcp__cks__cks.context.find_symbol
-  - mcp__cks__cks.context.get_subgraph
-  - mcp__cks__cks.context.find_callers
-  - mcp__cks__cks.context.find_callees
-  - mcp__cks__cks.context.impact_analysis
-  - mcp__cks__cks.context.concurrency_impact
-  - mcp__cks__cks.context.change_history
-  - mcp__cks__cks.context.get_for_task
-  - mcp__cks__cks.ops.health
-  - mcp__cks__cks.ops.freshness
-  - mcp__cks__cks.ops.index
+  - mcp__plugin_coding-agent_cks__cks_context_semantic_search
+  - mcp__plugin_coding-agent_cks__cks_context_search_text
+  - mcp__plugin_coding-agent_cks__cks_context_find_symbol
+  - mcp__plugin_coding-agent_cks__cks_context_get_subgraph
+  - mcp__plugin_coding-agent_cks__cks_context_find_callers
+  - mcp__plugin_coding-agent_cks__cks_context_find_callees
+  - mcp__plugin_coding-agent_cks__cks_context_impact_analysis
+  - mcp__plugin_coding-agent_cks__cks_context_concurrency_impact
+  - mcp__plugin_coding-agent_cks__cks_context_change_history
+  - mcp__plugin_coding-agent_cks__cks_context_get_for_task
+  - mcp__plugin_coding-agent_cks__cks_ops_health
+  - mcp__plugin_coding-agent_cks__cks_ops_freshness
+  - mcp__plugin_coding-agent_cks__cks_ops_index
 skills:
   - state-machine
   - template-parse
@@ -74,11 +74,18 @@ returns an error, the Planner reports the missing artifacts and stops.
 
 ### 3.0 cks health check (record retrieval mode)
 
+**Load the cks tools first (they are deferred plugin MCP tools).** The
+`mcp__plugin_coding-agent_cks__*` tools are surfaced by name but their schemas
+load on demand — if a call says the tool is unknown, run ToolSearch once to load
+them, then call normally:
+`ToolSearch "select:mcp__plugin_coding-agent_cks__cks_ops_health,mcp__plugin_coding-agent_cks__cks_context_semantic_search,mcp__plugin_coding-agent_cks__cks_context_get_subgraph,mcp__plugin_coding-agent_cks__cks_context_impact_analysis,mcp__plugin_coding-agent_cks__cks_context_concurrency_impact,mcp__plugin_coding-agent_cks__cks_ops_freshness,mcp__plugin_coding-agent_cks__cks_context_find_callers,mcp__plugin_coding-agent_cks__cks_context_get_for_task"`.
+Do NOT silently fall back to grep/Read while cks is healthy — cks is the primary retrieval path.
+
 Before any retrieval, check the backend so the analysis states its own
 confidence honestly:
 
 ```
-health = mcp__cks__cks.ops.health()
+health = mcp__plugin_coding-agent_cks__cks_ops_health()
 record in analysis.md "Retrieval backend" line:
   - health.status == "ok"        → full retrieval (ckv semantic + ckg graph)
   - health.status == "degraded"  → ckv embedder unavailable; semantic_search is
@@ -106,7 +113,7 @@ keep going — the Planner infers from context.
 
 ```
 keywords = parsed.summary + parsed.fields.requirements + parsed.fields.scope.modules
-results = mcp__cks__cks.context.semantic_search(
+results = mcp__plugin_coding-agent_cks__cks_context_semantic_search(
   query = keywords joined,
   k = 15,
   path_glob = first module in parsed.fields.scope.modules (optional, e.g. "consensus/**"),
@@ -147,9 +154,9 @@ Before structural traversal, make sure the index reflects the current tree —
 otherwise graph/impact results miss recent changes:
 
 ```
-fresh = mcp__cks__cks.ops.freshness()
+fresh = mcp__plugin_coding-agent_cks__cks_ops_freshness()
 if fresh reports stale (indexed_head != current_head, or changed_files non-empty):
-  mcp__cks__cks.ops.index({ mode: "incremental" })   # refresh ckv + ckg
+  mcp__plugin_coding-agent_cks__cks_ops_index({ mode: "incremental" })   # refresh ckv + ckg
 ```
 
 If `cks.ops.index` is unavailable or fails, record "index stale; analysis may
@@ -161,13 +168,13 @@ miss recent changes" in analysis.md and continue best-effort.
 seeds = top symbols from §3.2 (deduped, qualified names preferred)
 
 for each seed:
-  subgraph = mcp__cks__cks.context.get_subgraph(
+  subgraph = mcp__plugin_coding-agent_cks__cks_context_get_subgraph(
     symbol = seed,
     depth = 2,
     max_total = 200,
   )
   # When you specifically need caller direction (who calls this seed):
-  callers = mcp__cks__cks.context.find_callers(symbol = seed)   # as needed
+  callers = mcp__plugin_coding-agent_cks__cks_context_find_callers(symbol = seed)   # as needed
 ```
 
 **Stage-7 concurrency (required for concurrency-sensitive seeds).** For any seed
@@ -175,7 +182,7 @@ whose path is under `consensus/**`, `core/txpool/**`, `core/state/**`,
 `miner/**`, or `systemcontracts/**`, also call:
 
 ```
-conc = mcp__cks__cks.context.concurrency_impact(
+conc = mcp__plugin_coding-agent_cks__cks_context_concurrency_impact(
   symbol = seed,
   depth = 3,          # channel reach is one hop deeper than calls
   max_total = 200,
@@ -193,7 +200,7 @@ Persist as `related-code.json.ckg` with the per-seed subgraphs under
 For each top-3 seed symbol (skip for `release`):
 
 ```
-impact = mcp__cks__cks.context.impact_analysis(
+impact = mcp__plugin_coding-agent_cks__cks_context_impact_analysis(
   symbol = <qualified name>,
   depth = inferred from work_type:
           bugfix → 2   (shallower — localized fix)
@@ -468,14 +475,14 @@ must read them directly.
 For each modified file in the diffs:
 
 ```
-results = mcp__cks__cks.context.semantic_search(
+results = mcp__plugin_coding-agent_cks__cks_context_semantic_search(
   query = test-report failure summary + modified file name + failure symbol,
   k = 10,
 )
 for each affected symbol:
-  subgraph = mcp__cks__cks.context.get_subgraph(symbol = <symbol>, depth = 2)
+  subgraph = mcp__plugin_coding-agent_cks__cks_context_get_subgraph(symbol = <symbol>, depth = 2)
   # concurrency-sensitive paths (consensus/txpool/state/miner/systemcontracts):
-  conc     = mcp__cks__cks.context.concurrency_impact(symbol = <symbol>)
+  conc     = mcp__plugin_coding-agent_cks__cks_context_concurrency_impact(symbol = <symbol>)
 ```
 
 ### 6.4 Synthesize

@@ -11,10 +11,10 @@ tools:
   - Write
   - Edit
   - Bash
-  - mcp__jira-gateway__jira_read_ticket
-  - mcp__jira-gateway__jira_read_comments
-  - mcp__jira-gateway__jira_add_comment
-  - mcp__jira-gateway__jira_update_status
+  - mcp__plugin_coding-agent_jira-gateway__jira_read_ticket
+  - mcp__plugin_coding-agent_jira-gateway__jira_read_comments
+  - mcp__plugin_coding-agent_jira-gateway__jira_add_comment
+  - mcp__plugin_coding-agent_jira-gateway__jira_update_status
 skills:
   - state-machine
 ---
@@ -214,9 +214,9 @@ When the Evaluator reports all stages green:
 6. Jira updates (failures are warnings, not fatal)
    SKIP this entire step when requirement_source == "local" (no Jira ticket).
    Otherwise:
-   mcp__jira-gateway__jira_add_comment(ticket_id,
+   mcp__plugin_coding-agent_jira-gateway__jira_add_comment(ticket_id,
      "PR created: {pr_url}")
-   mcp__jira-gateway__jira_update_status(ticket_id, "In Review")
+   mcp__plugin_coding-agent_jira-gateway__jira_update_status(ticket_id, "In Review")
 
 7. state.json
    states.COMPLETION.pr_url = pr_url
