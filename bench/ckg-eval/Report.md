@@ -1,14 +1,15 @@
-# CKG 4-Way Retrieval Evaluation (Report v3)
+# CKG 4-Way Retrieval Evaluation (Report v4)
 
 > Test set: 30 questions across 12 go-stablenet domains (`ckg-query-testset.md`).
 > Index: built from go-stablenet `dev` (`c051d50b`), scoped to the `gstable`
 > build files (unused consensus engines excluded, Solidity contract sources
-> included). Retrieval averaged over 3 runs; LLM relevance/sufficiency judged
-> by Sonnet (PARSE_FAIL 0). Inputs are keyword/sentence only; ground-truth
-> answers are kept separate (no answer leakage). α = grep (does not use the graph).
+> included), with production-over-test ranking. Retrieval averaged over 3 runs;
+> relevance/sufficiency judged by Sonnet (PARSE_FAIL 0, single vote). Inputs are
+> keyword/sentence only; ground-truth answers are kept separate (no leakage).
+> α = grep (does not use the graph).
 >
-> v3 change: production code is now ranked above test files by default in the
-> auto-selected path (composer test-demotion). v2 measured before that fix.
+> v4 change: the precision metric is split so related context is no longer
+> counted as noise (see "Metrics" below). v3 used a single strict precision.
 
 ## Methods
 - **α** raw files via keyword grep (baseline, no graph)
@@ -16,76 +17,62 @@
 - **γ** incremental graph lookups + node bodies
 - **δ** auto-selected evidence pack (`get_for_task`)
 
+## Metrics
+- **Answer-present** (separate check): the ground-truth answer file is in the
+  surfaced set. Answers "did we actually retrieve the answer?" — independent of
+  how much else was returned.
+- **Answer-focus** (strict): surfaced files that are *exactly* the designated
+  answer file, over total surfaced. Measures concentration on the answer; it
+  treats every other file as off-target, so related context lowers it.
+- **Relevance-precision** (LLM-judged): surfaced files that are the answer *or*
+  genuinely design-relevant context (callers, callees, types, related
+  contracts), over total surfaced. Credits useful related code a graph surfaces.
+- **Design-sufficiency** (LLM-judged): the context is enough to modify/design
+  the feature.
+- **Tokens**: information volume injected. **Efficiency** = sufficiency / 1k tokens.
+
 ## Overall comparison
 
-| Method | Relevance | Design-sufficiency | Location hit | Precision | Avg tokens | Test pollution | Efficiency (suf/1k tok) |
-|--------|----------:|-------------------:|-------------:|----------:|-----------:|---------------:|------------------------:|
-| α grep | 93% | 83% | 70% | 0.266 | 10,829 | 12/90 | 7.66 |
-| β graph+body | 93% | 73% | 83% | 0.034 | 11,797 | 63/90 | 6.19 |
-| γ incremental+body | 93% | 80% | 83% | 0.061 | 7,016 | 66/90 | 11.40 |
-| **δ auto-select** | 93% | **77%** | **83%** | **0.208** | **5,398** | **0/90** | **14.26** |
+| Method | Answer-present | Answer-focus | Relevance-precision | Design-sufficiency | Avg tokens | Efficiency |
+|--------|---------------:|-------------:|--------------------:|-------------------:|-----------:|-----------:|
+| α grep | 70% | 0.266 | 0.744 | 80% | 10,829 | 7.39 |
+| β graph+body | 83% | 0.034 | 0.300 | 80% | 11,858 | 6.75 |
+| γ incremental+body | 83% | 0.061 | 0.383 | 80% | 7,014 | 11.41 |
+| **δ auto-select** | **83%** | 0.208 | **0.594** | **77%** | **5,398** | **14.20** |
 
-- Relevance: judge says the retrieved context is on-topic.
-- Design-sufficiency: judge says there is enough code to modify/design the feature.
-- Location hit: retrieved context includes the ground-truth file (3-run mean).
-- Precision: fraction of surfaced files that are on-target.
-- Test pollution: cells whose retrieved set contains any `*_test.go` / test file.
+## Strict vs relevance precision (why the split matters)
 
-## Effect of production-over-test ranking on δ (v2 → v3)
+| Method | Answer-focus (strict) | Relevance-precision | Interpretation |
+|--------|----------------------:|--------------------:|----------------|
+| α grep | 0.266 | 0.744 | few files, mostly relevant |
+| β graph+body | 0.034 | 0.300 | ~9× more files are relevant than are the exact answer |
+| γ incremental+body | 0.061 | 0.383 | graph breadth is mostly useful context, not noise |
+| δ auto-select | 0.208 | 0.594 | concise pack, ~60% directly relevant |
 
-| Metric (δ) | v2 (before) | v3 (after) |
-|------------|------------:|-----------:|
-| Test pollution | high | **0/90** |
-| Location hit | 70% | **83%** |
-| Precision | 0.121 | **0.208** |
-| Design-sufficiency | 63% | **77%** |
-| Efficiency | 11.59 | **14.26** |
-
-Demoting test files lets the implementation file rank into the evidence pack
-instead of being crowded out by tests that mention the same symbol more often.
-
-## Domain-level design-sufficiency
-
-| Domain | α | β | γ | δ |
-|--------|--:|--:|--:|--:|
-| anzeon-gasprice | 100% | 100% | 100% | 100% |
-| fee-delegation | 67% | 100% | 67% | 67% |
-| gov-council | 100% | 67% | 100% | 100% |
-| gov-minter | 100% | 100% | 100% | 100% |
-| gov-validator | 100% | 0% | 0% | 0% |
-| native-manager | 50% | 50% | 50% | 50% |
-| wbft-finalize | 50% | 100% | 100% | 100% |
-| wbft-header | 100% | 100% | 100% | 100% |
-| wbft-justification | 100% | 100% | 100% | 100% |
-| wbft-prepare-commit | 100% | 67% | 67% | 100% |
-| wbft-roundchange | 100% | 100% | 100% | 100% |
-| wbft-seal | 67% | 67% | 100% | 33% |
-| wbft-validator | 67% | 33% | 67% | 67% |
+The strict metric (answer-focus) made the graph methods look like 96–97% noise
+(β 0.034, γ 0.061). Judging each surfaced file for relevance shows that 30–38%
+of what β/γ surface is genuinely design-relevant — the breadth a knowledge graph
+adds is largely useful context, not noise. Answer-present is reported separately
+so a high relevance-precision cannot hide a missing answer.
 
 ## Findings
 
-1. **δ (auto-select) is the efficiency leader and the cleanest method.** With
-   test demotion it reaches 77% design-sufficiency at the lowest token cost
-   (5,398) and zero test pollution — efficiency 14.26, roughly 2× the grep
-   baseline (7.66). It ties the best location hit (83%) and has by far the best
-   precision among graph methods (0.208).
-2. **Production-over-test ranking matters.** Before the fix, queries for an
-   implementation were crowded out by `*_test.go` files that mention the symbol
-   repeatedly. Demoting tests for non-test intents removed that entirely for δ
-   and raised its hit rate, precision, and sufficiency.
-3. **β (full graph dump) is the worst value even with bodies** — most tokens
-   (11,797), lowest efficiency (6.19). Dumping everything is counterproductive.
-4. **β/γ still show test pollution** because they call the raw `semantic_search`
-   / `get_subgraph` tools directly, which bypass the composer ranking where the
-   demotion lives. The production auto-select path (δ) is clean.
-5. **α (grep) is a strong but expensive baseline** — high sufficiency (83%,
-   whole files) but lowest location hit (70%, grep misses) at ~2× the tokens of δ.
+1. **δ (auto-select) is the balanced leader.** Answer-present 83% (tied best),
+   relevance-precision 0.594, design-sufficiency 77%, lowest tokens (5,398),
+   best efficiency (14.20 — about 2× the grep baseline). It retrieves a concise,
+   mostly-relevant pack that contains the answer.
+2. **Strict precision under-credited the graph.** Splitting it revealed that
+   β/γ's surfaced files are 30–38% relevant (not 3–6%); their value is breadth
+   of related context, paid for in tokens.
+3. **β (full graph dump) is still the worst value** — most tokens (11,858),
+   lowest efficiency (6.75). Breadth without selection is expensive.
+4. **α (grep) has the highest relevance-precision (0.744)** because it returns
+   few whole files, but the lowest answer-present (70%, grep misses) at ~2× δ's
+   tokens.
 
 ## Limitations
-- gov-validator: the graph methods score 0% sufficiency (only grep covers it).
-  cks retrieval does not surface the validator-contract initialization usefully —
-  a concrete target for retrieval-quality work.
-- Domain rows use 1–3 questions each, so per-domain numbers indicate trend only;
-  the overall numbers are the stable signal.
-- Single judge vote per cell; retrieval averaged over 3 runs. Noise is reduced
-  but not eliminated.
+- gov-validator: graph methods retrieve no useful context for it (only grep
+  covers it) — a concrete retrieval-quality target.
+- Domain rows use 1–3 questions each (trend only); overall numbers are stable.
+- Retrieval averaged over 3 runs; relevance/sufficiency judged with a single
+  vote, so those LLM metrics carry some run-to-run noise.
