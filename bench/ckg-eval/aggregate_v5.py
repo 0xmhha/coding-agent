@@ -10,8 +10,7 @@ for l in open("results.jsonl_full"):
     g["present"] += 1 if d["location_hit"] else 0
     g["focus"] += d["answer_focus"]
     g["tok"] += d["tokens"]
-    sf = d.get("surfaced_files", [])
-    g["testpoll"] += 1 if any("_test.go" in f or "/test" in f for f in sf) else 0
+    g["testpoll"] += d.get("test_pollution", 0)
 
 jud = collections.defaultdict(lambda: {"n": 0, "suf": 0, "rel": 0, "relp": 0.0, "rn": 0})
 for l in open("judged.jsonl"):

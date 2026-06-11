@@ -106,25 +106,25 @@ def _bodies_context(objs, locs, cap):
 
 # ---------- β: broad graph dump (+ 노드 본문) ----------
 def beta(entry, cks):
-    ss = cks("semantic_search", {"query": entry["query"], "k": 3})
+    ss = cks("semantic_search", {"query": entry["query"], "k": 3, "exclude_tests": True})
     objs = [ss]
     for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
         if name:
-            objs.append(cks("get_subgraph", {"symbol": name, "depth": 2, "max_total": 1500}))
+            objs.append(cks("get_subgraph", {"symbol": name, "depth": 2, "max_total": 1500, "exclude_tests": True}))
     locs = []
     for o in objs: collect_locations(o, locs)
     return _bodies_context(objs, locs, 70000), locs
 
 # ---------- γ: incremental targeted (+ 노드 본문) ----------
 def gamma(entry, cks):
-    ss = cks("semantic_search", {"query": entry["query"], "k": 5})
+    ss = cks("semantic_search", {"query": entry["query"], "k": 5, "exclude_tests": True})
     objs = [ss]
     for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
         if not name: continue
-        objs.append(cks("find_symbol", {"name": name}))
-        objs.append(cks("get_subgraph", {"symbol": name, "depth": 1, "max_total": 200}))
+        objs.append(cks("find_symbol", {"name": name, "exclude_tests": True}))
+        objs.append(cks("get_subgraph", {"symbol": name, "depth": 1, "max_total": 200, "exclude_tests": True}))
     locs = []
     for o in objs: collect_locations(o, locs)
     return _bodies_context(objs, locs, 40000), locs
@@ -143,6 +143,28 @@ def _norm(f):
     # strip a leading "./" ONLY (lstrip("./") would also eat the dot in ".claude/...")
     return f[2:] if f.startswith("./") else f
 
+# Mirrors pkg/testpath.IsTest in code-knowledge-system so the benchmark's
+# test-pollution metric matches what the exclude_tests filter actually drops.
+# Test-only support files (testutil*.go, testdata/ etc.) count as tests.
+_TEST_SUFFIXES = (".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx",
+                  ".test.js", ".test.jsx", ".spec.js", ".spec.jsx")
+_TEST_SEGMENTS = {"test", "tests", "testdata", "testutil", "testutils", "testhelpers"}
+
+def is_test_file(f):
+    f = _norm(f).replace("\\", "/")
+    if not f:
+        return False
+    base = f.rsplit("/", 1)[-1]
+    if base.endswith("_test.go"):
+        return True
+    if base.endswith(".go") and (base.startswith("testutil") or base.startswith("testhelper")):
+        return True
+    if base.endswith(_TEST_SUFFIXES):
+        return True
+    if base.endswith(".t.sol"):
+        return True
+    return any(seg in _TEST_SEGMENTS for seg in f.split("/"))
+
 def score(entry, locs):
     surfaced = []
     for f, s, e in locs:
@@ -157,10 +179,13 @@ def score(entry, locs):
     answer_focus = n_on_target / len(surfaced) if surfaced else 0.0
     recall = 1.0 if hit else 0.0
     errors = sum(1 for sf, _, _ in surfaced if not os.path.isfile(os.path.join(ROOT, sf)))
+    test_files = [sf for sf, _, _ in surfaced if is_test_file(sf)]
     # surfaced_files: full list, no cap — the relevance judge needs every file
     return {"location_hit": hit, "answer_present": hit,
             "answer_focus": round(answer_focus, 3), "recall": recall,
             "n_surfaced": len(surfaced), "error_count": errors,
+            "test_file_count": len(test_files),
+            "test_pollution": 1 if test_files else 0,
             "surfaced_files": [sf for sf, _, _ in surfaced]}
 
 def main():
