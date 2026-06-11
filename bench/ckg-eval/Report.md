@@ -35,17 +35,17 @@
 - **Design-sufficiency** (LLM-judged): the context is enough to modify/design
   the feature.
 - **Tokens**: information volume injected. **Efficiency** = sufficiency / 1k tokens.
-- **Test-pollution**: fraction of surfaced files that are test files (lower is
-  better for design tasks).
+- **Test-pollution**: cells (out of 90 = 30 questions × 3 runs) whose surfaced
+  set contains at least one test file (lower is better for design tasks).
 
 ## Overall comparison
 
 | Method | Answer-present | Answer-focus | Relevance-precision | Design-sufficiency | Avg tokens | Efficiency | Test-pollution |
 |--------|---------------:|-------------:|--------------------:|-------------------:|-----------:|-----------:|---------------:|
-| α grep | 70% | 0.266 | 0.756 | 80% | 10,829 | 7.39 | 0.000 |
-| β graph+body | 83% | 0.034 | 0.293 | 80% | 11,811 | 6.77 | 0.000 |
-| γ incremental+body | 83% | 0.061 | 0.372 | 80% | 7,056 | 11.34 | 0.000 |
-| **δ auto-select** | **97%** | 0.263 | **0.641** | **87%** | **4,767** | **18.25** | 0.000 |
+| α grep | 70% | 0.266 | 0.756 | 80% | 10,829 | 7.39 | 15/90 |
+| β graph+body | 83% | 0.034 | 0.293 | 80% | 11,811 | 6.77 | 78/90 |
+| γ incremental+body | 83% | 0.061 | 0.372 | 80% | 7,056 | 11.34 | 69/90 |
+| **δ auto-select** | **97%** | 0.263 | **0.641** | **87%** | **4,767** | **18.18** | **3/90** |
 
 ## v4 → v5 change (glossary query expansion)
 
@@ -56,7 +56,7 @@
 | Relevance-precision | 0.594 | 0.641 | +0.047 |
 | Design-sufficiency | 77% | **87%** | +10pp |
 | Avg tokens | 5,398 | 4,767 | −631 |
-| Efficiency | 14.20 | **18.25** | +4.05 |
+| Efficiency | 14.20 | **18.18** | +3.98 |
 
 The four questions that previously missed on every graph method (Q03/Q17/Q18/
 Q23) were not a graph-construction gap — the files were indexed (chunks + nodes
@@ -88,7 +88,7 @@ so a high relevance-precision cannot hide a missing answer.
 1. **δ (auto-select) is the clear leader on every axis that matters.** It now
    retrieves the answer 97% of the time (best by 14pp), at the lowest token cost
    (4,767), the highest design-sufficiency (87%), and the best efficiency
-   (18.25 — ~2.5× the grep baseline). Glossary expansion turned its weakest axis
+   (18.18 — ~2.5× the grep baseline). Glossary expansion turned its weakest axis
    (answer-present, tied at 83%) into its strongest.
 2. **Glossary expansion is a durable, low-cost lever.** Four domain entries
    moved δ answer-present +14pp with no token penalty (tokens fell). Because the
@@ -101,8 +101,10 @@ so a high relevance-precision cannot hide a missing answer.
 5. **α (grep) keeps the highest relevance-precision (0.756)** because it returns
    few whole files, but the lowest answer-present (70%, grep misses) at ~2.3× δ's
    tokens.
-6. **Test-pollution is 0 across all methods** — production-over-test ranking
-   keeps test files out of design packs.
+6. **δ keeps test files out of the pack (3/90); the raw-graph methods don't.**
+   Production-over-test ranking on the composer path holds δ at 3/90, vs β 78/90
+   and γ 69/90 (they bypass the composer via raw graph dump / `semantic_search`)
+   and α 15/90. Test-bearing context is what β/γ pay extra tokens for.
 
 ## Limitations
 - The previously flagged gov-validator gap is closed for δ (the validator-set /
