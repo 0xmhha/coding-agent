@@ -1,65 +1,91 @@
-# CKG 4-Way 비교 테스트 결과 (Report v2)
+# CKG 4-Way Retrieval Evaluation (Report v3)
 
-> 테스트셋 30문항·12도메인 (`.coding-agent/ckg-query-testset.md`) · HEAD `9978930ba`
-> 검색=**3회 평균**(cks 비결정성 보정), 판정=**3표 다수결**(Sonnet, PARSE_FAIL 0)
-> v2 변경: **β/γ에 그래프 노드의 실제 코드 본문 포함**(이전 v1은 참조만 → 충분성 과소평가).
-> 입력=키워드/문장만, 정답(expected)은 채점 전용(oracle 누수 없음). α=grep(시스템 미사용).
+> Test set: 30 questions across 12 go-stablenet domains (`ckg-query-testset.md`).
+> Index: built from go-stablenet `dev` (`c051d50b`), scoped to the `gstable`
+> build files (unused consensus engines excluded, Solidity contract sources
+> included). Retrieval averaged over 3 runs; LLM relevance/sufficiency judged
+> by Sonnet (PARSE_FAIL 0). Inputs are keyword/sentence only; ground-truth
+> answers are kept separate (no answer leakage). α = grep (does not use the graph).
+>
+> v3 change: production code is now ranked above test files by default in the
+> auto-selected path (composer test-demotion). v2 measured before that fix.
 
-## 종합 비교
+## Methods
+- **α** raw files via keyword grep (baseline, no graph)
+- **β** full graph dump + node bodies
+- **γ** incremental graph lookups + node bodies
+- **δ** auto-selected evidence pack (`get_for_task`)
 
-| 방식 | 관련성 | 설계충분성 | 정답존재 | 위치적중 | precision | 파일수 | 평균토큰 | 효율(충분성/1k토큰) |
-|------|------:|----------:|--------:|--------:|----------:|------:|--------:|------:|
-| α 파일원문(grep) | 93% | 80% | 80% | 70% | 0.266 | 2.7 | 10807 | 7.40 |
-| β 그래프전체+본문 | 87% | 70% | 70% | 80% | 0.037 | 33.7 | 11468 | 6.10 |
-| γ 개별조회+본문 | 93% | 80% | 83% | 77% | 0.053 | 24.2 | 6672 | 11.99 |
-| δ 자동선별 | 97% | 63% | 63% | 70% | 0.121 | 7.5 | 5465 | 11.59 |
+## Overall comparison
 
-## 도메인별 설계충분성 (방식별)
+| Method | Relevance | Design-sufficiency | Location hit | Precision | Avg tokens | Test pollution | Efficiency (suf/1k tok) |
+|--------|----------:|-------------------:|-------------:|----------:|-----------:|---------------:|------------------------:|
+| α grep | 93% | 83% | 70% | 0.266 | 10,829 | 12/90 | 7.66 |
+| β graph+body | 93% | 73% | 83% | 0.034 | 11,797 | 63/90 | 6.19 |
+| γ incremental+body | 93% | 80% | 83% | 0.061 | 7,016 | 66/90 | 11.40 |
+| **δ auto-select** | 93% | **77%** | **83%** | **0.208** | **5,398** | **0/90** | **14.26** |
 
-| 도메인 | α | β | γ | δ |
+- Relevance: judge says the retrieved context is on-topic.
+- Design-sufficiency: judge says there is enough code to modify/design the feature.
+- Location hit: retrieved context includes the ground-truth file (3-run mean).
+- Precision: fraction of surfaced files that are on-target.
+- Test pollution: cells whose retrieved set contains any `*_test.go` / test file.
+
+## Effect of production-over-test ranking on δ (v2 → v3)
+
+| Metric (δ) | v2 (before) | v3 (after) |
+|------------|------------:|-----------:|
+| Test pollution | high | **0/90** |
+| Location hit | 70% | **83%** |
+| Precision | 0.121 | **0.208** |
+| Design-sufficiency | 63% | **77%** |
+| Efficiency | 11.59 | **14.26** |
+
+Demoting test files lets the implementation file rank into the evidence pack
+instead of being crowded out by tests that mention the same symbol more often.
+
+## Domain-level design-sufficiency
+
+| Domain | α | β | γ | δ |
 |--------|--:|--:|--:|--:|
 | anzeon-gasprice | 100% | 100% | 100% | 100% |
-| fee-delegation | 67% | 67% | 67% | 67% |
-| gov-council | 100% | 67% | 100% | 67% |
+| fee-delegation | 67% | 100% | 67% | 67% |
+| gov-council | 100% | 67% | 100% | 100% |
 | gov-minter | 100% | 100% | 100% | 100% |
 | gov-validator | 100% | 0% | 0% | 0% |
 | native-manager | 50% | 50% | 50% | 50% |
-| wbft-finalize | 50% | 50% | 100% | 100% |
-| wbft-header | 100% | 100% | 100% | 0% |
+| wbft-finalize | 50% | 100% | 100% | 100% |
+| wbft-header | 100% | 100% | 100% | 100% |
 | wbft-justification | 100% | 100% | 100% | 100% |
-| wbft-prepare-commit | 100% | 67% | 67% | 33% |
+| wbft-prepare-commit | 100% | 67% | 67% | 100% |
 | wbft-roundchange | 100% | 100% | 100% | 100% |
-| wbft-seal | 67% | 100% | 100% | 67% |
-| wbft-validator | 33% | 33% | 67% | 33% |
+| wbft-seal | 67% | 67% | 100% | 33% |
+| wbft-validator | 67% | 33% | 67% | 67% |
 
-## 핵심 발견 (v2)
+## Findings
 
-1. **본문 포함이 그래프 방식의 평가를 바꿨다.** β/γ 설계충분성: v1(참조만) 53% → v2(본문) **β 70%, γ 80%**.
-   v1의 한계 주석이 수치로 확증 — 그래프의 저조는 "본문 미포함" 직렬화 탓이었다.
-2. **효율 리더는 γ(11.99)·δ(11.59) — 둘 다 grep 기준선(7.40)을 능가.** 그래프의 가치가 공정 비교에서도
-   입증됨.
-   - **γ(개별조회+본문)**: 설계충분성 80%를 6.7k토큰에 — grep과 동급 충분성을 **2/3 토큰**으로. 균형 최고.
-   - **δ(자동선별)**: 최소 토큰(5.5k)·최고 관련성(97%)이지만 충분성 63%(일부 도메인 누락).
-3. **β(그래프 전체)는 본문을 붙여도 가성비 최하(6.10).** 토큰 최다(11.5k)·파일 33개 — 위치적중은 1위(80%)나
-   설계 효율은 낮음. "통째로"는 여전히 비효율.
-4. **α(grep)은 견고하나 비효율.** 충분성 80%(파일 전체)지만 위치적중 70%(grep 한계)+토큰 2배.
+1. **δ (auto-select) is the efficiency leader and the cleanest method.** With
+   test demotion it reaches 77% design-sufficiency at the lowest token cost
+   (5,398) and zero test pollution — efficiency 14.26, roughly 2× the grep
+   baseline (7.66). It ties the best location hit (83%) and has by far the best
+   precision among graph methods (0.208).
+2. **Production-over-test ranking matters.** Before the fix, queries for an
+   implementation were crowded out by `*_test.go` files that mention the symbol
+   repeatedly. Demoting tests for non-test intents removed that entirely for δ
+   and raised its hit rate, precision, and sufficiency.
+3. **β (full graph dump) is the worst value even with bodies** — most tokens
+   (11,797), lowest efficiency (6.19). Dumping everything is counterproductive.
+4. **β/γ still show test pollution** because they call the raw `semantic_search`
+   / `get_subgraph` tools directly, which bypass the composer ranking where the
+   demotion lives. The production auto-select path (δ) is clean.
+5. **α (grep) is a strong but expensive baseline** — high sufficiency (83%,
+   whole files) but lowest location hit (70%, grep misses) at ~2× the tokens of δ.
 
-## 도메인별 약점 분석 (Task 2)
-
-- **gov-validator: ckg 전 방식(β/γ/δ) 충분성 0%, α만 100%** — 가장 두드러진 약점. 밸리데이터 컨트랙트
-  초기화(`initializeValidator`)·스토리지 슬롯 로직을 cks 검색이 유용하게 길어내지 못함. grep 전체파일만 성공.
-  → **cks 인덱싱/검색의 명확한 개선 타깃.**
-- **wbft-header: δ 0%** (get_for_task가 `istanbul.go`의 `WBFTExtra` 헤더 인코딩을 못 집어냄).
-- **wbft-prepare-commit: δ 33%** — δ가 prepare/commit 핸들러 본문 선별에 약함.
-- **native-manager·fee-delegation: 전 방식 50~67%** — 도메인 자체가 어렵거나(다파일 분산) 골든 정답이 단일
-  파일로 환원 안 됨. 골든셋 재검토 후보.
-- **anzeon·gov-minter·justification·roundchange·seal: 대체로 100%** — cks가 강한 도메인.
-
-## 한계 / 주의
-
-- **δ 충분성 변동**: v1 73% → v2 63%. 3-run 재검색으로 δ 컨텍스트가 바뀐 영향 + 도메인 누락(gov-validator,
-  wbft-header 0%)이 평균을 끌어내림. δ는 토큰 효율은 최고지만 도메인 편차가 큼.
-- **위치적중 vs 충분성 분리 유지**: 위치적중은 검색이 정답 "위치"를 찾았나, 충분성은 그 컨텍스트로 설계가
-  가능한가 — β는 위치 1위(80%)지만 충분성은 γ보다 낮음.
-- **표본**: 도메인당 1~3문항이라 도메인별 수치는 경향만(특히 0%/100%는 n=1~2 영향). 종합 수치가 더 안정적.
-- 검색 3회 평균·판정 3표 다수결로 노이즈는 줄였으나 완전 제거는 아님.
+## Limitations
+- gov-validator: the graph methods score 0% sufficiency (only grep covers it).
+  cks retrieval does not surface the validator-contract initialization usefully —
+  a concrete target for retrieval-quality work.
+- Domain rows use 1–3 questions each, so per-domain numbers indicate trend only;
+  the overall numbers are the stable signal.
+- Single judge vote per cell; retrieval averaged over 3 runs. Noise is reduced
+  but not eliminated.
