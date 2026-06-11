@@ -150,14 +150,18 @@ def score(entry, locs):
         if nf not in [x[0] for x in surfaced]:
             surfaced.append((nf, s, e))
     exp = [_norm(f) for f in entry["expected_files"]]
+    # answer_present: ground-truth answer file is in the surfaced set (same as location_hit)
     hit = any(sf in exp for sf, _, _ in surfaced)
     n_on_target = sum(1 for sf, _, _ in surfaced if sf in exp)
-    precision = n_on_target / len(surfaced) if surfaced else 0.0
+    # answer_focus: strict precision — how concentrated on the designated answer file(s)
+    answer_focus = n_on_target / len(surfaced) if surfaced else 0.0
     recall = 1.0 if hit else 0.0
     errors = sum(1 for sf, _, _ in surfaced if not os.path.isfile(os.path.join(ROOT, sf)))
-    return {"location_hit": hit, "precision": round(precision, 3), "recall": recall,
+    # surfaced_files: full list, no cap — the relevance judge needs every file
+    return {"location_hit": hit, "answer_present": hit,
+            "answer_focus": round(answer_focus, 3), "recall": recall,
             "n_surfaced": len(surfaced), "error_count": errors,
-            "surfaced_files": [sf for sf, _, _ in surfaced][:15]}
+            "surfaced_files": [sf for sf, _, _ in surfaced]}
 
 def main():
     import argparse
