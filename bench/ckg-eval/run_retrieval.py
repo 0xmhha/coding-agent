@@ -129,14 +129,37 @@ def gamma(entry, cks):
     for o in objs: collect_locations(o, locs)
     return _bodies_context(objs, locs, 40000), locs
 
-# ---------- δ: get_for_task ----------
+# ---------- δ: get_for_task (방식5 — ckv+ckg 하이브리드 자동선별) ----------
 def delta(entry, cks):
     pack = cks("get_for_task", {"prompt": entry["query"]})
     locs = []
     collect_locations(pack, locs)
     return json.dumps(pack, ensure_ascii=False), locs
 
-METHODS = {"alpha": alpha, "beta": beta, "gamma": gamma, "delta": delta}
+# ---------- ε: graph-only auto-select (방식4 — ckv 미사용) ----------
+# Mirrors γ exactly except the seed comes from ckg BM25 text search
+# (search_text) instead of ckv vector search (semantic_search). This
+# isolates the ckv contribution: ε vs γ/δ = "what does the vector add?".
+# glossary expand stays on for both (query rewriting is orthogonal to ckv).
+def _fts_safe(q):
+    # ckg's FTS5 backend treats ?, ", *, :, (), etc. as query syntax and errors
+    # on a raw NL prompt. Keep only word characters (incl. Hangul) and spaces so
+    # glossary expand can still match Korean aliases and append code keywords.
+    return re.sub(r"[^\w\s]", " ", q, flags=re.UNICODE)
+
+def epsilon(entry, cks):
+    ss = cks("search_text", {"query": _fts_safe(entry["query"]), "k": 5, "exclude_tests": True, "expand": True})
+    objs = [ss]
+    for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
+        name = bare(h.get("symbol", ""))
+        if not name: continue
+        objs.append(cks("find_symbol", {"name": name, "exclude_tests": True}))
+        objs.append(cks("get_subgraph", {"symbol": name, "depth": 1, "max_total": 200, "exclude_tests": True}))
+    locs = []
+    for o in objs: collect_locations(o, locs)
+    return _bodies_context(objs, locs, 40000), locs
+
+METHODS = {"alpha": alpha, "beta": beta, "gamma": gamma, "epsilon": epsilon, "delta": delta}
 
 # ---------- deterministic scoring ----------
 def _norm(f):

@@ -24,10 +24,11 @@ for l in open("judged.jsonl"):
         g["relp"] += rp
         g["rn"] += 1
 
-NAMES = {"alpha": "α grep", "beta": "β graph+body", "gamma": "γ incremental", "delta": "δ auto-select"}
-print(f"{'method':<16}{'present':>9}{'focus':>8}{'rel-prec':>10}{'suffic':>9}{'tokens':>9}{'effic':>8}{'testpoll':>9}")
+NAMES = {"alpha": "α grep", "beta": "β graph dump", "gamma": "γ incremental",
+         "epsilon": "ε graph-only auto", "delta": "δ hybrid auto"}
+print(f"{'method':<20}{'present':>9}{'focus':>8}{'rel-prec':>10}{'suffic':>9}{'tokens':>9}{'effic':>8}{'testpoll':>9}")
 rows = {}
-for m in ["alpha", "beta", "gamma", "delta"]:
+for m in ["alpha", "beta", "gamma", "epsilon", "delta"]:
     dg = det[m]; jg = jud[m]
     dn = dg["n"] or 1; jn = jg["n"] or 1; rn = jg["rn"] or 1
     present = 100 * dg["present"] / dn
@@ -38,6 +39,6 @@ for m in ["alpha", "beta", "gamma", "delta"]:
     eff = suf / (tok / 1000) if tok else 0
     testpoll = f"{dg['testpoll']}/{dg['n']}"
     rows[m] = dict(present=present, focus=focus, relp=relp, suf=suf, tok=tok, eff=eff, testpoll=testpoll, jn=jn)
-    print(f"{NAMES[m]:<16}{present:>8.0f}%{focus:>8.3f}{relp:>10.3f}{suf:>8.0f}%{tok:>9.0f}{eff:>8.2f}{testpoll:>9}")
+    print(f"{NAMES[m]:<20}{present:>8.0f}%{focus:>8.3f}{relp:>10.3f}{suf:>8.0f}%{tok:>9.0f}{eff:>8.2f}{testpoll:>9}")
 print(f"\njudge cells per method (n): " + ", ".join(f"{m}={rows[m]['jn']}" for m in rows))
 json.dump(rows, open("agg_v5.json", "w"), indent=2)
