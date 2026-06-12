@@ -106,7 +106,7 @@ def _bodies_context(objs, locs, cap):
 
 # ---------- β: broad graph dump (+ 노드 본문) ----------
 def beta(entry, cks):
-    ss = cks("semantic_search", {"query": entry["query"], "k": 3, "exclude_tests": True})
+    ss = cks("semantic_search", {"query": entry["query"], "k": 3, "exclude_tests": True, "expand": True})
     objs = [ss]
     for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
@@ -118,7 +118,7 @@ def beta(entry, cks):
 
 # ---------- γ: incremental targeted (+ 노드 본문) ----------
 def gamma(entry, cks):
-    ss = cks("semantic_search", {"query": entry["query"], "k": 5, "exclude_tests": True})
+    ss = cks("semantic_search", {"query": entry["query"], "k": 5, "exclude_tests": True, "expand": True})
     objs = [ss]
     for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
