@@ -49,7 +49,9 @@ Orchestrator only holds jira tool grants, so it does a **config-level** check
 (registration + env) and relies on point-of-use **live** checks downstream:
 jira at intake (`work.md` §5.2), cks at the Planner (`planner.md` §3.0
 `cks.ops.health`), chainbench at the Evaluator (`evaluator.md` §7.0 tool
-pre-flight).
+pre-flight). Note: cks is required to be **serviceable** (ckg + ckv both
+usable), not merely registered — a non-serviceable cks (ckv/embedder down)
+makes the Planner transition to BLOCKED rather than run a degraded design.
 
 First read `state.requirement_source` (state.json). When it is `"local"` (free-text
 `/coding-agent:analyze` entry) jira-gateway is NOT used by this run — skip every jira

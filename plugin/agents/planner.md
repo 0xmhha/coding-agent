@@ -101,22 +101,33 @@ them, then call normally:
 cks (via `get_for_task`, §3.1b) is the primary retrieval path; targeted grep/Read is a
 fine *complement* (§3.1c), but do not replace a healthy cks with a blind grep sweep.
 
-Before any retrieval, check the backend so the analysis states its own
-confidence honestly:
+Before any retrieval, gate on the backend. cks semantic retrieval (ckv) is
+**required**: without it the evidence lacks the upfront meaning needed to
+design correctly, so a ckg-only run produces confidently-wrong plans. Honor
+the `serviceable` field — it is true only when both ckg and ckv (index +
+embedding model) are usable; `degraded` and `down` are BOTH non-serviceable.
 
 ```
 health = mcp__plugin_coding-agent_cks__cks_ops_health()
-record in analysis.md "Retrieval backend" line:
-  - health.status == "ok"        → full retrieval (ckv semantic + ckg graph)
-  - health.status == "degraded"  → ckv embedder unavailable; semantic_search is
-                                    Smart-Dummy. Note "retrieval DEGRADED — design
-                                    confidence reduced; verify findings against code"
-                                    and lean harder on direct Read of the cited files.
-  - call fails / "down"          → note "cks unavailable; falling back to grep/Read"
-                                    and proceed best-effort (do NOT emit empty analysis).
+record in analysis.md "Retrieval backend" line: health.status + health.backends
+  - health.serviceable == true   → full retrieval (ckv semantic + ckg graph). Proceed.
+  - health.serviceable == false  → DO NOT proceed with a degraded/blind run.
+      reason = health.backends.ckv.reason (or .ckg.error) — typically
+               "ckv not ready" (embedder/Ollama down or index not built).
+      write analysis.md "Retrieval backend: NOT SERVICEABLE — {status}: {reason}".
+      state-machine.transition(workspace_dir, current_state, "BLOCKED")
+      explain to user: cks is not serviceable ({reason}); semantic retrieval is
+        required for a trustworthy design. Wait for ckv to come up (start Ollama +
+        bge-m3 / finish the index build) or provision it, then re-run. Do NOT
+        emit a best-effort analysis from grep/Read alone.
+      STOP
 ```
 
-This is a connectivity/quality signal, distinct from §3.3b freshness (staleness).
+Rationale: a `degraded` (ckv-down, ckg-only) pack was previously treated as a
+reduced-confidence "proceed", but in practice it omits the semantic context
+the design depends on — so it is now a hard stop, not a warning. This is a
+serviceability gate, distinct from §3.3b freshness (staleness), which remains
+a warning.
 
 ### 3.1 Load + parse the ticket
 
