@@ -31,7 +31,7 @@
       "oracle": { "chainbench_test": "basic/tx-send" }
     }
   ],
-  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/go-stablenet",
+  "go_stablenet_root": "${GO_STABLENET_ROOT}",
   "batch_size": 1,
   "config": { "max_eval_cycles": 3 }
 }

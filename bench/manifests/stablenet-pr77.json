@@ -20,11 +20,11 @@
       }
     }
   ],
-  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/test/pr-77",
+  "go_stablenet_root": "${PR77_ROOT}",
   "batch_size": 1,
   "config": { "max_eval_cycles": 3 },
   "_requires": {
-    "cks_config": "/Users/wm-it-25_0220/Work/github/knowledge-data/pr-77/cks-pr77.yaml",
+    "cks_config": "${KNOWLEDGE_DATA_ROOT}/pr-77/cks-pr77.yaml",
     "note": "A_cks 모드는 cks MCP가 위 pr-77 DB를 서빙하도록 재설정된 뒤에만 공정. (다른 세션에서 처리 중.) B/C는 cks 불필요. 실행은 autopilot 세션 + 사용자 승인 필요. 종료 후 throwaway 브랜치/커밋 정리 필수."
   }
 }

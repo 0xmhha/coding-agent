@@ -54,8 +54,12 @@ def main(argv=None) -> int:
         print(f"no cells under {exp}")
         return 1
 
-    # repo root from any cell's manifest-implied path; fall back to known root
-    root = "/Users/wm-it-25_0220/Work/github/go-stablenet"
+    # repo root from env so re-scoring is machine-portable across checkouts.
+    root = os.path.expanduser(os.environ.get("GO_STABLENET_ROOT", ""))
+    if not root or not os.path.isdir(root):
+        print("error: set GO_STABLENET_ROOT to your go-stablenet checkout path",
+              file=sys.stderr)
+        return 1
 
     cks_tool = None
     cks_ctx = None

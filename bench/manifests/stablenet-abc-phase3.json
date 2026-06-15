@@ -46,7 +46,7 @@
       "_pr": "#14", "_quality": "high drift (다중-기능 squash, dev에서 멀어 인덱스 drift 큼 — 범위 한정 평가)"
     }
   ],
-  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/go-stablenet",
+  "go_stablenet_root": "${GO_STABLENET_ROOT}",
   "batch_size": 1,
   "config": { "max_eval_cycles": 3 }
 }

@@ -16,6 +16,6 @@
       "ticket": "bench/fixtures/tickets/STABLE-0001.json"
     }
   ],
-  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/go-stablenet",
+  "go_stablenet_root": "${GO_STABLENET_ROOT}",
   "batch_size": 1
 }

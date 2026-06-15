@@ -59,11 +59,16 @@ type: skill
       "ticket": "bench/fixtures/tickets/STABLE-0001.json",
       "oracle": { "chainbench_test": "basic/consensus" } }
   ],
-  "go_stablenet_root": "/abs/path/to/go-stablenet",
+  "go_stablenet_root": "${GO_STABLENET_ROOT}",  // 머신-이식성: 절대경로 대신 env 참조 권장
   "batch_size": 1,                       // 한 invocation당 실행할 셀 수(token 한계)
   "config": { "max_eval_cycles": 3 }     // 셀당 bug-cycle 상한(§4.4 step e). 미지정 시 3.
 }
 ```
+
+> **경로 이식성**: `go_stablenet_root`(및 기타 경로 필드)에는 절대경로 대신
+> `${GO_STABLENET_ROOT}` 같은 env 참조를 쓴다. §4.1 복사 단계에서 확장되므로,
+> 새 머신은 `export GO_STABLENET_ROOT=~/.../go-stablenet` 한 번만 설정하면 된다.
+> 절대경로도 그대로 동작(확장은 `${...}`만 치환).
 
 셀 집합 = `tasks × modes` (예: 1 task × 3 modes = 3 cells).
 
@@ -90,8 +95,27 @@ type: skill
 
 ```
 4.1 진입(/coding-agent:bench)
-    - 신규: manifest 경로 → .coding-agent/bench/{experiment}/ 생성, manifest 복사,
-      state.json 초기화(모든 셀 status=pending).
+    - 신규: manifest 경로 → .coding-agent/bench/{experiment}/ 생성, manifest 를
+      env-확장하여 복사(아래), state.json 초기화(모든 셀 status=pending).
+      ★ 경로 이식성: 복사 시 문자열 값의 ${VAR}/~ 를 환경변수로 확장한다.
+        미설정 env(${...} 잔존)는 즉시 실패시킨다(silent broken path 방지):
+        ```bash
+        python3 - "{manifest}" ".coding-agent/bench/{experiment}/manifest.json" <<'PY'
+        import json, os, sys
+        src, dst = sys.argv[1], sys.argv[2]
+        m = json.load(open(src))
+        def exp(v):
+            if isinstance(v, str):
+                r = os.path.expanduser(os.path.expandvars(v))
+                if "${" in r:
+                    sys.exit(f"unresolved env in manifest path: {v!r} (set the env var)")
+                return r
+            if isinstance(v, dict):  return {k: exp(x) for k, x in v.items()}
+            if isinstance(v, list):  return [exp(x) for x in v]
+            return v
+        json.dump(exp(m), open(dst, "w"), indent=2, ensure_ascii=False)
+        PY
+        ```
     - --continue: 기존 experiment 디렉터리 로드.
 
 4.2 MCP pre-flight (orchestrator §2.0 재사용)

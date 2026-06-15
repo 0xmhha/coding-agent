@@ -102,6 +102,18 @@ def _load_manifest(path: str) -> dict:
     if missing:
         print(f"error: manifest missing required keys: {missing}", file=sys.stderr)
         sys.exit(1)
+    # Resolve env vars / ~ in path fields so manifests are machine-portable
+    # (e.g. "go_stablenet_root": "${GO_STABLENET_ROOT}"). expandvars leaves an
+    # undefined ${VAR} literal, so the residual "$" check catches an unset env.
+    root = os.path.expanduser(os.path.expandvars(manifest["go_stablenet_root"]))
+    if "$" in root or not os.path.isdir(root):
+        print(
+            f"error: go_stablenet_root not resolvable: {root!r}. "
+            f"Set GO_STABLENET_ROOT to your go-stablenet checkout.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    manifest["go_stablenet_root"] = root
     return manifest
 
 

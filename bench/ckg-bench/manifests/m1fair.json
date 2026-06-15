@@ -3,7 +3,7 @@
   "golden_set": { "source": "golden-set/index.yaml", "ids": [], "buckets": [] },
   "methods": ["M1_fair"],
   "driver": "claude_cli",
-  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/go-stablenet",
+  "go_stablenet_root": "${GO_STABLENET_ROOT}",
   "sha_pin": "9978930ba",
   "batch_size": 200,
   "output_dir": "",

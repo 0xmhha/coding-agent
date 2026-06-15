@@ -29,6 +29,23 @@ grep?") with data: final-code correctness, tokens, cost, latency, safety.
 2. **Measurement (this directory — deterministic, no LLM).** `compare.py` reads
    each cell's trace sink and emits the comparison report.
 
+## Setup (per machine)
+
+Manifests and scripts reference the **external** go-stablenet checkout via env
+vars instead of hardcoded absolute paths, so a fresh clone works on any machine
+after exporting these once (e.g. in your shell rc or a `direnv` `.envrc`):
+
+```bash
+export GO_STABLENET_ROOT=~/work/github/go-stablenet     # required (abc phases, ckg-bench)
+export PR77_ROOT=~/work/github/test/pr-77               # only for stablenet-pr77.json
+export KNOWLEDGE_DATA_ROOT=~/work/github/knowledge-data # only for the pr-77 cks DB
+```
+
+Manifests use `${GO_STABLENET_ROOT}` placeholders; the orchestration skill and
+`ckg-bench/run.py` expand them at load time and **fail loudly** if a referenced
+env var is unset (rather than running against an empty/broken path). `ckg-eval/
+run_retrieval.py` and `ckg-bench/rescore.py` read `GO_STABLENET_ROOT` directly.
+
 ## Run
 
 ```

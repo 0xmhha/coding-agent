@@ -17,7 +17,10 @@ import json, os, re, subprocess, collections, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path: sys.path.insert(0, HERE)
-ROOT = "/Users/wm-it-25_0220/Work/github/go-stablenet"
+ROOT = os.environ.get("GO_STABLENET_ROOT", "")
+if not ROOT:
+    sys.exit("error: set GO_STABLENET_ROOT to your go-stablenet checkout path")
+ROOT = os.path.expanduser(ROOT)
 BUILD_DIRS = ["consensus", "core", "systemcontracts", "eth", "params", "cmd", "common"]
 _STOP = {"the","and","are","how","what","does","do","is","in","of","to","a","an","for","with",
          "which","where","when","why","that","this","go","stablenet","wbft","코드","파일","함수",
@@ -108,7 +111,7 @@ def _bodies_context(objs, locs, cap):
 def beta(entry, cks):
     ss = cks("semantic_search", {"query": entry["query"], "k": 3, "exclude_tests": True, "expand": True})
     objs = [ss]
-    for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
+    for h in ((ss.get("hits") or []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
         if name:
             objs.append(cks("get_subgraph", {"symbol": name, "depth": 2, "max_total": 1500, "exclude_tests": True}))
@@ -120,7 +123,7 @@ def beta(entry, cks):
 def gamma(entry, cks):
     ss = cks("semantic_search", {"query": entry["query"], "k": 5, "exclude_tests": True, "expand": True})
     objs = [ss]
-    for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
+    for h in ((ss.get("hits") or []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
         if not name: continue
         objs.append(cks("find_symbol", {"name": name, "exclude_tests": True}))
@@ -150,7 +153,7 @@ def _fts_safe(q):
 def epsilon(entry, cks):
     ss = cks("search_text", {"query": _fts_safe(entry["query"]), "k": 5, "exclude_tests": True, "expand": True})
     objs = [ss]
-    for h in (ss.get("hits", []) if isinstance(ss, dict) else [])[:3]:
+    for h in ((ss.get("hits") or []) if isinstance(ss, dict) else [])[:3]:
         name = bare(h.get("symbol", ""))
         if not name: continue
         objs.append(cks("find_symbol", {"name": name, "exclude_tests": True}))
