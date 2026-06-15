@@ -1,0 +1,13 @@
+{
+  "ticket_id": "STABLE-0004",
+  "type": "Bug Fix",
+  "summary": "initializeGovCouncil이 params-only alloc 엔트리에 nil Balance를 써 genesis dump가 실패한다",
+  "description": "## 작업 유형: Bug Fix\n## 요약\nsystemcontracts.initializeGovCouncil 은 chain config params(blacklist/authorized 주소)를 genesis alloc 로 역동기화한다. 이때 alloc 에 없던 주소는 zero-value Account{}(Balance=nil)로 가져온다.\n## 재현 방법\n1. blacklist/authorized 주소가 alloc 에 없는 chain config 로 genesis 구성\n2. genesis dump 수행\n## 기대 동작\n모든 alloc 엔트리가 non-nil Balance 를 가져 정상 직렬화/역직렬화된다.\n## 실제 동작\nnil Balance 가 \"balance\":null 로 직렬화되어 Account.UnmarshalJSON 의 gencodec required-field 검사를 실패시킨다: 'missing required field balance for Account'.\n## 영향 범위\n- 모듈: systemcontracts (gov_council, Go↔Solidity 경계)\n- 심각도: high (genesis dump 차단)\n## 수용 기준\n- [ ] params-only 엔트리 작성 전 Balance 를 new(big.Int)(zero) 로 초기화 (모든 alloc 엔트리 non-nil Balance 불변식)\n- [ ] 회귀: TestAllocSync_ParamsOnly (새 alloc 엔트리 Balance != nil)\n- [ ] 회귀: round-trip marshal/unmarshal 로 'missing required field balance' 부재 확인\n- [ ] unit + race 통과",
+  "assignee": null,
+  "status": "To Do",
+  "status_category": "todo",
+  "labels": ["bug", "systemcontracts", "genesis"],
+  "created": "2026-06-15T00:00:00Z",
+  "updated": "2026-06-15T00:00:00Z",
+  "_filter_metadata": { "scan_result": "CLEAN", "redacted_count": 0, "redacted_patterns": [], "blocked_patterns": [], "warnings": [], "scanned_at": "2026-06-15T00:00:00Z" }
+}

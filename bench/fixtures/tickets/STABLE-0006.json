@@ -1,0 +1,13 @@
+{
+  "ticket_id": "STABLE-0006",
+  "type": "Feature",
+  "summary": "CollectUpgrades 레지스트리 기반 통합 하드포크 업그레이드 시스템",
+  "description": "## 작업 유형: Feature\n## 요약\n흩어진 수동 append 패턴을 ChainConfig.CollectUpgrades() 라는 단일 진실로 대체한다. Block-0 하드포크는 genesis 의 InjectContracts overlay 로, 런타임 하드포크는 WBFT 블록 finalization 의 병합 StateTransitions 로 적용한다.\n## 배경\n하드포크 등록이 코드 곳곳에 수동 append 로 흩어져 누락/불일치가 발생하기 쉽다.\n## 기대 동작\nCollectUpgrades() 가 하드포크 레지스트리의 단일 소스로 동작하고, block-0/런타임 하드포크가 일관된 경로로 적용된다.\n## 영향 범위\n- 모듈: params / hardfork (+ consensus/wbft config, genesis)\n- 심각도: medium\n## 수용 기준\n- [ ] CollectUpgrades() 를 하드포크 레지스트리 단일 소스로 추가\n- [ ] InjectContracts 에 block-0 하드포크 overlay 지원\n- [ ] SetConfigFromChainConfig 가 CollectUpgrades() 사용하도록 리팩터\n- [ ] 부분-param 상태 migration 용 upgrade*() 함수\n- [ ] 전 업그레이드 경로 테스트 + unit 통과\n## 비고\n대규모 diff(테스트데이터 포함). 본 태스크는 grep 이 비교적 강한 설정/레지스트리 코드라 cks 대조군 성격.",
+  "assignee": null,
+  "status": "To Do",
+  "status_category": "todo",
+  "labels": ["feature", "params", "hardfork"],
+  "created": "2026-06-15T00:00:00Z",
+  "updated": "2026-06-15T00:00:00Z",
+  "_filter_metadata": { "scan_result": "CLEAN", "redacted_count": 0, "redacted_patterns": [], "blocked_patterns": [], "warnings": [], "scanned_at": "2026-06-15T00:00:00Z" }
+}

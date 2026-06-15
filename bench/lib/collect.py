@@ -24,6 +24,20 @@ from .capture import collect_cell_usage
 _PASS_STATES = {"EVALUATION_PASS", "COMPLETED", "COMPLETION"}
 _FAIL_STATES = {"EVALUATION_FAIL", "BLOCKED"}
 
+# A bug-cycle is one EVALUATION failure that sent the pipeline back to ANALYSIS.
+# The single source of truth is failure_log (orchestrator.md §5 counts the same).
+_EVAL_STATE = "EVALUATION"
+
+# Regression / side-effect classes: an EVALUATION failure that broke something
+# *beyond* the task's own unit acceptance — i.e. collateral damage the planner's
+# info regime failed to prevent. Detected from the structured one-liner the
+# evaluator writes into failure_log[].actual_outcome.summary (evaluator.md §9).
+# Lower is better; cks's value-prop is fewer of these (complete info → right
+# first fix). This is the only place per-cycle stage info is persisted, so the
+# classifier is a documented heuristic over a *structured* field, not raw logs.
+_SIDE_EFFECT_MARKERS = ("chainbench", "race", "regression", "derived state",
+                        "derived-state", "panic", "data race")
+
 
 def _read_json(path: Path) -> dict:
     try:
@@ -49,6 +63,8 @@ class RunResult:
     pipeline_state: str | None = None
     correct: bool | None = None      # final-code correctness (None = never evaluated)
     correctness_detail: dict = field(default_factory=dict)
+    bug_cycles: int = 0              # EVALUATION_FAIL→re-plan re-entries (0 = passed first eval)
+    side_effect_failures: int = 0    # bug-cycles caused by a regression/collateral break (lower=better)
     usage: CanonicalUsage = field(default_factory=CanonicalUsage)
     usage_by_model: dict = field(default_factory=dict)
     cost_usd: float = 0.0
@@ -65,6 +81,8 @@ class RunResult:
             "pipeline_state": self.pipeline_state,
             "correct": self.correct,
             "correctness_detail": self.correctness_detail,
+            "bug_cycles": self.bug_cycles,
+            "side_effect_failures": self.side_effect_failures,
             "usage": self.usage.as_dict(),
             "usage_by_model": {m: u.as_dict() for m, u in self.usage_by_model.items()},
             "cost_usd": self.cost_usd,
@@ -93,6 +111,29 @@ def _correctness(state: dict) -> tuple[bool | None, dict]:
     if cur in _FAIL_STATES:
         return False, detail
     return None, detail  # never reached EVALUATION
+
+
+def _bug_cycles(state: dict) -> tuple[int, int]:
+    """(bug_cycles, side_effect_failures) from the structured failure_log.
+
+    bug_cycles = number of EVALUATION failures (each sends the pipeline back to
+    ANALYSIS for a re-plan, per orchestrator.md §5). side_effect_failures = the
+    subset whose evaluator summary names a regression/collateral class.
+    """
+    log = state.get("failure_log")
+    if not isinstance(log, list):
+        return 0, 0
+    cycles = 0
+    side_effects = 0
+    for entry in log:
+        if not isinstance(entry, dict) or entry.get("state") != _EVAL_STATE:
+            continue
+        cycles += 1
+        outcome = entry.get("actual_outcome") or {}
+        summary = str(outcome.get("summary", "")).lower()
+        if any(marker in summary for marker in _SIDE_EFFECT_MARKERS):
+            side_effects += 1
+    return cycles, side_effects
 
 
 def _safety(state: dict) -> list[str]:
@@ -124,6 +165,7 @@ def collect_cell(cell_dir: Path, prices: dict[str, ModelPrice] | None = None,
     )
 
     rr.correct, rr.correctness_detail = _correctness(state)
+    rr.bug_cycles, rr.side_effect_failures = _bug_cycles(state)
     rr.safety_flags = _safety(state)
 
     # Latency: prefer run-meta start/end, else pipeline timestamps.

@@ -1,0 +1,13 @@
+{
+  "ticket_id": "STABLE-0008",
+  "type": "Feature",
+  "summary": "고정 minPriorityFee 수수료 정책 (miner.gasprice 비활성 + SuggestTipCap 고정)",
+  "description": "## 작업 유형: Feature\n## 요약\n수수료 정책을 고정 minPriorityFee 기반으로 변경한다: miner.gasprice CLI 플래그/설정 비활성, 기본 priority fee 조정, SuggestTipCap 이 config 의 고정 minPriorityFee 반환, WBFTExtra 에 GovTip 필드 도입(합의 미포함).\n## 배경\n거버넌스 투표 기반 GovTip 설정이 구현되기 전까지, miner 의 GasPrice 를 WBFT 엔진에 임시 전달한다.\n## 기대 동작\nminer.gasprice 설정이 무력화되고 SuggestTipCap 이 config minPriorityFee 를 일관되게 반환한다.\n## 영향 범위\n- 모듈: miner / eth/gasprice / consensus/wbft(Extra) / cmd flags (수수료 정책)\n- 심각도: medium\n## 수용 기준\n- [ ] miner.gasprice CLI 플래그 및 설정 비활성\n- [ ] SuggestTipCap 이 config 의 고정 minPriorityFee 반환\n- [ ] WBFTExtra 에 GovTip 필드 추가(합의 경로 미포함)\n- [ ] miner GasPrice 를 WBFT 엔진에 임시 전달\n- [ ] 회귀 테스트 + unit 통과\n## 비고\n실제 PR(#14)은 다중 기능 squash 이며 base_commit 이 dev 에서 멀어 인덱스 drift 가 크다. 본 태스크는 핵심 deliverable(고정 minPriorityFee + miner.gasprice 비활성)로 범위를 한정해 평가할 것.",
+  "assignee": null,
+  "status": "To Do",
+  "status_category": "todo",
+  "labels": ["feature", "miner", "gasprice", "fee-policy"],
+  "created": "2026-06-15T00:00:00Z",
+  "updated": "2026-06-15T00:00:00Z",
+  "_filter_metadata": { "scan_result": "CLEAN", "redacted_count": 0, "redacted_patterns": [], "blocked_patterns": [], "warnings": [], "scanned_at": "2026-06-15T00:00:00Z" }
+}

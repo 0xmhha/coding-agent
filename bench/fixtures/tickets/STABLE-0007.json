@@ -1,0 +1,13 @@
+{
+  "ticket_id": "STABLE-0007",
+  "type": "Bug Fix",
+  "summary": "genesis init 시 Account.Extra를 GovCouncil 컨트랙트 슬롯과 동기화한다",
+  "description": "## 작업 유형: Bug Fix\n## 요약\ngenesis 초기화 경로에서 Account.Extra 가 GovCouncil 시스템 컨트랙트 슬롯과 동기화되지 않고, prealloc 직렬화에 Extra 가 보존되지 않으며, nil Alloc 맵이 시스템 컨트랙트 초기화로 전달되어 패닉 위험이 있다.\n## 재현 방법\n1. Alloc 이 미할당(nil)인 genesis 로 시스템 컨트랙트 초기화\n2. 또는 Account.Extra 가 설정된 계정으로 genesis prealloc round-trip\n## 기대 동작\nAccount.Extra 가 prealloc 에 보존되고, nil Alloc 가 안전하게 초기화되며, genesis init 시 Extra 가 GovCouncil 슬롯과 일치한다.\n## 실제 동작\nExtra 유실 / nil 맵 쓰기 패닉 / Extra-슬롯 불일치.\n## 영향 범위\n- 모듈: core/state·genesis ↔ core/types ↔ systemcontracts (교차모듈)\n- 심각도: high\n## 수용 기준\n- [ ] prealloc RLP 에 Account.Extra 포함 (rlp:\"optional\", 하위호환)\n- [ ] genesis.Alloc 를 GetSystemContractsTransition 호출 전에 초기화(nil 패닉 방지)\n- [ ] AccountExtraValidMask + ValidateExtra 로 미정의 비트 거부\n- [ ] genesis init 시 Account.Extra ↔ GovCouncil 슬롯 동기화\n- [ ] gov_council_alloc_sync 회귀 테스트 + unit/race 통과",
+  "assignee": null,
+  "status": "To Do",
+  "status_category": "todo",
+  "labels": ["bug", "state", "genesis", "systemcontracts"],
+  "created": "2026-06-15T00:00:00Z",
+  "updated": "2026-06-15T00:00:00Z",
+  "_filter_metadata": { "scan_result": "CLEAN", "redacted_count": 0, "redacted_patterns": [], "blocked_patterns": [], "warnings": [], "scanned_at": "2026-06-15T00:00:00Z" }
+}
