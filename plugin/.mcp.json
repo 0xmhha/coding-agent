@@ -14,6 +14,10 @@
       "command": "${CKS_MCP_BIN}",
       "args": ["-config", "${CKS_CONFIG}"]
     },
+    "ckg": {
+      "command": "${CKG_MCP_BIN}",
+      "args": ["mcp", "--graph", "${CKG_GRAPH_DIR}"]
+    },
     "chainbench": {
       "command": "chainbench-mcp",
       "env": {
