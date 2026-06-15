@@ -106,6 +106,10 @@ type: skill
        state.json 셀 status=running.
     b. ticket을 셀 워크스페이스에 복사(manifest.tasks[].ticket → ticket.json),
        state-machine.init_state 로 파이프라인 state 초기화.
+       ★ base 고정: task.base_commit 이 있으면 go_stablenet_root 를 그 커밋으로 reset
+         (`git -C {root} checkout {base_commit}` 또는 worktree)하여 **각 셀이 같은 출발점**에서
+         시작하게 한다. 미지정 시 현재 HEAD. (기-수정 버그 태스크는 반드시 버그가 실재하는
+         부모 커밋이어야 trivially-pass 거짓신호를 피한다.) 셀 종료 후 생성 브랜치는 §5 정리 대상.
     c. ANALYSIS/PLANNING/DESIGN: Agent tool 로 mode_agents[mode] 디스패치
        (A=planner, B=bench-planner-codeonly, C=bench-planner-skills).
        → 동일 artifact(analysis.md, related-code.json, plan.md, design-v*.md) 생성.
@@ -148,6 +152,12 @@ type: skill
     ★ 단발 토큰이 아니라 "옳은 수정까지의 총비용"(Σ across bug-cycles)·bug-cycle 수·
       회귀-클래스 사이드이펙트 실패 수가 핵심 비교축이다(§2 방법론).
 
+4.5b 전문가 유사도(선택; task.oracle.reference_fix 가 있을 때):
+    셀의 에이전트 diff(`git -C {root} diff {base_commit} {agent-HEAD}`)를 reference_fix(전문가 정답
+    diff)와 비교해 별도 축으로 보고한다 — (i) 결정적: 수정 파일/핵심 심볼 overlap, (ii) 의미적:
+    동일 근본원인·동등 해법인지 LLM 판정. 기능 정확성(EVALUATION_PASS)과 **분리**해서 표기한다
+    (둘은 다른 질문 — "통과하는가" vs "전문가처럼 고쳤는가"). 자동 스코어러 미구현 시 수동/판정 단계.
+
 4.6 진행 보고 + 재개 안내
     - pending 셀이 남았으면: "남은 N 셀. 이어서: /coding-agent:bench {experiment} --continue"
     - 모두 done: 최종 리포트 경로 안내.
@@ -160,3 +170,7 @@ type: skill
 - B/C 모드 agent는 cks tool grant가 없어(별도 agent) regime이 하드하게 분리된다 —
   "cks 쓰지 마"라는 프롬프트 의존이 아니라 도구 부재로 보장.
 - 실패한 셀도 리포트에 포함(정확성=실패로 집계) — 누락 truncation 금지.
+- 🔴 **데이터셋 오염 방지**: 벤치는 go_stablenet_root 에 셀별 throwaway 브랜치/커밋을 만든다.
+  실험 종료 후 **반드시 정리**한다 — 캐노니컬 브랜치 checkout → `git branch -D {셀 브랜치들}` →
+  `git reflog expire --expire-unreachable=now --all && git gc --prune=now`. 안 그러면 다음 cks/ckg
+  재빌드 때 가짜 코드·커밋이 인덱스로 유입된다(과거 실제 발생). base_commit 으로 reset 한 트리도 원복.

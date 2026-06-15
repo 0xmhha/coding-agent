@@ -1,8 +1,8 @@
 {
   "ticket_id": "STABLE-0009",
   "type": "Bug Fix",
-  "summary": "엔진 초기화 전에 override를 적용해 chain config를 로드한다 (chainconfig engine mismatch)",
-  "description": "## 작업 유형: Bug Fix\n## 요약\nchain config override(엔진 등)가 엔진 생성 이후에 적용되어, 저장된 genesis 와 엔진 설정이 불일치(engine mismatch)한다.\n## 재현 방법\n1. override 가 있는 chain config 로 노드 기동\n2. 엔진 초기화 시점의 config 확인\n## 기대 동작\noverride 가 엔진 생성 전에 적용되고, nil genesis config 및 stored-genesis mismatch 가 검증된다.\n## 실제 동작\n엔진 생성 후 override 적용 → engine mismatch.\n## 영향 범위\n- 모듈: params / core/genesis / eth backend (chainconfig)\n- 심각도: high\n## 수용 기준\n- [ ] LoadChainConfigWithOverride 가 엔진 초기화 전에 override 적용\n- [ ] nil genesis config 검증 + stored-genesis mismatch 검사\n- [ ] MakeChain 에서 엔진 생성 전 override 적용\n- [ ] 공유 genesis override/anzeon init 로직 추출\n- [ ] LoadChainConfigWithOverride 테스트 + unit 통과\n## 비고\nbase_commit 이 dev 에서 ~13 PR 전이라 인덱스 drift 중간 정도. 대조군 보조 케이스.",
+  "summary": "chain config override가 엔진 설정에 제때 반영되지 않아 engine mismatch가 발생한다",
+  "description": "## 작업 유형: Bug Fix\n## 요약\noverride 가 포함된 chain config 로 노드를 기동하면, override 가 엔진 설정에 제때 반영되지 않아 저장된 genesis 와 엔진 설정이 불일치(engine mismatch)한다.\n## 재현 방법\n1. override 가 있는 chain config 로 노드 기동\n2. 엔진 초기화 결과 확인\n## 기대 동작\noverride 가 엔진 설정에 반영되고, 잘못된(nil/불일치) genesis 는 거부된다.\n## 실제 동작\noverride 가 반영되지 않아 engine mismatch.\n## 영향 범위\n- 모듈: params / core/genesis / eth backend (chainconfig)\n- 심각도: high\n## 수용 기준\n- [ ] override 가 엔진 설정에 반영되어 mismatch 가 발생하지 않는다\n- [ ] nil / 불일치 genesis config 거부\n- [ ] 회귀 테스트 + unit 통과\n## 비고\n해법 메커니즘은 명시하지 않는다. base_commit 이 dev 에서 ~13 PR 전이라 인덱스 drift 중간 정도(대조군 보조 케이스).",
   "assignee": null,
   "status": "To Do",
   "status_category": "todo",

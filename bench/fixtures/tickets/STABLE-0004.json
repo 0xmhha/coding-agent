@@ -1,8 +1,8 @@
 {
   "ticket_id": "STABLE-0004",
   "type": "Bug Fix",
-  "summary": "initializeGovCouncil이 params-only alloc 엔트리에 nil Balance를 써 genesis dump가 실패한다",
-  "description": "## 작업 유형: Bug Fix\n## 요약\nsystemcontracts.initializeGovCouncil 은 chain config params(blacklist/authorized 주소)를 genesis alloc 로 역동기화한다. 이때 alloc 에 없던 주소는 zero-value Account{}(Balance=nil)로 가져온다.\n## 재현 방법\n1. blacklist/authorized 주소가 alloc 에 없는 chain config 로 genesis 구성\n2. genesis dump 수행\n## 기대 동작\n모든 alloc 엔트리가 non-nil Balance 를 가져 정상 직렬화/역직렬화된다.\n## 실제 동작\nnil Balance 가 \"balance\":null 로 직렬화되어 Account.UnmarshalJSON 의 gencodec required-field 검사를 실패시킨다: 'missing required field balance for Account'.\n## 영향 범위\n- 모듈: systemcontracts (gov_council, Go↔Solidity 경계)\n- 심각도: high (genesis dump 차단)\n## 수용 기준\n- [ ] params-only 엔트리 작성 전 Balance 를 new(big.Int)(zero) 로 초기화 (모든 alloc 엔트리 non-nil Balance 불변식)\n- [ ] 회귀: TestAllocSync_ParamsOnly (새 alloc 엔트리 Balance != nil)\n- [ ] 회귀: round-trip marshal/unmarshal 로 'missing required field balance' 부재 확인\n- [ ] unit + race 통과",
+  "summary": "거버넌스 params 기반으로 alloc을 동기화한 뒤 genesis dump가 'missing required field balance'로 실패한다",
+  "description": "## 작업 유형: Bug Fix\n## 요약\nchain config params(blacklist/authorized 주소 등)에만 존재하고 genesis alloc 에는 없던 주소가 거버넌스 동기화 과정에서 alloc 으로 들어간 뒤, genesis dump(직렬화)가 실패한다.\n## 재현 방법\n1. alloc 에 없는 주소가 chain config params 에 있는 상태로 genesis 구성\n2. genesis dump 수행\n## 기대 동작\n동기화로 추가된 엔트리를 포함해 genesis 가 정상 직렬화/역직렬화(round-trip)된다.\n## 실제 동작\ndump 가 'missing required field balance for Account' 에러로 실패한다(일부 alloc 엔트리가 required 필드를 충족하지 못함).\n## 영향 범위\n- 모듈: systemcontracts (gov_council, Go↔Solidity 경계) / genesis\n- 심각도: high (genesis dump 차단)\n## 수용 기준\n- [ ] params 기반 alloc 동기화 후에도 genesis dump 및 round-trip 이 성공한다\n- [ ] 해당 시나리오 회귀 테스트 추가\n- [ ] unit + race 통과\n## 비고\n해법 메커니즘은 명시하지 않는다 — 에이전트가 스스로 진단·수정한다.",
   "assignee": null,
   "status": "To Do",
   "status_category": "todo",

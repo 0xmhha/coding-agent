@@ -38,7 +38,8 @@
             "type": "object",
             "description": "Correctness oracle hints (e.g. which chainbench test must pass).",
             "properties": {
-              "chainbench_test": { "type": "string" }
+              "chainbench_test": { "type": "string" },
+              "reference_fix": { "type": "string", "description": "Expert/ground-truth fix to compare the agent's diff against (a commit-ish reachable from base_commit, and/or a saved .diff path). Enables an expert-similarity review axis: how close did the agent's solution come to the human PR. Functional pass (chainbench_test) and similarity are reported separately." }
             }
           }
         }

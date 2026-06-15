@@ -1,8 +1,8 @@
 {
   "ticket_id": "STABLE-0007",
   "type": "Bug Fix",
-  "summary": "genesis init 시 Account.Extra를 GovCouncil 컨트랙트 슬롯과 동기화한다",
-  "description": "## 작업 유형: Bug Fix\n## 요약\ngenesis 초기화 경로에서 Account.Extra 가 GovCouncil 시스템 컨트랙트 슬롯과 동기화되지 않고, prealloc 직렬화에 Extra 가 보존되지 않으며, nil Alloc 맵이 시스템 컨트랙트 초기화로 전달되어 패닉 위험이 있다.\n## 재현 방법\n1. Alloc 이 미할당(nil)인 genesis 로 시스템 컨트랙트 초기화\n2. 또는 Account.Extra 가 설정된 계정으로 genesis prealloc round-trip\n## 기대 동작\nAccount.Extra 가 prealloc 에 보존되고, nil Alloc 가 안전하게 초기화되며, genesis init 시 Extra 가 GovCouncil 슬롯과 일치한다.\n## 실제 동작\nExtra 유실 / nil 맵 쓰기 패닉 / Extra-슬롯 불일치.\n## 영향 범위\n- 모듈: core/state·genesis ↔ core/types ↔ systemcontracts (교차모듈)\n- 심각도: high\n## 수용 기준\n- [ ] prealloc RLP 에 Account.Extra 포함 (rlp:\"optional\", 하위호환)\n- [ ] genesis.Alloc 를 GetSystemContractsTransition 호출 전에 초기화(nil 패닉 방지)\n- [ ] AccountExtraValidMask + ValidateExtra 로 미정의 비트 거부\n- [ ] genesis init 시 Account.Extra ↔ GovCouncil 슬롯 동기화\n- [ ] gov_council_alloc_sync 회귀 테스트 + unit/race 통과",
+  "summary": "genesis 초기화 시 Account.Extra가 GovCouncil 상태와 불일치하고 일부 경로에서 패닉/유실된다",
+  "description": "## 작업 유형: Bug Fix\n## 요약\ngenesis 초기화에서 계정의 Extra 정보가 GovCouncil 시스템 컨트랙트 상태와 일치하지 않고, 직렬화 과정에서 Extra 가 보존되지 않으며, 특정 입력(미할당 alloc)에서 시스템 컨트랙트 초기화 중 패닉이 발생한다.\n## 재현 방법\n1. alloc 이 미할당인 genesis 로 시스템 컨트랙트 초기화 시도\n2. 또는 Extra 가 설정된 계정으로 genesis 직렬화/역직렬화(round-trip)\n## 기대 동작\nExtra 가 보존·검증되고, 미할당 입력에서도 패닉 없이 처리되며, genesis 초기화 후 Extra 가 GovCouncil 상태와 일치한다.\n## 실제 동작\nExtra 유실 / 미할당 입력 시 패닉 / Extra 와 GovCouncil 상태 불일치.\n## 영향 범위\n- 모듈: core/state·genesis ↔ core/types ↔ systemcontracts (교차모듈)\n- 심각도: high\n## 수용 기준\n- [ ] genesis 초기화 후 Account.Extra 가 GovCouncil 상태와 일치하고 보존된다\n- [ ] 미할당 입력에서도 패닉 없이 안전하게 처리\n- [ ] 유효하지 않은 Extra 값 거부\n- [ ] 회귀 테스트 + unit/race 통과\n## 비고\n해법 메커니즘은 명시하지 않는다 — 에이전트가 스스로 진단·수정한다.",
   "assignee": null,
   "status": "To Do",
   "status_category": "todo",

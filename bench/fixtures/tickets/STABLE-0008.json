@@ -1,8 +1,8 @@
 {
   "ticket_id": "STABLE-0008",
   "type": "Feature",
-  "summary": "고정 minPriorityFee 수수료 정책 (miner.gasprice 비활성 + SuggestTipCap 고정)",
-  "description": "## 작업 유형: Feature\n## 요약\n수수료 정책을 고정 minPriorityFee 기반으로 변경한다: miner.gasprice CLI 플래그/설정 비활성, 기본 priority fee 조정, SuggestTipCap 이 config 의 고정 minPriorityFee 반환, WBFTExtra 에 GovTip 필드 도입(합의 미포함).\n## 배경\n거버넌스 투표 기반 GovTip 설정이 구현되기 전까지, miner 의 GasPrice 를 WBFT 엔진에 임시 전달한다.\n## 기대 동작\nminer.gasprice 설정이 무력화되고 SuggestTipCap 이 config minPriorityFee 를 일관되게 반환한다.\n## 영향 범위\n- 모듈: miner / eth/gasprice / consensus/wbft(Extra) / cmd flags (수수료 정책)\n- 심각도: medium\n## 수용 기준\n- [ ] miner.gasprice CLI 플래그 및 설정 비활성\n- [ ] SuggestTipCap 이 config 의 고정 minPriorityFee 반환\n- [ ] WBFTExtra 에 GovTip 필드 추가(합의 경로 미포함)\n- [ ] miner GasPrice 를 WBFT 엔진에 임시 전달\n- [ ] 회귀 테스트 + unit 통과\n## 비고\n실제 PR(#14)은 다중 기능 squash 이며 base_commit 이 dev 에서 멀어 인덱스 drift 가 크다. 본 태스크는 핵심 deliverable(고정 minPriorityFee + miner.gasprice 비활성)로 범위를 한정해 평가할 것.",
+  "summary": "수수료 정책을 고정 최소 우선수수료(minPriorityFee) 기반으로 전환한다",
+  "description": "## 작업 유형: Feature\n## 요약\n수수료 정책을 운영자/거버넌스가 정한 고정 최소 우선수수료 기반으로 전환한다. miner 가 임의로 gas price 를 설정해 정책을 우회하지 못하게 하고, tip 제안이 설정된 고정 최소값을 따르도록 한다.\n## 목표\n- miner 의 임의 gas price 설정이 수수료 정책을 바꾸지 못함\n- tip 제안 로직이 설정된 고정 최소 우선수수료를 일관되게 반환\n## 영향 범위\n- 모듈: miner / eth/gasprice / cmd flags (수수료 정책)\n- 심각도: medium\n## 수용 기준\n- [ ] miner 의 임의 gas price 설정이 정책을 변경하지 못한다\n- [ ] tip 제안이 설정된 고정 최소 우선수수료를 반환한다\n- [ ] 회귀 테스트 + unit 통과\n## 비고\n해법 설계는 명시하지 않는다. ⚠️ feature 라 전문가-유사도는 약한 신호. 실제 PR(#14)은 다중 기능 squash + base_commit 이 dev 에서 멀어 인덱스 drift 큼 → 핵심 deliverable 로 범위 한정 평가.",
   "assignee": null,
   "status": "To Do",
   "status_category": "todo",
