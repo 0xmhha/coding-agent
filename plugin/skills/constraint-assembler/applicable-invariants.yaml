@@ -1,0 +1,86 @@
+# module → applicable invariants/rules index  (v0, 2026-06-16)
+#
+# The constraint-assembler's primary lookup. Given the target code module(s) of a
+# change, returns the constraints (invariants + rules) that apply — so DESIGN must
+# satisfy a LISTED, CITED constraint set rather than rely on the LLM recalling them.
+#
+# Source: study/docs/research/ai-knowledge-data/docs/category-ontology.md (D-024 remap, 36 entries).
+# IDs use the canonical D-023(개정) scheme: <category=module>.<area>.<slug>.
+# enforce_ref → chainbench/catalog/invariant-tests.yaml (#2) where a binding exists.
+# tier L3 = always-on backstop (inject regardless of retrieval). kind doc = reference, NOT a constraint.
+#
+# DEGRADED-mode note (D-007): this index is cks-INDEPENDENT (static). The assembler
+# surfaces applicable constraints from here even when cks/impact_analysis is unavailable;
+# impact-surface enrichment (callers/concurrency) is the cks/grep step layered on top.
+
+schema_version: 0
+
+# path → module classifier (prefix match on repo-relative path; first match wins; most-specific first)
+path_to_module:
+  - { prefix: "consensus/wbft",        module: consensus }
+  - { prefix: "consensus/",            module: consensus }
+  - { prefix: "core/txpool",           module: txpool }
+  - { prefix: "core/vm",               module: evm }
+  - { prefix: "core/state",            module: blockchain }
+  - { prefix: "core/",                 module: blockchain }
+  - { prefix: "systemcontracts/",      module: systemcontracts }
+  - { prefix: "core/types",            module: types }
+  - { prefix: "params/",               module: params }
+  - { prefix: "miner/",                module: gasprice }      # gas tip override path
+  - { prefix: "eth/",                  module: eth-protocol }
+  - { prefix: "rpc",                   module: rpc }
+
+modules:
+
+  consensus:
+    invariants:
+      - { id: consensus.wbft_core.quorum_calc,          lens: consensus-safety,      kind: inv, tier: L2, enforce_ref: regression/b-wbft/b-08-quorum-deficient }
+      - { id: consensus.wbft_core.round_change,         lens: byzantine-fairness,    kind: inv, tier: L2, enforce_ref: regression/b-wbft/b-09-round-change }
+      - { id: consensus.wbft_core.message_handlers,     lens: consensus-safety,      kind: inv, tier: L2 }
+      - { id: consensus.validator.equal_power,          lens: byzantine-fairness,    kind: inv, tier: L3, enforce_ref: regression/b-wbft/b-07-istanbul-get-validators }
+      - { id: consensus.validator.epoch_transition,     lens: byzantine-fairness,    kind: inv, tier: L2, enforce_ref: regression/b-wbft/b-03-epoch-transition }
+      - { id: consensus.finality.instant_finality,      lens: consensus-safety,      kind: inv, tier: L3, enforce_ref: basic/wbft-consensus }
+      - { id: consensus.fee.base_fee_redistribution,    lens: fee-policy,            kind: inv, tier: L3, enforce_ref: regression/c-anzeon/c-03-basefee-increase }   # ⚠ partial binding (not-burned unasserted)
+      - { id: consensus.concurrency.core_lock_discipline, lens: concurrency-discipline, kind: inv, tier: L3 }
+      - { id: consensus.seals.bls_seal_scheme,          lens: consensus-safety,      kind: inv, tier: L2 }
+      - { id: consensus.theory.3f1_intersection,        lens: consensus-safety,      kind: inv, tier: L3 }
+      - { id: consensus.theory.justification_locking,   lens: consensus-safety,      kind: inv, tier: L3 }
+
+  types:
+    invariants:
+      - { id: types.fee_delegation.feepayer_sighash,    lens: fee-policy,            kind: inv, tier: L2, enforce_ref: regression/d-fee-delegation/d-04-feepayer-sig-invalid }
+      - { id: types.fee_delegation.signing_model,       lens: fee-policy,            kind: inv, tier: L2 }
+      - { id: types.block_encoding.filtered_header_hash, lens: consensus-safety,     kind: inv, tier: L2 }
+      - { id: types.account_extra.bit_layout,           lens: cross-cutting,         kind: inv, tier: L2 }
+
+  systemcontracts:
+    invariants:
+      - { id: systemcontracts.native_coin.wkrc_not_eth, lens: ledger-conservation,   kind: inv, tier: L3 }
+      - { id: systemcontracts.gov_minter,               lens: ledger-conservation,   kind: inv, tier: L2 }
+      - { id: systemcontracts.codegen.no_edit_zones,    lens: cross-cutting,         kind: rule, tier: L2 }
+      - { id: systemcontracts.codegen.regen_procedure,  lens: cross-cutting,         kind: rule, tier: L2 }
+
+  evm:
+    invariants:
+      - { id: evm.native_coin.issuance_burn_flow,       lens: ledger-conservation,   kind: inv, tier: L2 }
+
+  txpool:
+    invariants:
+      - { id: txpool.reorg.serialization,               lens: concurrency-discipline, kind: inv, tier: L2 }
+
+  gasprice:
+    invariants:
+      - { id: gasprice.anzeon.tip_override,             lens: fee-policy,            kind: inv, tier: L2 }
+
+  blockchain:
+    invariants:
+      - { id: blockchain.state_transition.blacklist_checks, lens: cross-cutting,     kind: inv, tier: L2 }
+
+  params:
+    invariants:
+      - { id: params.timing.wbft_config_defaults,       lens: byzantine-fairness,    kind: inv, tier: L2 }
+      - { id: params.hardfork.add_procedure,            lens: cross-cutting,         kind: rule, tier: L2 }
+
+# cross-cutting rules: always candidate regardless of module
+cross_cutting:
+  - { id: rules.cherry_pick_principle,                  lens: cross-cutting,         kind: rule, tier: L2 }

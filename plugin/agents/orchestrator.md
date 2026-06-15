@@ -122,11 +122,19 @@ it as a stuck pipeline and report.
 +-------------------+------------------------------------------------------+
 | ANALYSIS          | Dispatch Planner agent (ANALYSIS section).           |
 | PLANNING          | Dispatch Planner agent (PLANNING section).           |
-| DESIGN            | Dispatch Planner agent (DESIGN section, iterates     |
-|                   | up to states.DESIGN.revision == max).                |
+| DESIGN            | Planner FIRST runs the `constraint-assembler` skill  |
+|                   | → constraints.md (constraint-first; any INVALID item |
+|                   | = uncited → block, do not proceed). Then dispatch     |
+|                   | Planner (DESIGN), iterating up to                    |
+|                   | states.DESIGN.revision == max. DESIGN must satisfy   |
+|                   | every constraints.md item.                           |
 +-------------------+------------------------------------------------------+
-| READY_FOR_IMPL    | Verify plan.md + design-v{N}.md.                     |
-|                   | Dispatch Implementer agent.                          |
+| READY_FOR_IMPL    | Verify plan.md + design-v{N}.md + constraints.md.    |
+|                   | Run the `perspective-reviewer` skill →               |
+|                   | perspective-report.md (selective lenses from         |
+|                   | constraints.md). If REJECT (blocking VIOLATION ≥1):  |
+|                   | transition→DESIGN (revision++; at cap → BLOCKED).    |
+|                   | If PASS → dispatch Implementer.                      |
 +-------------------+------------------------------------------------------+
 | IMPLEMENTATION    | (Likely a resume.) Dispatch Implementer again so it  |
 |                   | picks up at the first non-completed step.            |

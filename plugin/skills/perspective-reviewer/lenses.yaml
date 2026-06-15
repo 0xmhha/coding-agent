@@ -1,0 +1,80 @@
+# perspective-reviewer lenses (v0, 2026-06-16)
+#
+# Per-lens adversarial rubric. The perspective-reviewer activates ONLY the lenses
+# whose invariants are in the change's constraints.md (selective, GLOSSARY §5 — NOT
+# all 6 every time). Each lens specifically targets the `distinguishing_claim` of
+# partial-binding invariants — the exact things the executable chainbench gate (#4)
+# CANNOT verify (proven in #5). This is LLM adversarial judgment, complementing
+# (not replacing) the machine gate.
+#
+# 6 canonical lenses (GLOSSARY §5): consensus-safety, ledger-conservation,
+# concurrency-discipline, byzantine-fairness, fee-policy, cross-cutting.
+
+schema_version: 0
+
+lenses:
+
+  fee-policy:
+    owns: [consensus.fee.base_fee_redistribution, types.fee_delegation.feepayer_sighash,
+           types.fee_delegation.signing_model, gasprice.anzeon.tip_override]
+    ask:
+      - "baseFee가 validator에게 *재분배*되는가, 아니면 어딘가에서 소각/방치되는가? (EIP-1559 burn 아님)"
+      - "🔴 partial-gap: 어떤 early-return/에러 경로가 `distributeBaseFee`를 *건너뛰는가*? (return nil로 Finalize 빠지면 재분배 누락 = 위반)"
+      - "fee delegation 경로에서 feePayer 서명이 올바른 sighash payload에 묶이는가?"
+    distinguishing_claims:
+      - id: consensus.fee.base_fee_redistribution
+        claim: "baseFee는 소각되지 않고 재분배된다(WKRC 공급 보존)."
+        gate_blind: "c-03은 +2% 공식만 검증 → 소각해도 통과. 설계가 재분배 경로 보존을 *논증*해야 함."
+
+  ledger-conservation:
+    owns: [systemcontracts.native_coin.wkrc_not_eth, systemcontracts.gov_minter,
+           evm.native_coin.issuance_burn_flow]
+    ask:
+      - "변경 전후 총공급(sum of balances + 발행/소각)이 보존되는가?"
+      - "native coin이 WKRC 의미(ETH 아님)를 유지하는가? 직접 balance write가 native-manager 밖에서 일어나지 않는가?"
+      - "gov_minter 발행/소각 흐름이 권한·상한을 우회하지 않는가?"
+    distinguishing_claims:
+      - id: systemcontracts.native_coin.wkrc_not_eth
+        claim: "native coin 원장은 WKRC 보존 규칙을 따른다."
+        gate_blind: "chainbench 바인딩 없음 — 전적으로 이 렌즈가 담당."
+
+  consensus-safety:
+    owns: [consensus.wbft_core.quorum_calc, consensus.finality.instant_finality,
+           consensus.wbft_core.message_handlers, consensus.theory.3f1_intersection,
+           consensus.seals.bls_seal_scheme, types.block_encoding.filtered_header_hash]
+    ask:
+      - "동일 높이에서 충돌하는 두 블록이 final 될 수 있는가? (safety)"
+      - "🔴 partial-gap: commit된 블록이 reorg로 뒤집힐 수 있는가? (instant finality = inert reorg 보장)"
+      - "quorum = ceil(2N/3)이 유지되는가? quorum 미만에서 commit이 가능해지지 않는가?"
+    distinguishing_claims:
+      - id: consensus.finality.instant_finality
+        claim: "commit된 블록은 reorg로 뒤집히지 않는다."
+        gate_blind: "network-partition은 halt/recover만 검증, no-reorg 미단언. 설계가 finality 불변을 보증해야."
+
+  byzantine-fairness:
+    owns: [consensus.validator.equal_power, consensus.validator.epoch_transition,
+           consensus.wbft_core.round_change, params.timing.wbft_config_defaults]
+    ask:
+      - "🔴 partial-gap: 모든 활성 validator가 *동등한* 투표 권한을 유지하는가? (가중치/표=1)"
+      - "round-change/proposer 선정에 특정 노드 편중(sticky)이 생기지 않는가?"
+      - "epoch 전환에서 diligence accounting이 비대칭으로 어긋나지 않는가?"
+    distinguishing_claims:
+      - id: consensus.validator.equal_power
+        claim: "각 validator는 동등한 투표 권한을 가진다."
+        gate_blind: "b-07은 validator *집합*만 검증, power 동등성 미검증."
+
+  concurrency-discipline:
+    owns: [consensus.concurrency.core_lock_discipline, txpool.reorg.serialization]
+    ask:
+      - "lock 획득 순서가 기존 규율을 따르는가? (deadlock 회피)"
+      - "새 goroutine/공유상태 접근이 -race 커버리지 없이 추가되지 않는가?"
+      - "txpool reorg 직렬화 가정이 깨지지 않는가?"
+    distinguishing_claims: []
+
+  cross-cutting:
+    owns: [blockchain.state_transition.blacklist_checks, types.account_extra.bit_layout,
+           rules.cherry_pick_principle, systemcontracts.codegen.no_edit_zones]
+    ask:
+      - "blacklist 검사가 모든 state-transition 지점(sender/recipient/feePayer)에서 강제되는가?"
+      - "cherry-pick은 *새 파일*로(기존 파일 편집 아님)? codegen no-edit-zone을 건드리지 않는가?"
+    distinguishing_claims: []

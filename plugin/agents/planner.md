@@ -451,6 +451,27 @@ state-machine.transition(workspace_dir, "PLANNING", "DESIGN",
 
 ## 5. DESIGN (modes: fresh, bugfix)
 
+### 5.0 Constraint assembly (constraint-first — REQUIRED before any design)
+
+Before writing per-step design, produce `constraints.md` via the
+**`constraint-assembler` skill**. This lists the invariants/rules that apply to
+the change (by target module) with citations — so the design must satisfy a
+*listed, cited* constraint set, not the LLM's recall.
+
+```
+module(s) = stablenet-context.classify(changed files from analysis.md/plan.md)
+invoke skill constraint-assembler:
+  in  = analysis.md (target files/symbols), plan.md
+  out = constraints.md  (적용 불변식·규칙 + 영향면, 전부 인용 / 미인용=INVALID)
+write constraints.md to workspace; add to states.DESIGN.artifacts
+```
+
+- **Any INVALID item (uncited) → STOP**: do not proceed to design (uncited constraint = hallucination).
+- Degraded OK (D-007): the assembler's invariant list is cks-independent (static index);
+  impact-surface enrichment uses cks if available, else grep.
+- The per-step design (§5.2) MUST address every constraints.md item; partial-binding
+  invariants (gate-blind) are carried to the perspective-review gate (READY_FOR_IMPL).
+
 ### 5.1 Read plan + related code
 
 ```

@@ -434,6 +434,37 @@ Run additional catalog tests as the ticket scope warrants (e.g.
 authoritative pass/fail comes from the report parse in §7.5b, not from scraping
 this text output.
 
+### 7.5a Invariant gate (deterministic — D-020 machine signal)
+
+Beyond ad-hoc catalog tests, run the **bound invariant tests** for the change's
+*applicable invariants*. This makes Stage 4 gate on invariants, not LLM-chosen tests.
+
+```
+# target module: from constraints.md (constraint-assembler #3, if present),
+# else the stablenet-context path classifier over the diff's changed files.
+module = constraints.md "대상 모듈" field  OR  stablenet-context.classify(changed_paths)
+
+bash: python3 {coding_agent_root}/tools/invariant_gate.py \
+        --module {module} --run --json \
+        > {workspace_dir}/logs/invariant-gate.json   # exit 0=PASS, 2=BLOCK
+
+gate = parse(invariant-gate.json)   # {verdict, rows, blocked, warnings}
+```
+
+- `gate.verdict == "BLOCK"` (exit 2) → **stage4.status = FAIL**; summary lists
+  `gate.blocked` (invariants whose bound chainbench test FAILED or has no passing
+  evidence). This is the invariant gate: **통과 증빙 없으면 EVALUATION 차단.**
+- `gate.warnings` (partial binding: PASS but distinguishing claim unverified) →
+  record in the report and **flag for perspective-review**. A green partial test is
+  NOT a safety proof — e.g. `base_fee_redistribution` (c-03) passes even if the
+  fee were burned (catalog `missing` field).
+- `unbound` invariants (no chainbench binding) → defer to perspective-review (#6),
+  not a hard fail.
+
+Bindings come from `chainbench/catalog/invariant-tests.yaml` (#2) + the
+constraint-assembler index (#3) — the SSoT for invariant→test mapping. The gate
+reads the JSON result files (`state/results/*.json`), avoiding the MCP text-wrap.
+
 ### 7.5b Parse the JSON report (C4 loop-back)
 
 ```
@@ -446,7 +477,7 @@ count_pass = report.summary.passed
 count_fail = report.summary.failed
 
 stage4.status =
-  "FAIL" if §7.4 status FAIL OR count_fail > 0 OR build failed
+  "FAIL" if §7.4 status FAIL OR count_fail > 0 OR §7.5a gate.verdict == "BLOCK" OR build failed
   "PASS" otherwise
 
 # On failure, capture diagnostics for the bug cycle:

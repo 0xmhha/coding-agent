@@ -216,9 +216,13 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
    - `Bash`: `test -f {workspace_dir}/plan.md && echo OK`
    - plan.md에 "## Step" 헤더가 최소 1개 이상 존재 (`grep -c "^## Step" {workspace_dir}/plan.md`)
 
-   **DESIGN → IMPLEMENTATION**:
+   **DESIGN → IMPLEMENTATION** (= orchestrator READY_FOR_IMPL 게이트):
    - design-v{N}.md 파일이 최소 1개 존재 (`ls {workspace_dir}/design-v*.md`)
    - state.states.DESIGN.revision <= config.max_design_revisions
+   - **constraints.md 존재 + INVALID 0개** (constraint-assembler #3):
+     `test -f {workspace_dir}/constraints.md && ! grep -q "INVALID" {workspace_dir}/constraints.md`
+   - **perspective-report.md = PASS** (perspective-reviewer #6): blocking VIOLATION 0.
+     REJECT면 전이 거부 → DESIGN (revision++); revision > max → BLOCKED.
 
    **IMPLEMENTATION → EVALUATION**:
    - state.states.IMPLEMENTATION.plan_progress.steps 의 모든 step.status == "completed"
