@@ -100,6 +100,45 @@ class TestCollectReport(unittest.TestCase):
             csv_text = to_csv(results)
             self.assertEqual(csv_text.strip().count("\n"), 3)  # header + 3 rows
 
+    def test_bug_cycles_and_side_effects(self):
+        """A passes first try (0 cycles); B reaches PASS after 2 bug-cycles,
+        one of which is a regression-class (chainbench) side-effect."""
+        with tempfile.TemporaryDirectory() as d:
+            exp = Path(d) / "exp"
+            _write(exp / "manifest.json", {"experiment": "cyc-exp"})
+            _write(exp / "cells" / "T1__A_cks" / "run-meta.json",
+                   {"task": "T1", "mode": "A_cks", "status": "done"})
+            _write(exp / "cells" / "T1__A_cks" / "state.json",
+                   {"current_state": "EVALUATION_PASS", "failure_log": []})
+            _write(exp / "cells" / "T1__B_code_only" / "run-meta.json",
+                   {"task": "T1", "mode": "B_code_only", "status": "done"})
+            _write(exp / "cells" / "T1__B_code_only" / "state.json", {
+                "current_state": "EVALUATION_PASS",
+                "failure_log": [
+                    {"state": "EVALUATION",
+                     "actual_outcome": {"summary": "unit test FAIL: assertion"}},
+                    {"state": "EVALUATION",
+                     "actual_outcome": {"summary": "chainbench basic/consensus regression"}},
+                    {"state": "PLANNING",   # non-eval entries must not count
+                     "actual_outcome": {"summary": "irrelevant"}},
+                ],
+            })
+            _write(exp / "state.json", {"experiment": "cyc-exp", "cells": [
+                {"task": "T1", "mode": "A_cks", "workspace": "cells/T1__A_cks", "status": "done"},
+                {"task": "T1", "mode": "B_code_only", "workspace": "cells/T1__B_code_only", "status": "done"},
+            ]})
+            by_mode = {r.mode: r for r in collect_experiment(exp)}
+            self.assertEqual(by_mode["A_cks"].bug_cycles, 0)
+            self.assertEqual(by_mode["A_cks"].side_effect_failures, 0)
+            self.assertEqual(by_mode["B_code_only"].bug_cycles, 2)  # only EVALUATION entries
+            self.assertEqual(by_mode["B_code_only"].side_effect_failures, 1)  # chainbench one
+            roll = aggregate(collect_experiment(exp))
+            self.assertEqual(roll["B_code_only"]["bug_cycles_sum"], 2)
+            self.assertEqual(roll["B_code_only"]["side_effect_failures"], 1)
+            md = to_markdown(build_report(collect_experiment(exp)))
+            self.assertIn("bug_cycles", md)
+            self.assertIn("side_fx", md)
+
     def test_cli_writes_report(self):
         with tempfile.TemporaryDirectory() as d:
             exp = make_experiment(Path(d))

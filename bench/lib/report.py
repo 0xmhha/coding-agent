@@ -26,13 +26,16 @@ def aggregate(results: list[RunResult]) -> dict:
             r.mode,
             {"mode": r.mode, "cells": 0, "evaluated": 0, "correct": 0,
              "tokens_sum": 0, "cost_sum": 0.0, "latency_sum": 0.0, "latency_n": 0,
-             "safety_flags": 0, "cost_status": set()},
+             "safety_flags": 0, "bug_cycles_sum": 0, "side_effect_sum": 0,
+             "cost_status": set()},
         )
         m["cells"] += 1
         m["tokens_sum"] += r.usage.total()
         m["cost_sum"] += r.cost_usd
         m["cost_status"].add(r.cost_status)
         m["safety_flags"] += len(r.safety_flags)
+        m["bug_cycles_sum"] += r.bug_cycles
+        m["side_effect_sum"] += r.side_effect_failures
         if r.correct is not None:
             m["evaluated"] += 1
             if r.correct:
@@ -56,7 +59,11 @@ def aggregate(results: list[RunResult]) -> dict:
             "correct": m["correct"],
             "evaluated": m["evaluated"],
             "correct_rate": round(m["correct"] / m["evaluated"], 4) if m["evaluated"] else None,
+            "bug_cycles_sum": m["bug_cycles_sum"],
+            "avg_bug_cycles": round(m["bug_cycles_sum"] / cells, 2),
+            "side_effect_failures": m["side_effect_sum"],
             "avg_tokens": round(m["tokens_sum"] / cells, 1),
+            "total_tokens": m["tokens_sum"],
             "avg_cost_usd": round(m["cost_sum"] / cells, 6),
             "avg_latency_s": round(m["latency_sum"] / m["latency_n"], 2) if m["latency_n"] else None,
             "safety_flags": m["safety_flags"],
@@ -72,6 +79,8 @@ def build_report(results: list[RunResult], experiment: str = "", generated_at: s
     for r in results:
         tasks.setdefault(r.task, {})[r.mode] = {
             "correct": r.correct,
+            "bug_cycles": r.bug_cycles,
+            "side_effect_failures": r.side_effect_failures,
             "tokens": r.usage.total(),
             "cost_usd": r.cost_usd,
             "latency_s": r.latency_s,
@@ -102,13 +111,18 @@ def to_markdown(report: dict) -> str:
     lines.append("")
     lines.append("## Mode rollup")
     lines.append("")
-    lines.append("| mode | cells | correct | avg_tokens | avg_cost($) | avg_latency(s) | safety_flags | cost |")
-    lines.append("|------|-------|---------|------------|-------------|----------------|--------------|------|")
+    lines.append("> 핵심 비교축은 **correct(최종정확성)** · **bug_cycles(총비용 동인)** · "
+                 "**side_fx(회귀-클래스 실패, 낮을수록 좋음)** · **total_tokens(Σ across cycles)**. "
+                 "단발 토큰이 아니라 '옳은 수정까지의 총비용'을 본다(§2 방법론).")
+    lines.append("")
+    lines.append("| mode | cells | correct | bug_cycles(Σ/avg) | side_fx | total_tokens | avg_cost($) | avg_latency(s) | safety | cost |")
+    lines.append("|------|-------|---------|-------------------|---------|--------------|-------------|----------------|--------|------|")
     for mode in order:
         m = modes[mode]
         correct = f"{m['correct']}/{m['evaluated']}" if m["evaluated"] else "—"
         lines.append(
-            f"| {mode} | {m['cells']} | {correct} | {m['avg_tokens']} | "
+            f"| {mode} | {m['cells']} | {correct} | {m['bug_cycles_sum']}/{m['avg_bug_cycles']} | "
+            f"{m['side_effect_failures']} | {m['total_tokens']} | "
             f"{m['avg_cost_usd']} | {_fmt(m['avg_latency_s'])} | {m['safety_flags']} | {m['cost_status']} |"
         )
     lines.append("")
@@ -116,7 +130,7 @@ def to_markdown(report: dict) -> str:
     # Per-task A/B/C correctness + tokens + cost.
     tasks = report.get("tasks", {})
     if tasks:
-        lines.append("## Per-task (correct · tokens · $)")
+        lines.append("## Per-task (correct · cycles · side_fx · tokens · $)")
         lines.append("")
         header = "| task | " + " | ".join(order) + " |"
         sep = "|------|" + "|".join(["------"] * len(order)) + "|"
@@ -131,7 +145,8 @@ def to_markdown(report: dict) -> str:
                     row.append("—")
                     continue
                 mark = "✓" if c["correct"] else ("✗" if c["correct"] is False else "?")
-                row.append(f"{mark} · {c['tokens']} · ${c['cost_usd']}")
+                row.append(f"{mark} · {c['bug_cycles']}cyc · {c['side_effect_failures']}sfx · "
+                           f"{c['tokens']}tok · ${c['cost_usd']}")
             lines.append("| " + " | ".join(row) + " |")
         lines.append("")
 
@@ -146,12 +161,14 @@ def to_csv(results: list[RunResult]) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["task", "mode", "status", "pipeline_state", "correct",
+                "bug_cycles", "side_effect_failures",
                 "tokens", "cost_usd", "cost_status", "usage_source",
                 "latency_s", "safety_flags"])
     for r in results:
         w.writerow([
             r.task, r.mode, r.status, r.pipeline_state,
             "" if r.correct is None else int(r.correct),
+            r.bug_cycles, r.side_effect_failures,
             r.usage.total(), r.cost_usd, r.cost_status, r.usage_source,
             "" if r.latency_s is None else r.latency_s,
             ";".join(r.safety_flags),
