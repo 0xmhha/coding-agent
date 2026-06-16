@@ -1,10 +1,11 @@
 {
   "name": "coding-agent",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "go-stablenet Jira-driven automated development pipeline",
   "author": {
     "name": "mhha"
   },
   "license": "Apache-2.0",
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.json"
 }

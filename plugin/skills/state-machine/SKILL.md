@@ -230,7 +230,8 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 
    **EVALUATION → ANALYSIS** (fail cycle):
    - state.states.EVALUATION.results 중 하나 이상이 "FAIL"
-   - 현재까지의 cycle 카운트 (failure_log에서 transitioned_to=="ANALYSIS"인 항목 수) < config.max_eval_cycles
+   - 현재까지의 eval-cycle 카운트 (failure_log에서 **state=="EVALUATION"** 인 항목 수) < config.max_eval_cycles
+     - ⚠️ orchestrator §5 · bench-orchestration §4.4 와 **동일 술어**로 통일(예전 `transitioned_to=="ANALYSIS"`는 `/review` 재진입까지 세어 불일치). `/review` 사이클 엔트리는 `state==current_state`(예: COMPLETION)라 이 카운트에서 자연히 제외된다.
 
    **\* → BLOCKED**:
    - max_eval_cycles 초과 OR max_design_revisions 초과

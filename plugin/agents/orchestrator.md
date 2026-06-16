@@ -125,11 +125,10 @@ it as a stuck pipeline and report.
 | DESIGN            | Dispatch Planner agent (DESIGN section, iterates     |
 |                   | up to states.DESIGN.revision == max).                |
 +-------------------+------------------------------------------------------+
-| READY_FOR_IMPL    | Verify plan.md + design-v{N}.md.                     |
-|                   | Dispatch Implementer agent.                          |
-+-------------------+------------------------------------------------------+
-| IMPLEMENTATION    | (Likely a resume.) Dispatch Implementer again so it  |
-|                   | picks up at the first non-completed step.            |
+| IMPLEMENTATION    | Verify plan.md + design-v{N}.md exist, then dispatch |
+|                   | Implementer (resumes at the first non-completed      |
+|                   | step). Planner transitions DESIGN→IMPLEMENTATION     |
+|                   | directly; there is no separate READY_FOR_IMPL state. |
 +-------------------+------------------------------------------------------+
 | EVALUATION        | Dispatch Evaluator agent.                            |
 +-------------------+------------------------------------------------------+
