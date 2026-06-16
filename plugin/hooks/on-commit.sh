@@ -9,8 +9,14 @@ set -u
 
 payload="$(cat 2>/dev/null || true)"
 
-# Skip non-git-commit bash invocations.
-if ! printf '%s' "${payload}" | grep -q 'git commit'; then
+# Inspect only the actual command (PostToolUse Bash payload: .tool_input.command),
+# NOT the whole payload — otherwise any tool whose output merely contains the text
+# "git commit" (git log, echo, a help string, this comment) would trip the hook.
+# Match a real `git [-C <path>] commit` invocation at the start of the command or
+# after a shell separator. (Requires jq, like the sibling on-agent-complete hook;
+# if jq is absent the command is empty and we exit without logging.)
+command="$(printf '%s' "${payload}" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
+if ! printf '%s' "${command}" | grep -Eq '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?commit([[:space:]]|$)'; then
   exit 0
 fi
 

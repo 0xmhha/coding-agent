@@ -48,7 +48,8 @@ on *outgoing* data (LLM → GitHub, LLM → Jira).
 ```
 candidates = [
   os.environ.get("PATTERNS_PATH"),
-  "<repo_root>/shared/patterns.json",
+  "<plugin_root>/patterns.json",          # bundled copy — present in marketplace installs (shared/ is dev-only)
+  "<repo_root>/shared/patterns.json",     # dev source-tree copy
   "<plugin_root>/../shared/patterns.json",
 ]
 patterns_path = first existing candidate
