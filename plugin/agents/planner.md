@@ -27,6 +27,7 @@ skills:
   - template-parse
   - stablenet-context
   - stablenet-invariants
+  - root-cause-lifecycle
 ---
 
 # Planner Agent
@@ -518,6 +519,11 @@ graph to enumerate write-sites exhaustively:
 Carry the write-site table and the invariant/test names into the design doc so
 the Implementer mirrors every site and the Evaluator can verify the invariant.
 
+> This is the **design-time** form of the same principle the `root-cause-lifecycle`
+> skill applies at **diagnosis time** (§6 bug cycle / `/diagnose`): a value plus every
+> copy/cache of it, maintained/invalidated at every edge. Forward here (source → keep
+> all consumers consistent); backward there (symptom → which copy went stale).
+
 ### 5.3 Self-review loop
 
 After drafting all steps:
@@ -612,7 +618,14 @@ The Planner now has three sources:
 - git diff (current modifications)
 - CKS (original code structure)
 
-Use these to identify root cause. Produce:
+Use these to identify root cause. **Apply the `root-cause-lifecycle` skill** to
+derive it — do not jump straight to a guess. Pick the single value the failure is
+about, enumerate every copy/cache of it (CKS `find_callers`/`impact_analysis`),
+find which lifecycle edge is broken, **trace a stale value to its source (the first
+cache is usually the symptom, not the cause), and falsify competitors with the
+failure's distinguishing feature**. The "Root cause (hypothesis)" section below MUST
+name the broken edge (`file:line`) and the competing hypothesis you ruled out (why).
+Produce:
 
 `{workspace_dir}/plan-fix-{cycle_number}.md`:
 
