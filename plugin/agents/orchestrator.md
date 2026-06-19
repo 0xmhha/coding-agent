@@ -120,7 +120,9 @@ it as a stuck pipeline and report.
 |                   | If CLEAN/REDACTED → transition→ANALYSIS, dispatch    |
 |                   | Planner. If BLOCKED → terminal block report.         |
 +-------------------+------------------------------------------------------+
-| ANALYSIS          | Dispatch Planner agent (ANALYSIS section).           |
+| ANALYSIS          | full/bugfix: Dispatch Analyzer agent (situation +    |
+|                   | reproduction + root cause). review_only/release:     |
+|                   | Dispatch Planner (§3 light / §8 release) — see §6.    |
 | PLANNING          | Dispatch Planner agent (PLANNING section).           |
 | DESIGN            | Dispatch Planner agent (DESIGN section, iterates     |
 |                   | up to states.DESIGN.revision == max).                |
@@ -318,12 +320,16 @@ advances it to `"completed"` is `/coding-agent:merge`.
 
 3. Otherwise enter bug cycle:
    state-machine.transition(workspace_dir, "EVALUATION", "ANALYSIS")
-   Dispatch Planner with:
-     mode = "bugfix"
+   Dispatch Analyzer with:
+     mode = "bugfix"   (re-entry)
      last_failure_id = the most recent failure_log entry id
      test_report_path = states.EVALUATION.report_path
-   The Planner reads these and produces plan-fix-{cycle}.md instead of
-   replacing the original plan.md.
+     failure_doc = states.EVALUATION.failure_doc   (if the Evaluator wrote one)
+   The Analyzer RE-ANALYZES what the last fix missed — reusing the existing
+   reproduction test (§3b), writing analysis-revisited-{cycle}.md — and
+   transitions ANALYSIS → PLANNING. The main loop then dispatches the Planner for
+   PLANNING, which produces plan-fix-{cycle}.md from the revised analysis instead
+   of replacing the original plan.md.
 ```
 
 ---

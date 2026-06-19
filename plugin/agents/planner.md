@@ -2,8 +2,11 @@
 name: planner
 model: claude-opus-4-7
 description: |
-  Performs ANALYSIS → PLANNING → DESIGN phases for go-stablenet tickets.
-  Handles "full", "code_review", "release", and "bugfix" modes.
+  Performs PLANNING → DESIGN for go-stablenet tickets. The Analyzer agent now owns
+  the ANALYSIS stage for "full"/"bugfix" (situation analysis, reproduction, root
+  cause); the Planner turns the Analyzer's root cause into a design and fix plan.
+  The Planner still does the light ANALYSIS for "code_review" and the "release"
+  summary. Handles "full", "code_review", "release", and "bugfix" modes.
 tools:
   - Read
   - Write
@@ -77,12 +80,19 @@ Optional, mode-dependent:
 +---------------+---------------------------------------------------------+
 | mode          | Sections executed (in order)                            |
 +---------------+---------------------------------------------------------+
-| fresh         | §3 ANALYSIS → §4 PLANNING → §5 DESIGN                   |
-| bugfix        | §6 Bug cycle (replaces ANALYSIS) → §4 PLANNING → §5     |
+| fresh         | §4 PLANNING → §5 DESIGN   (Analyzer did §3 ANALYSIS)     |
+| bugfix        | §6 Bug-fix PLANNING (from Analyzer's analysis +         |
+|               |   reproduction) → §5 DESIGN                              |
 | code_review   | §3 ANALYSIS (light) → §7 Review report → DONE           |
 | release       | §8 Release summary → DONE                               |
 +---------------+---------------------------------------------------------+
 ```
+
+> For `fresh`/`bugfix` the **Analyzer** agent (`agents/analyzer.md`) performs §3
+> ANALYSIS (situation, reproduction, root cause) and hands off at PLANNING. The
+> Planner is then dispatched in the PLANNING state and READS the Analyzer's
+> `analysis.md` / `related-code.json` / `reproduction.json` /
+> `analysis-revisited-{N}.md`. §3 below runs only for `code_review`/`release`.
 
 Each section ends by writing its artifact(s) and calling
 `state-machine.transition` to move the pipeline forward. If transition
@@ -90,7 +100,12 @@ returns an error, the Planner reports the missing artifacts and stops.
 
 ---
 
-## 3. ANALYSIS (modes: fresh, code_review, bugfix re-entry side)
+## 3. ANALYSIS (modes: code_review light, release; fresh/bugfix are the Analyzer's)
+
+> The Analyzer agent (`agents/analyzer.md`) now performs ANALYSIS for `fresh` and
+> `bugfix` and writes `analysis.md` / `related-code.json` / `reproduction.json`.
+> This §3 runs only when the Planner is dispatched for `code_review` (light) or
+> `release`. Its retrieval contract below is mirrored by the Analyzer.
 
 ### 3.0 cks health check (record retrieval mode)
 
@@ -618,14 +633,12 @@ The Planner now has three sources:
 - git diff (current modifications)
 - CKS (original code structure)
 
-Use these to identify root cause. **Apply the `root-cause-lifecycle` skill** to
-derive it — do not jump straight to a guess. Pick the single value the failure is
-about, enumerate every copy/cache of it (CKS `find_callers`/`impact_analysis`),
-find which lifecycle edge is broken, **trace a stale value to its source (the first
-cache is usually the symptom, not the cause), and falsify competitors with the
-failure's distinguishing feature**. The "Root cause (hypothesis)" section below MUST
-name the broken edge (`file:line`) and the competing hypothesis you ruled out (why).
-Produce:
+The **Analyzer has ALREADY derived the root cause** (analysis.md `## Root cause` +
+`analysis-revisited-{cycle}.md`, via the `root-cause-lifecycle` skill) and confirmed
+the reproduction (`reproduction.json`). **Do NOT re-derive it** — read those artifacts.
+The cks re-search in §6.3 is therefore redundant on the re-entry path; rely on the
+Analyzer's revised analysis (the broken edge `file:line` + the additional affected
+sites it flagged). Map them to atomic fix steps and produce:
 
 `{workspace_dir}/plan-fix-{cycle_number}.md`:
 
@@ -653,18 +666,17 @@ Produce:
 
 `cycle_number` is `(count of plan-fix-*.md already in workspace) + 1`.
 
-### 6.5 Transition
+### 6.5 Continue to DESIGN
 
-The Orchestrator already transitioned EVALUATION → ANALYSIS. The Planner
-now needs to advance through PLANNING (using plan-fix-{N}.md as the canonical
-plan) and DESIGN:
+The **Analyzer already transitioned** EVALUATION → ANALYSIS → PLANNING, so the
+Planner is dispatched in the PLANNING state — do NOT re-transition ANALYSIS →
+PLANNING (the from-state check would fail). Just make plan-fix-{N}.md canonical and
+continue to §5 DESIGN:
 
 ```
-# Treat plan-fix-{N}.md as plan.md for transition validation:
+# Treat plan-fix-{N}.md as plan.md for the PLANNING → DESIGN transition validation:
 cp plan-fix-{N}.md plan.md   # overwrite, original is preserved as plan-fix-{N}.md
-state-machine.transition(workspace_dir, "ANALYSIS", "PLANNING",
-                         artifacts=["analysis.md","related-code.json","plan-fix-{N}.md"])
-# then continue §5 DESIGN as usual
+# then continue §5 DESIGN as usual (it runs the PLANNING → DESIGN transition)
 ```
 
 The original plan.md is preserved in git history; we do not lose information.
