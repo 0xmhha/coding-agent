@@ -11,6 +11,7 @@ tools:
   - Bash
 skills:
   - state-machine
+  - reproduce-first
 ---
 
 # Implementer Agent
@@ -125,6 +126,25 @@ if current_branch in {"main", "master"}:
   abort: "Implementer refuses to commit to main/master."
 ```
 
+### 3.4 Bugfix: commit the reproduction test FIRST (reproduce-first CARRY)
+
+If `{workspace_dir}/reproduction.json` exists (the Analyzer's bugfix oracle), the
+reproduction test file is already in the working tree (untracked, authored by the
+Analyzer). Commit it as the FIRST commit on the branch — before any fix — so the
+branch records a real RED → GREEN:
+
+```
+read reproduction.json → { test_file, test_name, run_cmd }
+bash: git add {test_file}
+bash: git commit -m "{ticket_id}: add reproduction test (red)"
+states.IMPLEMENTATION.reproduction_commit = bash: git rev-parse HEAD
+```
+
+INVARIANT (reproduce-first): the reproduction test is the **acceptance oracle**.
+Do NOT edit, weaken, or delete `{test_file}` in any step — you make it pass by
+fixing *production code*, never by changing the test. (Editing the test to go green
+is a false GREEN and the Evaluator will reject it.)
+
 ---
 
 ## 4. Per-step loop
@@ -160,6 +180,10 @@ for each target_file in step.target_files:
 
 Constraints:
 
+- **reproduce-first**: never edit the reproduction test (`reproduction.json.test_file`)
+  — it is the acceptance oracle. Make it pass by fixing *production code*. For the
+  fix's OWN unit tests, work test-first: write the failing unit test, then the code,
+  then confirm it passes (red → green).
 - Use `Edit` for existing files. Use `Write` only for new files or full
   rewrites called out in the design.
 - Follow `~/.claude/rules/coding-style.md`:
@@ -291,6 +315,22 @@ verify plan_progress: every step.status == "completed"
                       `git status --porcelain` returns empty
 if any of the above fail: report and stop. Do NOT transition.
 ```
+
+### 6.0 Bugfix: confirm the reproduction test passes locally (reproduce-first GREEN pre-check)
+
+If `reproduction.json` exists, re-run the reproduction test on the finished branch
+before handing off — this catches an incomplete fix without spending an evaluation cycle:
+
+```
+bash: cd {repo_root} && {reproduction.json.run_cmd}
+- PASS → the bug no longer reproduces. Proceed to §6.1.
+- FAIL → the fix is incomplete. Do NOT transition. Keep fixing *production code*
+  (never the test) until it passes; if you cannot, report to the Orchestrator with the
+  failing output so the bug cycle re-enters the Analyzer.
+```
+
+The Evaluator runs the authoritative GREEN gate (re-run at HEAD + RED re-confirm at the
+reproduction-test commit); this local pre-check just avoids an obvious wasted cycle.
 
 ### 6.1 Build artifact (binary handoff to the Evaluator)
 

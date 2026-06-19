@@ -20,6 +20,7 @@ tools:
 skills:
   - state-machine
   - stablenet-invariants
+  - reproduce-first
 ---
 
 # Evaluator Agent
@@ -201,6 +202,40 @@ security + chainbench yet leaked its fee-payer aggregate on the pool-truncation
 path; only a recompute-from-source invariant test caught it. This gate makes
 that invariant mandatory whenever derived state appears.
 
+### 4.7 Reproduction GREEN gate (bugfix — reproduce-first)
+
+If `{workspace_dir}/reproduction.json` exists, the reproduction test is the
+**acceptance oracle** for this fix. Run the authoritative red→green check:
+
+```
+read reproduction.json → { run_cmd, test_name, test_file }
+repro_commit = states.IMPLEMENTATION.reproduction_commit
+
+# GREEN at HEAD — the bug must no longer reproduce:
+bash: cd {go_stablenet_root} && {run_cmd}            → green_at_head = (exit == 0)
+
+# RED re-confirm — the same test must FAIL at the reproduction commit (test present,
+# fix absent), proving a real red→green on the branch:
+bash: git -C {go_stablenet_root} checkout {repro_commit}
+bash: cd {go_stablenet_root} && {run_cmd}            → red_at_repro = (exit != 0)
+bash: git -C {go_stablenet_root} checkout {branch}   # restore HEAD
+
+# The implementer must NOT have edited the oracle:
+bash: git -C {go_stablenet_root} diff {repro_commit} HEAD -- {test_file}   → must be empty
+```
+
+- `green_at_head == false` → the fix does NOT resolve the symptom. This is the
+  PRIMARY bugfix failure: set the unit_test result to FAIL, summary
+  "reproduction still RED — bug not fixed", and route the bug cycle.
+- non-empty `{test_file}` diff → **false GREEN** (the test was changed to pass) → FAIL,
+  summary "reproduction test was modified".
+- `red_at_repro == false` → the test passed even before the fix (weak oracle, did not
+  prove the bug) → WARN (not a hard FAIL).
+
+Record into reproduction.json: `green_confirmed`, `green_at_head`, `red_at_parent`
+(= red_at_repro). This gate is the bugfix's correctness spine — a green unit suite
+without it does not prove the reported bug is fixed.
+
 ---
 
 ## 5. Stage 2 — Lint & Format
@@ -320,12 +355,15 @@ list tools available to this Agent. Compare to the expected names:
 missing = expected − available
 
 if missing is non-empty:
-  result.status = "FAIL"
-  result.summary = "ChainBench MCP interface mismatch: missing {missing}"
-  result.details = "These names are the C1 contract. If the chainbench MCP is
-                    not registered or its names drift, reconcile against the
-                    SSoT at coding-agent/contract/agent-mcp.schema.json (provider
-                    'chainbench') before re-running."
+  # Conditional e2e: run ChainBench ONLY when it is ready (graceful degradation).
+  # Do NOT fail the whole evaluation on chainbench absence — the reproduction GREEN
+  # gate (§4.7) + unit/lint/security still gate correctness. Mark e2e as not run; the
+  # overall verdict is computed WITHOUT chainbench and reported as "verified except e2e".
+  result.status = "SKIPPED"
+  result.summary = "ChainBench e2e skipped — MCP unavailable (missing {missing})"
+  result.details = "To enable e2e, register the chainbench MCP and reconcile names
+                    against the SSoT at coding-agent/contract/agent-mcp.schema.json
+                    (provider 'chainbench'). SKIPPED does not count as a stage failure."
   skip §7.1–§7.6
 ```
 
@@ -538,6 +576,11 @@ Also keep cycle-scoped copies:
 ```
 cycle_n = count of files matching test-report-*.md in workspace + 1
 copy test-report.md → test-report-{cycle_n}.md
+# On FAIL, this cycle-scoped report (with its §Failure Analysis section) IS the
+# failure doc the Orchestrator hands to the Analyzer on re-entry (orchestrator §5):
+if overall == FAIL:
+  states.EVALUATION.failure_doc = "test-report-{cycle_n}.md"
+  write state.json
 ```
 
 ---
