@@ -23,7 +23,10 @@
 - (권장) **Task #5 full bugfix 라이브 런** — `/coding-agent:analyze` 또는 bench 매니페스트로 PR-77을 end-to-end(analyzer→planner→implementer→evaluator) 자율 수정시키고 expert-fix와 비교.
 - 또는 **Task #3 추가 일반화** — STABLE-0009/0007 diagnose 1~2건 더.
 
-새 머신이라면 먼저 **§5(인덱스 재빌드) → §6(MCP 기동)** 을 수행해 cks가 살아있어야 한다.
+**완전 새 머신**이라면 먼저 **§4A(부트스트랩: 레포 클론·설정 생성·ollama·플러그인)** →
+**§5(인덱스 재빌드)** → **§6(MCP 기동)** 순으로 환경을 갖춰야 한다. (이미 이 작업을 돌려본
+머신이라면 §5부터.) `knowledge-data/`는 **git 버전관리 대상이 아니라** 설정/인덱스가 레포로
+전달되지 않으므로, 설정 전문을 §4A에 embed해 두었다.
 
 ---
 
@@ -125,6 +128,85 @@ ckv: { path: .../knowledge-data/pr-77/ckv, binary: .../code-knowledge-vector/bin
 - **절대경로**가 settings.json·cks-pr77.yaml·gstable-files는 상대경로에 박혀있다 — 새 머신 경로로 치환.
 - **ollama + bge-m3** 필요: `ollama` 데몬 + `bge-m3:latest` 모델 (`curl -s http://127.0.0.1:11434/api/tags`로 확인).
 - **go 툴체인**: 이 머신은 gvm(`~/.gvm/gos/go1.25.11`), 비대화 셸엔 PATH 없음 → 빌드/`go list`는 **`zsh -lic '...'`**(로그인 셸)로 실행. 사설 모듈: `export GOPRIVATE="github.com/0xmhha/*"`.
+
+---
+
+## 4A. 부트스트랩 — 완전 새 머신에서 0부터
+
+> `knowledge-data/`(설정·인덱스 DB)와 `test/pr-77`(대상 코드)은 **버전관리되지 않거나
+> 별도 레포**라 coding-agent 클론만으론 안 온다. 아래로 환경을 갖춘 뒤 §5(재빌드)로 간다.
+> `WG`=워크스페이스 루트(예: `~/Work/github`).
+
+### 4A.1 레포 클론 (모두 `0xmhha`/`stable-net` 오너)
+```bash
+cd $WG
+git clone https://github.com/0xmhha/coding-agent.git
+git clone https://github.com/0xmhha/code-knowledge-system.git
+git clone https://github.com/0xmhha/code-knowledge-graph.git
+git clone https://github.com/0xmhha/code-knowledge-vector.git
+git clone https://github.com/0xmhha/chainbench.git           # evaluator용(선택, #5에서 필요)
+# 대상 코드 = go-stablenet, PR-77 부모(버그)로 체크아웃:
+git clone https://github.com/stable-net/go-stablenet.git test/pr-77
+git -C test/pr-77 checkout 0bf2f4d1bfeb6605006d556957ef8c045d8f8ed8   # tag v1.0.0-25-g0bf2f4d1b (버그 부모)
+```
+브랜치 핀(§3): cks `main`, ckg `main`, ckv `feat/ckv-invariants-pkg`. 클론 후 §3 표와 대조.
+
+### 4A.2 go 툴체인 + 사설 모듈
+- go 1.25+ (이 머신은 gvm `~/.gvm/gos/go1.25.11`). 비대화 셸 PATH 없으면 `zsh -lic`로 실행.
+- `export GOPRIVATE="github.com/0xmhha/*"` (cks가 ckg/ckv 사설 모듈 당겨옴; git이 0xmhha에 인증돼 있어야).
+
+### 4A.3 ollama + bge-m3 (ckv 임베딩에 필수)
+```bash
+# ollama 설치(brew install ollama 등) 후 데몬 기동, 모델 받기:
+ollama pull bge-m3
+curl -s http://127.0.0.1:11434/api/tags   # bge-m3:latest 보이면 OK
+```
+
+### 4A.4 `knowledge-data/pr-77/` 디렉터리 + 설정 파일 생성 (VCS 안 됨 → 수기 생성)
+```bash
+mkdir -p $WG/knowledge-data/pr-77/logs/{footprint,audit}
+```
+`$WG/knowledge-data/pr-77/cks-pr77.yaml` (경로의 `/Users/.../Work/github`만 `$WG`로 치환):
+```yaml
+version: 1
+backends:
+  ckg:
+    path: "<WG>/knowledge-data/pr-77/ckg/graph.db"
+    source_root: "<WG>/test/pr-77"
+    binary_path: "<WG>/code-knowledge-graph/bin/ckg"
+    timeout_ms: 5000
+  ckv:
+    path: "<WG>/knowledge-data/pr-77/ckv"
+    timeout_ms: 3000
+    embed_model: "bge-m3"
+    ollama_url: "http://127.0.0.1:11434"
+    binary_path: "<WG>/code-knowledge-vector/bin/ckv"
+listen: { http_addr: "127.0.0.1:8080", mcp_stdio: true }
+logging:
+  level: "info"
+  mode: "prod"
+  footprint_dir: "<WG>/knowledge-data/pr-77/logs/footprint"
+  audit_dir: "<WG>/knowledge-data/pr-77/logs/audit"
+sanitize:
+  rules_path: "<WG>/code-knowledge-system/policies/sanitization_rules.yaml"
+  default_action: "drop"
+  fail_closed_on_unknown_rule: true
+```
+> 대안: `code-knowledge-system/scripts/gen-cks-config.sh`는 현재 체크아웃 경로에서 config+env를
+> 자동 생성(단 이름이 `cks-stablenet.yaml`; pr-77용은 위를 직접 쓰는 게 명확).
+
+### 4A.5 Claude Code에 환경변수 + 플러그인 등록
+`~/.claude/settings.json`의 `env`에:
+```json
+"CKS_MCP_BIN": "<WG>/code-knowledge-system/bin/cks-mcp",
+"CKS_CONFIG":  "<WG>/knowledge-data/pr-77/cks-pr77.yaml"
+```
+(참고용 `cks-pr77.env`: 위 둘 + `CKV_OLLAMA_ENDPOINT=http://127.0.0.1:11434`.)
+플러그인: `coding-agent/.claude-plugin/marketplace.json`로 marketplace 등록 후 `coding-agent`
+플러그인 설치 → `.mcp.json`의 `cks`/`chainbench` 서버가 위 env로 stdio 기동.
+
+### 4A.6 이후
+→ §5(바이너리 빌드 + 인덱스 재빌드) → §6(`/mcp` 기동) → §9(재검증).
 
 ---
 
@@ -259,8 +341,10 @@ cks는 두 가지로 뜰 수 있다:
 ## 9. 빠른 재검증 시퀀스 (이어받자마자)
 
 ```
+0) (완전 새 머신) §4A 부트스트랩: 레포 클론 + test/pr-77 checkout 0bf2f4d1b
+   + ollama/bge-m3 + cks-pr77.yaml + ~/.claude/settings.json + 플러그인 설치
 1) 각 레포 git fetch && status (origin 최신 확인; §3 표와 대조)
-2) (새 머신) §5 인덱스 재빌드 + §5.0 바이너리 빌드
+2) (새 머신) §5.0 바이너리 빌드 + §5 인덱스 재빌드
 3) §6 stale 정리 → /mcp reconnect
 4) cks_ops_health  → schema 1.21 / ckv reachable / data_path 확인
 5) B 스모크: find_callers("gasprice.AnzeonTipEnv.GetAnzeonTipCap", exclude_tests=true)
