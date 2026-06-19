@@ -574,7 +574,7 @@ is the root cause, plus a one-paragraph recommendation for the bug cycle.)
 Also keep cycle-scoped copies:
 
 ```
-cycle_n = count of files matching test-report-*.md in workspace + 1
+cycle_n = states.EVALUATION.cycle   # single-source bug-cycle counter (do NOT count files)
 copy test-report.md → test-report-{cycle_n}.md
 # On FAIL, this cycle-scoped report (with its §Failure Analysis section) IS the
 # failure doc the Orchestrator hands to the Analyzer on re-entry (orchestrator §5):

@@ -320,6 +320,8 @@ advances it to `"completed"` is `/coding-agent:merge`.
 
 3. Otherwise enter bug cycle:
    state-machine.transition(workspace_dir, "EVALUATION", "ANALYSIS")
+   states.EVALUATION.cycle += 1   # single-source bug-cycle counter (state-machine data model)
+   write state.json
    Dispatch Analyzer with:
      mode = "bugfix"   (re-entry)
      last_failure_id = the most recent failure_log entry id

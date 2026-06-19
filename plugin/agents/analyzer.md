@@ -272,7 +272,8 @@ existing one (read `reproduction.json`).
    (file:line), and the additional affected sites the Planner must cover this time. Append a
    "Cycle {N} revision" note to analysis.md.
 ```
-`cycle` = (count of `analysis-revisited-*.md` already in workspace) + 1.
+`cycle` = `states.EVALUATION.cycle` (the single-source bug-cycle counter the Orchestrator
+incremented on re-entry; do NOT count files).
 
 ---
 

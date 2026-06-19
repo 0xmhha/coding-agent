@@ -28,11 +28,11 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 
   "states": {
     "TICKET_INTAKE": { "status": "pending", "started_at": null, "completed_at": null, "artifacts": [], "sensitive_check": null },
-    "ANALYSIS":      { "status": "pending", "started_at": null, "completed_at": null, "artifacts": [] },
+    "ANALYSIS":      { "status": "pending", "started_at": null, "completed_at": null, "artifacts": [], "reproduction_confirmed": false },
     "PLANNING":      { "status": "pending", "started_at": null, "completed_at": null, "artifacts": [] },
     "DESIGN":        { "status": "pending", "started_at": null, "completed_at": null, "artifacts": [], "revision": 0 },
-    "IMPLEMENTATION":{ "status": "pending", "started_at": null, "completed_at": null, "branch": null, "plan_progress": null, "commits": [] },
-    "EVALUATION":    { "status": "pending", "started_at": null, "completed_at": null, "results": { "unit_test": null, "lint": null, "security": null, "chainbench": null }, "report_path": null },
+    "IMPLEMENTATION":{ "status": "pending", "started_at": null, "completed_at": null, "branch": null, "plan_progress": null, "commits": [], "reproduction_commit": null },
+    "EVALUATION":    { "status": "pending", "started_at": null, "completed_at": null, "results": { "unit_test": null, "lint": null, "security": null, "chainbench": null }, "report_path": null, "cycle": 1, "failure_doc": null },
     "COMPLETION":    { "status": "pending", "pr_url": null, "merged_at": null, "merge_commit": null }
   },
 
@@ -52,6 +52,19 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
   }
 }
 ```
+
+### reproduce-first / bug-cycle 필드 (item 10)
+
+- `states.ANALYSIS.reproduction_confirmed` (bool) — analyzer가 재현 테스트를 RED로 확인하면 true.
+- `states.IMPLEMENTATION.reproduction_commit` (sha) — implementer가 재현 테스트를 올린 첫 커밋(red).
+- `states.EVALUATION.cycle` (int, 1부터) — **bug-cycle 카운트의 단일 소스.** orchestrator §5가
+  EVALUATION_FAIL→bug-cycle 진입 시 +1 한다. analyzer(`analysis-revisited-{N}`)·planner(`plan-fix-{N}`)·
+  evaluator(`test-report-{N}`)는 파일 개수를 세지 말고 **이 값을 {N}으로 읽는다.** failure_log의
+  state=="EVALUATION" 개수와 일치해야 한다(교차검증).
+- `states.EVALUATION.failure_doc` (path) — FAIL 시 그 사이클의 `test-report-{N}.md`. orchestrator가
+  analyzer 재진입에 전달.
+- 실패유형 `reproduction_unobtainable` — analyzer가 증상을 재현하는 테스트를 만들지 못할 때. ANALYSIS
+  단계 실패 → autonomy 1회 escalate 후 **BLOCKED**(정답 오라클이 없으면 red→green을 닫을 수 없으므로 진행 불가).
 
 ### plan_progress 스키마 (IMPLEMENTATION 상태)
 
@@ -101,7 +114,7 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
   },
   "expected_outcome": "TestFinalize PASS",
   "actual_outcome": {
-    "type": "test_failure",
+    "type": "test_failure",   // test_failure | build_error | evaluation_failure | security_fail | reproduction_unobtainable | ...
     "summary": "panic: nil pointer",
     "details": "...",
     "exit_code": 2,
@@ -230,8 +243,10 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 
    **EVALUATION → ANALYSIS** (fail cycle):
    - state.states.EVALUATION.results 중 하나 이상이 "FAIL"
-   - 현재까지의 eval-cycle 카운트 (failure_log에서 **state=="EVALUATION"** 인 항목 수) < config.max_eval_cycles
-     - ⚠️ orchestrator §5 · bench-orchestration §4.4 와 **동일 술어**로 통일(예전 `transitioned_to=="ANALYSIS"`는 `/review` 재진입까지 세어 불일치). `/review` 사이클 엔트리는 `state==current_state`(예: COMPLETION)라 이 카운트에서 자연히 제외된다.
+   - **단일 소스**: `states.EVALUATION.cycle` < config.max_eval_cycles. orchestrator §5가 bug-cycle
+     진입 시 이 값을 +1 한다(이 가드 통과 직후). 교차검증으로 `failure_log`의 state=="EVALUATION"
+     항목 수와 일치해야 한다. (예전 `transitioned_to=="ANALYSIS"` 술어는 `/review` 재진입까지 세어
+     불일치 — `/review` 엔트리는 `state==current_state`(예: COMPLETION)라 양쪽 카운트에서 자연히 제외.)
 
    **\* → BLOCKED**:
    - max_eval_cycles 초과 OR max_design_revisions 초과

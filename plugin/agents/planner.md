@@ -664,7 +664,8 @@ sites it flagged). Map them to atomic fix steps and produce:
 - -race scope, if concurrency-related
 ```
 
-`cycle_number` is `(count of plan-fix-*.md already in workspace) + 1`.
+`cycle_number` is `states.EVALUATION.cycle` (the single-source bug-cycle counter; do NOT
+count files — state-machine data model).
 
 ### 6.5 Continue to DESIGN
 
