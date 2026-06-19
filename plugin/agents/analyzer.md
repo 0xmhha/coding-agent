@@ -32,6 +32,7 @@ skills:
   - stablenet-context
   - stablenet-invariants
   - root-cause-lifecycle
+  - reproduce-first
 ---
 
 # Analyzer Agent
@@ -247,8 +248,8 @@ Set the `reproduction_confirmed` marker in state (`states.ANALYSIS.reproduction_
 
 > The reproduction test is left in the working tree (uncommitted). The Implementer commits
 > it FIRST (the red/test commit) before the fix; the Evaluator re-runs it to confirm GREEN.
-> The Implementer must NOT modify it — it is the oracle. (This RED gate + the Evaluator's
-> GREEN gate are the two halves of the planned shared `reproduce-first` discipline.)
+> The Implementer must NOT modify it — it is the oracle. This RED gate + the Implementer's
+> CARRY + the Evaluator's GREEN gate are defined once in the **`reproduce-first` skill**.
 
 ---
 
