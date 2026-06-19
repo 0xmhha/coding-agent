@@ -33,6 +33,7 @@ skills:
   - stablenet-invariants
   - root-cause-lifecycle
   - reproduce-first
+  - investigative-probe
 ---
 
 # Analyzer Agent
@@ -198,16 +199,23 @@ include `## Root cause` (§4) and `## Reproduction` (§5). Minimum length > 200 
 ## 4. ROOT CAUSE (bugfix) — apply the root-cause-lifecycle skill
 
 Do NOT jump to a guess. **Apply the `root-cause-lifecycle` skill** to derive the cause:
-pick the single value the symptom is about → enumerate EVERY copy/cache of it (cks
-`find_callers`/`impact_analysis`) → find which lifecycle edge (produce/store/consume) is
-broken → **trace a stale value to its source (the first cache is usually the symptom, not
-the cause)** → **falsify competing hypotheses with the symptom's distinguishing feature** →
-check that every cache has an invalidator.
+keep candidate value(s) → enumerate EVERY copy/cache (cks `find_callers`/`impact_analysis`)
+→ failure-mode per edge → **for "after trigger X, symptom persists then clears" symptoms,
+trace the event SEQUENCE after X and find the event that *clears* it (it points at the
+missing update)** → **trace a stale value to its source (the first cache is usually the
+symptom, not the cause)** → falsify with the symptom's distinguishing feature → check every
+cache has an invalidator.
+
+★ **If competing candidates remain or static falsification is shaky, do NOT guess.** Use the
+`investigative-probe` skill: write a throwaway instrumented test that drives the symptom
+scenario and observes the suspect value at each candidate site, run it, and let the runtime
+observation pick the real cause (then revert the probe). Static code alone often cannot tell
+which of two plausible candidates actually fires — observe, don't assume.
 
 Write the `## Root cause` section of analysis.md. It MUST name:
-- the single value + its lifecycle (producer / every copy / consumers),
-- the **broken edge with `file:line`**,
-- the competing hypothesis you ruled out (one line on why),
+- the value(s) + lifecycle (producer / every copy / consumers),
+- the **broken edge with `file:line`** (runtime-confirmed where a probe was used),
+- the competing hypothesis you ruled out (one line on why; cite the probe observation if any),
 - confidence + which *distinguishing observation* would raise it.
 
 > This is the **diagnosis-time** mirror of the Planner's §5.2b write-site completeness

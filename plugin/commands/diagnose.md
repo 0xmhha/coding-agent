@@ -67,10 +67,12 @@ argument-hint: "\"<증상/문제 설명>\"  [--path <파일/디렉토리>]"
          "  4. Confidence — high/medium/low + what would raise it.\n"
          "  5. Suggested direction — a one-paragraph fix approach (NOT a full plan).\n"
          "\n"
-         "STRICT (diagnose mode): do ONLY situation analysis + root cause. Do NOT author\n"
-         "or run the reproduction test, do NOT write plan.md or any design, do NOT edit\n"
-         "code, do NOT create a branch, do NOT transition the pipeline (stay in ANALYSIS),\n"
-         "do NOT dispatch other agents. End after writing diagnosis.md."
+         "STRICT (diagnose mode): do ONLY situation analysis + root cause. You MAY write a\n"
+         "THROWAWAY investigative probe (investigative-probe skill) to disambiguate competing\n"
+         "candidates at runtime, then REVERT it (do not keep it). Do NOT author the\n"
+         "reproduction test (the fix oracle), do NOT modify production code, do NOT write\n"
+         "plan.md or any design, do NOT create a branch, do NOT transition the pipeline (stay\n"
+         "in ANALYSIS), do NOT dispatch other agents. End after writing diagnosis.md."
      )
 ```
 

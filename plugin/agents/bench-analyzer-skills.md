@@ -22,6 +22,7 @@ skills:
   - stablenet-invariants
   - root-cause-lifecycle
   - reproduce-first
+  - investigative-probe
 ---
 
 # Bench Analyzer — Mode C (code + comprehension skills)

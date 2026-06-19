@@ -18,6 +18,7 @@ skills:
   - state-machine
   - template-parse
   - reproduce-first
+  - investigative-probe
 ---
 
 # Bench Analyzer — Mode B (code-only)
