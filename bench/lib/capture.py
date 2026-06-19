@@ -27,8 +27,9 @@ from .usage import CanonicalUsage
 DEFAULT_AGENT_MODEL: dict[str, str] = {
     "orchestrator": "claude-opus-4-7",
     "planner": "claude-opus-4-7",
-    "bench-planner-codeonly": "claude-opus-4-7",
-    "bench-planner-skills": "claude-opus-4-7",
+    "analyzer": "claude-opus-4-7",
+    "bench-analyzer-codeonly": "claude-opus-4-7",
+    "bench-analyzer-skills": "claude-opus-4-7",
     "implementer": "claude-sonnet-4-6",
     "evaluator": "claude-sonnet-4-6",
 }

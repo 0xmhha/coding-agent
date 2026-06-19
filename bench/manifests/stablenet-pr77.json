@@ -1,13 +1,21 @@
 {
   "experiment": "gsn-pr77",
   "_comment": "PR-77(Anzeon 동적 가스팁 staleness) 단일-태스크 실행. 사용자의 'PR-77 부모에서 문제 제공→에이전트 수정→전문가 fix와 유사도 검토' 테스트와 결합. base_commit=0bf2f4d1b(부모, 버그 실재), go_stablenet_root=/test/pr-77(이미 부모에 체크아웃), A_cks는 PR-77 전용 cks DB(knowledge-data/pr-77) 사용. oracle.reference_fix=실제 PR-77 fix(유사도 비교 기준). 이 실험은 동시에 (d-1) 1셀 완주 검증을 겸한다.",
-  "modes": ["A_cks", "B_code_only", "C_code_skills"],
+  "modes": [
+    "A_cks",
+    "B_code_only",
+    "C_code_skills"
+  ],
   "mode_agents": {
-    "A_cks": "planner",
-    "B_code_only": "bench-planner-codeonly",
-    "C_code_skills": "bench-planner-skills"
+    "A_cks": "analyzer",
+    "B_code_only": "bench-analyzer-codeonly",
+    "C_code_skills": "bench-analyzer-skills"
   },
-  "shared_agents": { "implement": "implementer", "evaluate": "evaluator" },
+  "shared_agents": {
+    "plan": "planner",
+    "implement": "implementer",
+    "evaluate": "evaluator"
+  },
   "tasks": [
     {
       "id": "STABLE-0005",
@@ -22,7 +30,9 @@
   ],
   "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/test/pr-77",
   "batch_size": 1,
-  "config": { "max_eval_cycles": 3 },
+  "config": {
+    "max_eval_cycles": 3
+  },
   "_requires": {
     "cks_config": "/Users/wm-it-25_0220/Work/github/knowledge-data/pr-77/cks-pr77.yaml",
     "note": "A_cks 모드는 cks MCP가 위 pr-77 DB를 서빙하도록 재설정된 뒤에만 공정. (다른 세션에서 처리 중.) B/C는 cks 불필요. 실행은 autopilot 세션 + 사용자 승인 필요. 종료 후 throwaway 브랜치/커밋 정리 필수."

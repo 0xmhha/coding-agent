@@ -9,9 +9,9 @@ type: skill
 이 skill은 harness-engineering automation의 코어다. 하나의 실험 manifest(태스크 ×
 모드)를 받아, **같은 태스크를 세 정보 regime으로 자율 실행**하고 결과를 비교한다:
 
-- **A_cks** — 실제 `planner`(cks: semantic+graph+domain) → 공유 implementer → evaluator
-- **B_code_only** — `bench-planner-codeonly`(grep/read만) → 공유 implementer → evaluator
-- **C_code_skills** — `bench-planner-skills`(grep/read + 이해 skill) → 공유 implementer → evaluator
+- **A_cks** — 실제 `analyzer`(cks: semantic+graph+domain) → 공유 planner → implementer → evaluator
+- **B_code_only** — `bench-analyzer-codeonly`(grep/read만) → 공유 planner → implementer → evaluator
+- **C_code_skills** — `bench-analyzer-skills`(grep/read + 이해 skill) → 공유 planner → implementer → evaluator
 
 세 모드 모두 모델은 `claude-opus-4-7`(planner tier)로 고정 — 비교는 *정보 regime*을
 격리한다. 측정은 결정적 tool(`bench/compare.py`)이, 실행 구동은 이 skill(skill 중심)
@@ -48,12 +48,12 @@ type: skill
 {
   "experiment": "gsn-retrieval-abc-2026-06",
   "modes": ["A_cks", "B_code_only", "C_code_skills"],
-  "mode_agents": {                       // 모드 → ANALYSIS/PLANNING/DESIGN agent
-    "A_cks":         "planner",
-    "B_code_only":   "bench-planner-codeonly",
-    "C_code_skills": "bench-planner-skills"
+  "mode_agents": {                       // 모드 → ANALYSIS agent (정보 regime 격리 지점)
+    "A_cks":         "analyzer",
+    "B_code_only":   "bench-analyzer-codeonly",
+    "C_code_skills": "bench-analyzer-skills"
   },
-  "shared_agents": { "implement": "implementer", "evaluate": "evaluator" },
+  "shared_agents": { "plan": "planner", "implement": "implementer", "evaluate": "evaluator" },
   "tasks": [
     { "id": "STABLE-0001",
       "ticket": "bench/fixtures/tickets/STABLE-0001.json",
@@ -110,9 +110,10 @@ type: skill
          (`git -C {root} checkout {base_commit}` 또는 worktree)하여 **각 셀이 같은 출발점**에서
          시작하게 한다. 미지정 시 현재 HEAD. (기-수정 버그 태스크는 반드시 버그가 실재하는
          부모 커밋이어야 trivially-pass 거짓신호를 피한다.) 셀 종료 후 생성 브랜치는 §5 정리 대상.
-    c. ANALYSIS/PLANNING/DESIGN: Agent tool 로 mode_agents[mode] 디스패치
-       (A=planner, B=bench-planner-codeonly, C=bench-planner-skills).
-       → 동일 artifact(analysis.md, related-code.json, plan.md, design-v*.md) 생성.
+    c. ANALYSIS: Agent tool 로 mode_agents[mode] 디스패치 (A=analyzer / B=bench-analyzer-codeonly /
+       C=bench-analyzer-skills) → analysis.md, related-code.json, reproduction.json(bugfix).
+       (정보 regime 격리는 ANALYSIS(analyzer)에만 — 아래 planner/implementer/evaluator는 모드 불문 공유.)
+    c2. PLANNING/DESIGN: Agent tool 로 shared_agents.plan(planner) 디스패치 → plan.md, design-v*.md.
     d. IMPLEMENTATION: Agent tool 로 shared_agents.implement(implementer) 디스패치
        → build/bin/gstable + state.json.binary_path.
     e. EVALUATION + bug-cycle 루프 (★ 총비용 측정의 핵심 — orchestrator.md §5 포팅):
@@ -125,16 +126,16 @@ type: skill
        e3. FAIL → eval_failures = failure_log에서 state=="EVALUATION"인 항목 수.
            - eval_failures >= max_cycles → pipeline_state=BLOCKED. 루프 종료(최종 정확성=실패).
              (autonomy.on_blocked=="escalate"면 orchestrator §5의 1회 escalation 패스도 동일 적용 가능.)
-           - else → bug 사이클 진입(cycle = eval_failures):
+           - else → bug 사이클 진입(states.EVALUATION.cycle += 1):
                i.   state-machine.transition(workspace, "EVALUATION", "ANALYSIS").
-               ii.  ★ 재-plan은 반드시 **그 셀의 모드 planner**로:
-                      Agent tool 로 mode_agents[mode] 디스패치 (A=planner / B=bench-planner-codeonly /
-                      C=bench-planner-skills), mode="bugfix", last_failure_id + test_report_path 전달.
-                      → plan.md를 덮지 말고 plan-fix-{cycle}.md 생성.
-                    (orchestrator §5는 항상 planner를 쓰지만, bench는 regime 격리를 위해 모드 planner를
-                     써야 공정하다 — 이 한 줄이 프로덕션 orchestrator와의 유일한 차이.)
-               iii. IMPLEMENTATION 재실행: shared_agents.implement(implementer) 재디스패치 → 재빌드.
-               iv.  e1로 복귀(재평가).
+               ii.  ★ 재분석은 반드시 **그 셀의 모드 analyzer**로(regime 격리):
+                      Agent tool 로 mode_agents[mode] 디스패치 (A=analyzer / B=bench-analyzer-codeonly /
+                      C=bench-analyzer-skills), mode="bugfix"(re-entry), last_failure_id + test_report_path +
+                      failure_doc 전달 → analysis-revisited-{cycle}.md(재현 테스트 재사용), ANALYSIS→PLANNING.
+               iii. 재-plan: shared_agents.plan(planner) 디스패치 → plan-fix-{cycle}.md(plan.md 덮지 않음) → DESIGN.
+                    (regime 격리는 analyzer에만 — planner/implementer/evaluator는 모드 불문 공유.)
+               iv.  IMPLEMENTATION 재실행: shared_agents.implement(implementer) 재디스패치 → 재빌드.
+               v.   e1로 복귀(재평가).
        ⚠️ shared implementer/evaluator는 모드 불문 동일(공유). 재-plan의 planner만 모드별.
     f. transcript hook(P4)가 **모든 싸이클의** 각 sub-agent 디스패치 prompt/response를 셀 워크스페이스
        logs/agent-transcript.jsonl 에 누적 기록 → compare.py의 total_tokens(Σ across cycles) 원천.

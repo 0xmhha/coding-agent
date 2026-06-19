@@ -56,8 +56,8 @@ def make_experiment(root: Path):
         # B (code-only) burns more tokens (bigger grep/read prompts).
         chars = 8000 if mode == "B_code_only" else 2000
         _write_jsonl(cell / "logs" / "agent-transcript.jsonl", [
-            {"subagent_type": "planner" if mode == "A_cks"
-             else "bench-planner-codeonly" if mode == "B_code_only" else "bench-planner-skills",
+            {"subagent_type": "analyzer" if mode == "A_cks"
+             else "bench-analyzer-codeonly" if mode == "B_code_only" else "bench-analyzer-skills",
              "prompt_chars": chars, "response_chars": 400},
             {"subagent_type": "implementer", "prompt_chars": 1000, "response_chars": 600},
             {"subagent_type": "evaluator", "prompt_chars": 1200, "response_chars": 300},

@@ -1,12 +1,17 @@
 {
   "experiment": "gsn-retrieval-abc-example",
-  "modes": ["A_cks", "B_code_only", "C_code_skills"],
+  "modes": [
+    "A_cks",
+    "B_code_only",
+    "C_code_skills"
+  ],
   "mode_agents": {
-    "A_cks": "planner",
-    "B_code_only": "bench-planner-codeonly",
-    "C_code_skills": "bench-planner-skills"
+    "A_cks": "analyzer",
+    "B_code_only": "bench-analyzer-codeonly",
+    "C_code_skills": "bench-analyzer-skills"
   },
   "shared_agents": {
+    "plan": "planner",
     "implement": "implementer",
     "evaluate": "evaluator"
   },
@@ -14,7 +19,9 @@
     {
       "id": "STABLE-0001",
       "ticket": "bench/fixtures/tickets/STABLE-0001.json",
-      "oracle": { "chainbench_test": "basic/consensus" }
+      "oracle": {
+        "chainbench_test": "basic/consensus"
+      }
     }
   ],
   "go_stablenet_root": "/abs/path/to/go-stablenet",

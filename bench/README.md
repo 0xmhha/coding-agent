@@ -6,13 +6,14 @@ go-stablenet task under three information regimes and compares the outcomes:
 
 | mode | how it gathers information | agent |
 |------|---------------------------|-------|
-| **A_cks** | cks: semantic (ckv) + graph (ckg) + domain | real `planner` |
-| **B_code_only** | grep / glob / read only (no cks, no skills) | `bench-planner-codeonly` |
-| **C_code_skills** | grep / read + comprehension skills (no cks) | `bench-planner-skills` |
+| **A_cks** | cks: semantic (ckv) + graph (ckg) + domain | real `analyzer` |
+| **B_code_only** | grep / glob / read only (no cks, no skills) | `bench-analyzer-codeonly` |
+| **C_code_skills** | grep / read + comprehension skills (no cks) | `bench-analyzer-skills` |
 
-All three fix the model to the planner tier (`claude-opus-4-7`) so the
-comparison isolates the *information regime*, not the model. The `implementer`
-and `evaluator` are shared, so the variant planners produce mode-blind artifacts.
+All three fix the model to the analyzer tier (`claude-opus-4-7`) so the
+comparison isolates the *information regime*, not the model. The shared `planner`,
+`implementer`, and `evaluator` consume the mode-blind artifacts. The analysis stage
+is where the information regime decides quality, so it is the isolated component.
 This directly answers the system contract's §9 thesis ("does retrieval beat
 grep?") with data: final-code correctness, tokens, cost, latency, safety.
 
