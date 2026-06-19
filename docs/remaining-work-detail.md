@@ -136,13 +136,21 @@
 → planner 계획 보정(plan-fix-{cycle}) → implementer 재수정 → evaluator → green까지 / max_eval_cycles 초과 BLOCKED.`
 ※ 기존 상태기계가 이미 `EVALUATION→ANALYSIS` 실패사이클을 가지므로 ANALYSIS의 주인만 analyzer로 바꾸면 토폴로지 정합.
 
+### 기존 자산 재사용 (#13, 이미 main — 중복 구현 금지)
+PR #13(`c45e3bc`, v0.1.13)이 **`root-cause-lifecycle` 스킬**(근본원인 *추론 절차*: 값→모든 복사본/캐시→
+깨진 lifecycle edge→소스 역추적→증상 비대칭 반증)을 추가하고 planner §6·`/diagnose`에 배선했다.
+→ analyzer의 **"원인규명" 두뇌는 이미 존재** = **재사용**(신규 개발 X). item 10의 신규 skill은 `reproduce-first`(red→green) **하나뿐**.
+- 분리 시 **#13 배선을 함께 이전**: planner §6의 root-cause-lifecycle 적용 + §5.2b 크로스레퍼런스 → analyzer로.
+  planner엔 §5.2b(설계시점 거울상)만 남겨 forward/backward 대응 보존.
+- `/diagnose`의 root-cause-lifecycle 사용(#13)은 diagnose→analyzer 디스패치로 바꿀 때 자연 승계.
+
 ### 필요한 plugin 변경 (파일)
-- **신규** `agents/analyzer.md`(planner에서 ANALYSIS+재현+원인 추출), `skills/reproduce-first/SKILL.md`(red→green 단일 정의)
-- **수정** `agents/planner.md`(설계/계획만), `implementer.md`(수정 TDD·재현테스트 불가침), `evaluator.md`(재현 재실행 오라클·조건부 chainbench e2e·실패문서→analyzer), `orchestrator.md`(디스패치: ANALYSIS→analyzer·실패사이클→analyzer)
+- **신규** `agents/analyzer.md`(planner에서 ANALYSIS+재현+원인 추출; 스킬 `root-cause-lifecycle`(#13, 재사용)·`reproduce-first`(신규)·cks·stablenet-* 적용), `skills/reproduce-first/SKILL.md`(red→green 단일 정의)
+- **수정** `agents/planner.md`(설계/계획만; §5.2b 거울상 유지), `implementer.md`(수정 TDD·재현테스트 불가침), `evaluator.md`(재현 재실행 오라클·조건부 chainbench e2e·실패문서→analyzer), `orchestrator.md`(디스패치: ANALYSIS→analyzer·실패사이클→analyzer)
 - **수정** `skills/state-machine`(마커 `reproduction_confirmed`·실패유형 `reproduction_unobtainable`·**cycle 인덱스 단일화=Wave2①**), `skills/template-parse`(bugfix "재현 방법" 필수)
 - **벤치**: A/B/C 변이를 **analyzer 변이**로 — 신규 `agents/bench-analyzer-{codeonly,skills}.md`(기존 bench-planner-* 대체→Wave2② 해소), `bench-orchestration` mode_agents·매니페스트 갱신
 - **명령** `commands/diagnose.md`(analyzer 디스패치로 통일 = "analyzer 단독 실행"), 필요시 `work.md`/`analyze.md` 참조 갱신
-- 버전 bump
+- 버전 bump (현재 main **0.1.13**부터)
 
 ### 효율·하네스 이점
 단일 책임→프롬프트 작고 집중(토큰·컨텍스트↓)·핸드오프 명확 / 재현 테스트 1회 작성·재사용(재생성 churn 제거) /
