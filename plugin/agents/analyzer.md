@@ -206,11 +206,20 @@ missing update)** → **trace a stale value to its source (the first cache is us
 symptom, not the cause)** → falsify with the symptom's distinguishing feature → check every
 cache has an invalidator.
 
-★ **If competing candidates remain or static falsification is shaky, do NOT guess.** Use the
-`investigative-probe` skill: write a throwaway instrumented test that drives the symptom
-scenario and observes the suspect value at each candidate site, run it, and let the runtime
-observation pick the real cause (then revert the probe). Static code alone often cannot tell
-which of two plausible candidates actually fires — observe, don't assume.
+★ **Effect-completeness before ruling anything out**: enumerate EVERY path/stage that produces
+the symptom's observable (every site returning that error, every validation/processing stage —
+if there are two stages, check both; every use-site of the suspect object via `find_callers`/
+`search_text`). Eliminating a path that yields the SAME observable by static reasoning is the
+classic miss.
+★ **The cks bodies you already received can REFUTE your hypothesis** — before committing, re-read
+the get_for_task pack / hits for evidence against your leading guess (e.g. a comment saying a
+value is computed "during validation"). Evidence in hand outranks your static reasoning; do not
+assert against the pack.
+★ **If competing candidates remain, static falsification is shaky, or ≥2 paths produce the same
+observable, do NOT guess.** Use the `investigative-probe` skill: write a throwaway instrumented
+test that drives the symptom scenario, observe the suspect value at each candidate site, run it,
+let the runtime observation pick the real cause (then revert the probe). Static code alone often
+cannot tell which of two plausible candidates actually fires — observe, don't assume.
 
 Write the `## Root cause` section of analysis.md. It MUST name:
 - the value(s) + lifecycle (producer / every copy / consumers),
