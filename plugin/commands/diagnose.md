@@ -1,5 +1,5 @@
 ---
-description: 분석 전용. 증상을 입력하면 근본 원인만 진단하고 멈춘다(코드 변경·설계·PR 없음). planner의 ANALYSIS + cks 재사용.
+description: 분석 전용. 증상을 입력하면 근본 원인만 진단하고 멈춘다(코드 변경·설계·PR 없음). analyzer를 진단 모드로 재사용.
 argument-hint: "\"<증상/문제 설명>\"  [--path <파일/디렉토리>]"
 ---
 
@@ -8,9 +8,9 @@ argument-hint: "\"<증상/문제 설명>\"  [--path <파일/디렉토리>]"
 증상을 입력하면 **근본 원인이 무엇인지**만 파악해서 보고한다. `/coding-agent:analyze`
 와 달리 설계·구현·테스트·PR로 진행하지 **않는다** — **읽기 전용 진단**이다.
 
-내부적으로 `planner` 의 **ANALYSIS 단계 + cks 검색**(의미 검색·호출 그래프·도메인)을
-재사용하되, ANALYSIS 직후 **멈추고** `diagnosis.md` 를 산출한다. 코드를 수정하거나
-브랜치를 만들지 않는다.
+내부적으로 `analyzer`(상황분석 + 근본원인 단계 + cks 검색·root-cause-lifecycle)를
+**진단 모드**로 재사용하되, 근본원인 규명 직후 **멈추고** `diagnosis.md` 를 산출한다.
+재현 테스트를 만들지 않고, 코드를 수정하거나 브랜치를 만들지 않으며, PLANNING으로 넘어가지 않는다.
 
 > 언제 쓰나: "왜 이런 일이 생기지?"를 빠르게 규명하고 싶을 때. 고치는 것까지 자율로
 > 진행하려면 대신 `/coding-agent:analyze` 를 쓴다.
@@ -40,10 +40,10 @@ argument-hint: "\"<증상/문제 설명>\"  [--path <파일/디렉토리>]"
      "[REDACTED]" 로 치환(하드스톱 없음).
 ```
 
-## 3. planner 디스패치 (ANALYSIS 전용, 진단 모드)
+## 3. analyzer 디스패치 (진단 전용 — situation + root cause만)
 ```
 3.1. Agent(
-       subagent_type="planner",
+       subagent_type="analyzer",
        description="Diagnose root cause for DIAG-{timestamp}",
        prompt=
          "DIAGNOSE MODE — read-only root-cause analysis. Do the ANALYSIS phase ONLY.\n"
@@ -67,8 +67,9 @@ argument-hint: "\"<증상/문제 설명>\"  [--path <파일/디렉토리>]"
          "  4. Confidence — high/medium/low + what would raise it.\n"
          "  5. Suggested direction — a one-paragraph fix approach (NOT a full plan).\n"
          "\n"
-         "STRICT: do ONLY analysis. Do NOT write plan.md or any design, do NOT edit\n"
-         "code, do NOT create a branch, do NOT transition the pipeline past ANALYSIS,\n"
+         "STRICT (diagnose mode): do ONLY situation analysis + root cause. Do NOT author\n"
+         "or run the reproduction test, do NOT write plan.md or any design, do NOT edit\n"
+         "code, do NOT create a branch, do NOT transition the pipeline (stay in ANALYSIS),\n"
          "do NOT dispatch other agents. End after writing diagnosis.md."
      )
 ```

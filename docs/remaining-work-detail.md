@@ -10,9 +10,9 @@
 
 **다음 순서:**
 1. **Tier 0 — 즉시(저위험·독립)**: plugin Wave2 **③**(COMPLETION/COMPLETED 표시). *(②는 항목 10에 흡수됨)*
-2. **Tier 1 — 핵심 아키텍처 = 항목 10**: `planner`를 **`analyzer`+`planner`로 분리** + **reproduce-first(red→green)
-   4-스테이지**. Wave2 **①**(cycle 단일화)·기존 reproduce-first·②(bench-planner drift)를 **흡수**. 설계·구현은 지금,
-   동작 검증은 (d)에서.
+2. **Tier 1 — 핵심 아키텍처 = 항목 10**: ✅ **구현 완료(2026-06-19, v0.1.17)**. `analyzer` 분리 +
+   reproduce-first(red→green) 4-스테이지 + bench-analyzer 변이. Wave2 ①②·기존 reproduce-first 흡수.
+   **남은 것은 (d) 라이브 검증뿐.** (코드 검증은 lint·bench테스트·핸드오프 계약 정합으로 완료.)
 3. **Tier 2 — thesis 종착점 = (d)**: 새 4-스테이지 위에서 **bugfix 1셀 완주(red→green·재진입 라이브 검증)** →
    전체 A/B/C. autopilot+승인+cks(PR-77 DB) 재설정+오염정리 필요.
 4. **Tier 3 — 병행(cks측, 동시 세션)**: B-verify, D-2, D.
@@ -110,7 +110,12 @@
 - **왜/문제**: 현재 backstop이 합의 도메인 한정 → txpool 외 태스크엔 미적용.
 - **기대결과**: 신규 derived-state 태스크에서 §5.2b/§4.6 자동 적용 → 전 태스크 유형 부작용 예방.
 
-## 🔵 10. analyzer 분리 + reproduce-first 4-스테이지 파이프라인  *(핵심 아키텍처, 다중-파일 계약, ☐ 신규 2026-06-18)*
+## 🔵 10. analyzer 분리 + reproduce-first 4-스테이지 파이프라인  *(✅ 구현 완료 2026-06-19, v0.1.17 — (d) 라이브 검증만 남음)*
+
+> **구현 완료 (steps 1–9, main 반영)**: analyzer.md 신설(`21ff012`) → planner 슬림+orchestrator 배선(`d90fd82`)
+> → reproduce-first 스킬(`055d14c`) → implementer CARRY+evaluator GREEN(`dbab246`) → state-machine 계약+cycle
+> 단일화(`388b51a`) → bench-analyzer 변이(`38fa137`) → diagnose→analyzer 통일(이 커밋). lint·bench테스트(14/14)·
+> 핸드오프 계약 정합 검증 완료. **남은 것: (d) 실제 bugfix 1셀로 red→green·재진입 라이브 검증(Tier 2).**
 
 > **흡수**: 기존 reproduce-first(T1~T8) + Wave2 ①(cycle 단일화) + Wave2 ②(bench-planner drift)를 모두 포함한다.
 
