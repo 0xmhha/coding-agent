@@ -1,6 +1,6 @@
 # go-stablenet 자동개발 파이프라인 — 후속 작업 상태 갱신 (2026-06-15)
 
-> **짝 문서:** [`followup-plan.md`](./followup-plan.md)(작업 항목·우선순위), [`followup-expected-outcomes.md`](./followup-expected-outcomes.md)(기대 결과).
+> **짝 문서:** [`./archive/followup-plan.md`](./archive/followup-plan.md)(작업 항목·우선순위), [`./archive/followup-expected-outcomes.md`](./archive/followup-expected-outcomes.md)(기대 결과).
 > 두 짝 문서는 **2026-06-12 시점**에 멈춰 있다. 이 문서는 그 뒤 동시 세션 진행분을
 > **코드·커밋·라이브 인덱스와 직접 대조**해 갱신한 것이다. (검토 작성: 2026-06-15)
 > 인덱스: go-stablenet `dev c051d50b` (라이브 cks MCP `fresh:true` 확인), 경로 `data/{ckg,ckv}-stablenet`.
