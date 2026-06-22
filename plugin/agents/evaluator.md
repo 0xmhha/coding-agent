@@ -429,6 +429,10 @@ init args. Setup budget: 2 minutes.
 ### 7.3 Start + stabilize
 
 ```
+# P5: snapshot pre-existing node processes BEFORE starting, so §7.6 cleanup can
+# scope itself to only what THIS run starts and never kill a developer's instance.
+bash: pgrep -f 'gstable|wbft-node' > {workspace_dir}/logs/eval-node-prepids.txt 2>/dev/null || true
+
 mcp__plugin_coding-agent_chainbench__chainbench_start()
 
 # Poll for stabilization. Budget: 60 seconds for the first block,
@@ -517,13 +521,23 @@ if count_fail > 0:
 try:
   mcp__plugin_coding-agent_chainbench__chainbench_stop()
 finally:
-  # Defensive: kill any leftover processes named gstable or wbft-node.
-  # This is best-effort and never fails the run.
-  bash: pgrep -fl 'gstable|wbft-node' || true
-  bash: for pid in $(pgrep -f 'gstable'); do kill -TERM $pid 2>/dev/null || true; done
-  bash: sleep 2
-  bash: for pid in $(pgrep -f 'gstable'); do kill -KILL $pid 2>/dev/null || true; done
+  # Defensive net for leftovers chainbench_stop missed — but SCOPED to processes
+  # THIS run started (P5). NEVER kill a pre-existing instance (a developer's local
+  # node) or this shell itself: only PIDs that match AND are absent from the §7.3
+  # pre-start snapshot AND are not $$/$PPID. Best-effort; never fails the run.
+  bash: spare=" $(tr '\n' ' ' < {workspace_dir}/logs/eval-node-prepids.txt 2>/dev/null) $$ $PPID "
+        for sig in TERM KILL; do
+          for pid in $(pgrep -f 'gstable|wbft-node' 2>/dev/null || true); do
+            case "$spare" in *" $pid "*) continue ;; esac   # pre-existing / self → spare
+            kill -$sig "$pid" 2>/dev/null || true
+            [ "$sig" = TERM ] && echo "$pid" >> {workspace_dir}/logs/eval-killed-pids.txt
+          done
+          [ "$sig" = TERM ] && sleep 2
+        done
 ```
+
+> Reference implementation + binary safety test (foreign instance survives, only
+> ours is killed): `bench/p5-cleanup-scope/` (`cleanup_scoped.sh`, `verify.sh`).
 
 Overall ChainBench budget: 20 minutes. If exceeded at any point, run §7.6
 immediately and set `result.status = "FAIL"` with `summary = "chainbench timeout"`.
