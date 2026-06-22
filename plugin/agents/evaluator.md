@@ -19,7 +19,7 @@ tools:
   - mcp__plugin_coding-agent_chainbench__chainbench_stop
 skills:
   - state-machine
-  - stablenet-invariants
+  - domain-pack
   - reproduce-first
 ---
 

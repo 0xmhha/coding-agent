@@ -29,8 +29,7 @@ tools:
 skills:
   - state-machine
   - template-parse
-  - stablenet-context
-  - stablenet-invariants
+  - domain-pack
   - root-cause-lifecycle
   - reproduce-first
   - investigative-probe
@@ -179,14 +178,14 @@ fix → EVALUATION_FAIL → a full cycle that costs far more than the retrieval 
 Only when §3.1b missed a meaning-based hit you still need. Persist in `related-code.json.ckv`.
 History is separate: use `cks_context_change_history` for a hit's modification history.
 
-### 3.3 Domain + complexity (stablenet-context skill)
+### 3.3 Domain + complexity (domain-pack loader)
 ```
-classify   = stablenet-context.classify_domain(file_paths, symbols)   # path classification only
-complexity = stablenet-context.estimate_complexity(domains, change_summary)
+classify   = domain-pack.classify_domain(file_paths, symbols)   # active pack, path classification only
+complexity = domain-pack.estimate_complexity(domains, change_summary)
 ```
 Authoritative domain guidance (invariants, required_tests, system-contract names) comes
-from cks `guidance.*` fields and the always-on `stablenet-invariants` backstop — NOT from
-hardcoded names. Carry `guidance.watch_out`/`also_review`/`required_tests` into analysis.md.
+from cks `guidance.*` fields and the active pack's always-on invariants backstop
+(domain-pack §2.3) — NOT from hardcoded names. Carry `guidance.watch_out`/`also_review`/`required_tests` into analysis.md.
 
 ### 3.3b Freshness gate
 ```

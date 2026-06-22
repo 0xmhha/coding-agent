@@ -28,8 +28,7 @@ tools:
 skills:
   - state-machine
   - template-parse
-  - stablenet-context
-  - stablenet-invariants
+  - domain-pack
   - root-cause-lifecycle
 ---
 
@@ -232,16 +231,16 @@ results = mcp__plugin_coding-agent_cks__cks_context_semantic_search(
 modification history for a hit, make a separate `cks.context.change_history`
 call. Persist the raw result inside `related-code.json.ckv`.
 
-### 3.3 Domain + complexity (stablenet-context skill)
+### 3.3 Domain + complexity (domain-pack loader)
 
-Use the stablenet-context skill for path-based module classification only:
+Use the domain-pack loader (active pack) for path-based module classification only:
 
 ```
-classify = stablenet-context.classify_domain(
+classify = domain-pack.classify_domain(
   file_paths = [r.file for r in ckv.results],
   symbols    = [r.symbol for r in ckv.results],
 )
-complexity = stablenet-context.estimate_complexity(
+complexity = domain-pack.estimate_complexity(
   domains = classify.domains,
   change_summary = parsed.summary + parsed.fields (concatenated)
 )
@@ -251,9 +250,9 @@ Authoritative domain guidance — invariants, byzantine-fairness concerns,
 required tests, system-contract names — does NOT come from this skill (it only
 classifies by path). It comes from the cks `guidance` fields on
 `cks.context.get_for_task` / `cks.context.semantic_search` results (injected
-from ckv `policy/stablenet.yaml`) and from the always-on `stablenet-invariants`
-backstop. Carry those `guidance.watch_out` / `also_review` / `required_tests`
-values into analysis.md, not any hardcoded contract names.
+from ckv `policy/stablenet.yaml`) and from the active pack's always-on invariants
+backstop (domain-pack §2.3). Carry those `guidance.watch_out` / `also_review` /
+`required_tests` values into analysis.md, not any hardcoded contract names.
 
 ### 3.3b Freshness gate
 

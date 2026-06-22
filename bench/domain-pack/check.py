@@ -27,17 +27,16 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]                       # bench/domain-pack -> repo root
 DOMAINS = REPO / "plugin" / "domains"
 SKILLS = REPO / "plugin" / "skills"
+AGENTS = REPO / "plugin" / "agents"
 
 REQUIRED_KEYS = ("project_id", "ticket_namespace", "invariants", "context_classifier", "knowledge")
-# pointer skill -> the domains file it must reference (Phase 1 single-source guard)
-POINTERS = {
-    "stablenet-invariants": "domains/go-stablenet/invariants.md",
-    "stablenet-context": "domains/go-stablenet/context.md",
-}
+# Phase 2: agents must not load the (now-deleted) project-specific pointer skills as a
+# frontmatter dependency — they resolve the active pack via the generic domain-pack loader.
+FORBIDDEN_SKILL_REFS = ("stablenet-context", "stablenet-invariants")
 
 
 def check(*, domains_dir: Path = DOMAINS, skills_dir: Path = SKILLS,
-          check_pointers: bool = True) -> int:
+          agents_dir: Path = AGENTS, check_agents: bool = True) -> int:
     problems: list[str] = []
     packs = sorted(domains_dir.glob("*/domain-pack.json"))
     if not packs:
@@ -66,14 +65,25 @@ def check(*, domains_dir: Path = DOMAINS, skills_dir: Path = SKILLS,
     if not (skills_dir / "domain-pack" / "SKILL.md").is_file():
         problems.append(f"generic loader skill missing: {skills_dir}/domain-pack/SKILL.md")
 
-    # pointer skills point at the domains files (single source)
-    if check_pointers:
-        for skill, must_ref in POINTERS.items():
-            sp = skills_dir / skill / "SKILL.md"
-            if not sp.is_file():
-                problems.append(f"pointer skill missing: {sp}")
-            elif must_ref not in sp.read_text():
-                problems.append(f"{skill} skill does not reference '{must_ref}' (stale duplicate?)")
+    # Phase 2: no agent loads a deleted project-specific skill as a frontmatter dep;
+    # the agents that need domain context reference the generic domain-pack loader.
+    if check_agents:
+        import re
+        skill_line = re.compile(r"^\s*-\s*(\S+)\s*$", re.MULTILINE)
+        wired = 0
+        for md in sorted(agents_dir.glob("*.md")):
+            # frontmatter skills block only: take lines up to the closing '---'
+            text = md.read_text()
+            fm = text.split("\n---", 2)
+            head = fm[0] if len(fm) >= 2 else text
+            refs = set(skill_line.findall(head))
+            for forbidden in FORBIDDEN_SKILL_REFS:
+                if forbidden in refs:
+                    problems.append(f"{md.name} frontmatter still loads deleted skill '{forbidden}'")
+            if "domain-pack" in refs:
+                wired += 1
+        if wired == 0:
+            problems.append("no agent references the generic 'domain-pack' loader skill")
 
     if problems:
         print(f"DOMAIN-PACK STRUCTURE PROBLEMS ({len(problems)}):")
@@ -81,7 +91,7 @@ def check(*, domains_dir: Path = DOMAINS, skills_dir: Path = SKILLS,
             print(f"  - {p}")
         return 1
     names = ", ".join(p.parent.name for p in packs)
-    print(f"domain-pack structure OK — packs: [{names}]; loader + pointers conform")
+    print(f"domain-pack structure OK — packs: [{names}]; loader present; agents wired (no stablenet-* deps)")
     return 0
 
 

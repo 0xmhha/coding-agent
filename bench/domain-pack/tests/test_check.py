@@ -35,7 +35,7 @@ def _sandbox(tmp: Path, *, with_invariants=True, drop_key=None):
 
 
 def _run(domains, skills):
-    return check.check(domains_dir=domains, skills_dir=skills, check_pointers=False)
+    return check.check(domains_dir=domains, skills_dir=skills, check_agents=False)
 
 
 class TestSandbox(unittest.TestCase):
