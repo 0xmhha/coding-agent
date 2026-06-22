@@ -124,6 +124,11 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 > **시퀀싱 핵심**: P0·P1·P3은 파이프라인 동작을 *바꾼다* → 스트림1 thesis bench(F-core)의 측정을
 > 교란한다. **F-core 베이스라인을 먼저 캡처**한 뒤 착수하거나, 각 항목을 *자체 before/after A/B*로
 > 측정해야 한다(Part C 변수격리). P2·P4·P5는 비교란이라 아무 때나 가능.
+>
+> **📌 베이스라인 핀 (06-22)**: git tag **`fcore-baseline` = `b33931f`** (overlay P0/P2/P4/P5 적용,
+> pre-P1/P3). A/B/C 라이브 런(다른 세션)은 이 커밋에서 돌리고, P1/P3 교란 작업은 이것을 *before*로
+> 비교한다. 순수 pre-overlay 기준점이 필요하면 `def2af0~1`. (캡처=참조 커밋 핀일 뿐, 벤치 *실행*은
+> 별개 — 스트림1 F-core 행 참조.)
 
 **P4 분리 잔여 (신규 추적 항목):** `simulation-harness` 스킬 — 재현 테스트의 시뮬레이션 레벨
 라우팅(L1 단위 / L2 in-process 체인·합의 / L3 ChainBench) + ChainBench(L3, 20분)를 L2로 down-push.
