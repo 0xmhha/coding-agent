@@ -1,13 +1,14 @@
 # WORKLIST — 통합 작업 리스트 (SSoT)
 
-> 작성: 2026-06-22. 목적: `docs/` 하위 16개 문서에 흩어진 작업 항목을 **5개 스트림**으로 통합한 단일 기준점.
+> 작성: 2026-06-22. 목적: `docs/` 하위 문서에 흩어진 작업 항목을 **6개 스트림**으로 통합한 단일 기준점.
 > 상세는 각 원본 문서를 링크. 진행 마커: ✅완료 / ◐부분 / 🟡진입가능·대기 / 🔴미착수 / ☐예정.
 >
 > 짝 문서: [`remaining-work-detail.md`](./remaining-work-detail.md)(스트림1 상세) ·
 > [`cks-ckg-ckv-hardening-backlog-2026-06-19.md`](./cks-ckg-ckv-hardening-backlog-2026-06-19.md)(스트림2) ·
 > [`graph-reasoning-gap-and-fix-plan-2026-06-19.md`](./graph-reasoning-gap-and-fix-plan-2026-06-19.md)(스트림3) ·
 > [`rag-context-efficiency-proposals-2026-06-19.md`](./rag-context-efficiency-proposals-2026-06-19.md)(스트림4) ·
-> [`harness-improvement-proposals-2026-06-17.md`](./harness-improvement-proposals-2026-06-17.md)(스트림5).
+> [`harness-improvement-proposals-2026-06-17.md`](./harness-improvement-proposals-2026-06-17.md)(스트림5) ·
+> [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md)(스트림6: 오버레이 개선·도메인팩 확장·평가전략).
 >
 > ⚠️ `./archive/followup-plan.md`·`./archive/followup-expected-outcomes.md`는 `followup-status-2026-06-15.md`가 정정·대체했으므로
 > 아카이브 후보(중복·상충 주의).
@@ -55,7 +56,8 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | 3 (c) eval-set 확장 | 6모듈/9티켓 | ◐ 대부분완료 (인덱스 drift 잔여) |
 | 4 C chainbench 회귀환경 | 상태확인 | 🟢 (d) 비차단 확인 |
 | 2 (d) **F-core full pipeline 라이브 1셀** | red→green 완주 | 🟡 **진입가능** (전제충족·analyzer검증됨·승인+autopilot 대기) |
-| F-core 전체 A/B/C bench | thesis 종착점 | 🔴 미실행 |
+| A/B/C 정의 재설계 (whole-approach) | B/C=coding-agent 배제 단독 solver, C=프로젝트 .claude | ✅ **완료 (06-22)** — 정의문서 + `bench-solver-{codeonly,project-skills}` + SKILL §4.4 분기 + `stable-0005-abc.json` |
+| F-core 전체 A/B/C bench | thesis 종착점 | 🟡 **진입가능** (STABLE-0005 매니페스트 준비됨·승인+autopilot 대기) |
 | 9 H 가드레일 일반화 | 구현 불변식 확장 | ☐ |
 
 ## 스트림 2 — cks/ckg/ckv 하드닝
@@ -107,6 +109,22 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | 4~7 lessons.md·evaluator 병렬화·schema 검증·context:fork | | 🔴 미착수 |
 | query.ts 권고 (#1 reducer·#2 budget) | | ⏸ 본 repo 범위 밖 (상위 Claude Code 코어) |
 
+## 스트림 6 — coding-agent 오버레이 개선 / 도메인팩 확장
+원본: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md)
+
+| ID | 작업 | 평가 오라클 | 상태 |
+|---|---|---|---|
+| P0 계약 기계검증 | plan/design 구조화 스키마 + implementer write-site 표 대조 + evaluator §4.6 완전성 | mutant 코퍼스 누락-행 탐지율 / false-GREEN율 (expert reference_fix) | ◐ **스펙 패치 적용 (06-22)** — planner §4.5 plan-contract·§5.2b write-site-contract / implementer §2.1 파싱·§4.2b 대조 / evaluator §4.6 완전성. **평가(mutant 코퍼스) 대기** |
+| P2 cks 결함강건 | 재시도·백오프 + degraded/blocked 임계 명문화 ("조용한 best-effort" 금지) | PR-77 fault-injection (0/10/30/50%) → 조용한 오답 **0** | 🔴 미착수 (비교란) |
+| P5 정리 범위 한정 | evaluator §7.6 pkill→spawn한 PID만 | 동명 더미 프로세스 생존 이진 테스트 | 🔴 미착수 (비교란·소규모) |
+| P3 모델 핀 중앙화/갱신 | 6파일 산재 핀 → 단일 설정원, 4-7→4-8 | 동일 픽스처 3-way bench A/B (정확성 무회귀·비용) | ◐ **4-8 갱신 완료 (06-22)** — opus 핀 전부 claude-opus-4-8 (agents/SKILL/capture/prices), 14/14 통과. **중앙화(단일 설정원)는 미착수** |
+| P1 도메인팩 계약 | `domain-pack.json`+`project_id`, `stablenet-*` 정적 호명 → 활성 팩 해석, chainbench→`mcp:` 스테이지 일반화 | ① Project B 코어 0편집 완주(빈 diff) ② stablenet bench 무회귀 ③ 도메인 누출 0 | 🔴 미착수 (**최대 효용·교란·대형**) |
+| P4 문서 드리프트 | HANDOFF-simulation-verification supersede (reproduce-first/§4.7로 충족분 반영) | doc-truth 대조표: 활성문서 ↔ 코드 모순 0건 | 🔴 미착수 (비런타임) |
+
+> **시퀀싱 핵심**: P0·P1·P3은 파이프라인 동작을 *바꾼다* → 스트림1 thesis bench(F-core)의 측정을
+> 교란한다. **F-core 베이스라인을 먼저 캡처**한 뒤 착수하거나, 각 항목을 *자체 before/after A/B*로
+> 측정해야 한다(Part C 변수격리). P2·P4·P5는 비교란이라 아무 때나 가능.
+
 ---
 
 ## 권장 다음 순서 (2026-06-22 6/19 재검토 반영 — 조정본)
@@ -119,4 +137,19 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | **4 (하향)** | **스트림3 P1.5 → P2/P3** (P0 제외) | P0는 analyzer가 흡수(반증). 살아남는 건 저비용 가시성(P1.5)·정확성(P2/P3) |
 | **보류** | parity gap · query-eval · 스트림5 hooks | parity는 analyzer 13툴 PRIMARY 도달로 근거 약화 / query-eval 범위밖 / hooks는 autonomy=auto 전제 |
 
-**한 줄**: 6/19 문서는 "분석 끝·구현 0", graph-gap P0 전제는 6/22 검증으로 흔들림 → 진짜 중단된 건 **F-core (d) 하나뿐 = 1순위**.
+### 스트림6 오버레이 트랙 통합 순서 (thesis 트랙과의 관계)
+
+오버레이 개선(P0~P5)은 위 thesis/cks 트랙과 **별개 축**이지만, **교란 의존성**으로 끼워 넣어야 한다:
+
+| 단계 | 작업 | 근거·의존 |
+|---|---|---|
+| **A. 즉시·병렬** | 스트림6 **P2·P5** + 스트림6 **P4** | 파이프라인 비교란 → thesis 측정과 무관하게 아무 때나. P2는 PR-77 오라클로 단독 평가 |
+| **B. 베이스라인 락 이후** | 스트림6 **P0** | 계약 기계검증은 파이프라인 동작을 바꿈 → **스트림1 F-core 베이스라인 캡처 후** 착수(또는 자체 A/B) |
+| **C. 갱신 게이트** | 스트림6 **P3** | 모델 핀 갱신은 동일 픽스처 bench A/B로 무회귀 게이트 통과 시에만 |
+| **D. 대형 확장** | 스트림6 **P1** | 도메인팩 계약 = 최대 작업. 반드시 *무리팩터 이동→무회귀 락→일반화* 순. P0 구조화 산출물·P2 degraded 전파와 맞물림 |
+
+> **두 트랙 합본 1줄 우선순위**: ①스트림1 F-core 라이브(thesis 종착·overlay 교란분의 베이스라인) →
+> ②스트림6 P2·P5 + 스트림4 저비용(병렬·비교란) → ③스트림6 P0 + 스트림2 §3.1/§3.2(정확도 신뢰성) →
+> ④스트림6 P3(게이트) → ⑤스트림6 P1(도메인팩 대형) → ⑥스트림6 P4 + 잔여 문서정리.
+
+**한 줄**: 6/19 문서는 "분석 끝·구현 0", graph-gap P0 전제는 6/22 검증으로 흔들림 → 진짜 중단된 건 **F-core (d) 하나뿐 = 1순위**. 그 위에 **오버레이 트랙(스트림6)**은 *비교란 P2·P5·P4 즉시 / 교란 P0·P3·P1은 F-core 베이스라인 캡처 후* 끼워 넣는다.

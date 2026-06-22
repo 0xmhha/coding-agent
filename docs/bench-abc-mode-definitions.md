@@ -86,9 +86,11 @@
 
 ---
 
-## 5. 하네스 재설계 함의 (이 정의를 따르려면 바뀌어야 할 것)
+## 5. 하네스 재설계 함의 (✅ 2026-06-22 구현 완료)
 
-> 상세 변경계획은 별도 진행. 여기서는 정의→구현 간 갭만 명시.
+> 아래 1~5는 모두 반영됨: `plugin/agents/bench-solver-{codeonly,project-skills}.md` 신설,
+> `bench-orchestration/SKILL.md` §0 정의 교체 + §4.4 A/(B·C) 분기, `bench/manifests/stable-0005-abc.json`
+> 타깃루트 통일, 구식 `bench-analyzer-{codeonly,skills}.md` deprecation 배너. 모델 핀 `claude-opus-4-8`.
 
 1. **B/C는 더 이상 "분석-단계 변이"가 아니다.** 기존 `bench-analyzer-codeonly`/`bench-analyzer-skills`는
    분석만 하고 **공유 planner/implementer/evaluator**(= coding-agent)로 넘겼다. 새 정의에서 B·C는
@@ -101,6 +103,16 @@
 5. **모델 고정 유지**: 세 모드 동일 모델(비교는 regime만 격리).
 
 ---
+
+## 5b. 알려진 caveat — 모델 비대칭 (착수 전 인지)
+
+세 모드 모두 `claude-opus-4-8`로 핀하지만, **A는 단계별 모델이 갈린다**: analyzer/planner는
+opus-4-8, implementer/evaluator는 sonnet-4-6. 반면 **B/C는 단일 solver라 진단·수정 전부
+opus-4-8 단독**이다. 즉 *구현 단계 모델*이 A(sonnet) vs B/C(opus)로 다르다.
+
+- 이는 "접근법 전체 비교"라는 본 정의의 자연스러운 결과(맨몸/네이티브 regime은 단계분리가 인위적).
+- 정밀 비교가 필요하면 (i) A의 implementer/evaluator도 opus-4-8로 맞추거나, (ii) 결과 해석 시
+  이 비대칭을 명시한다. 현재는 (ii)로 진행하고 SKILL §0에 caveat를 명시.
 
 ## 6. Supersede 기록
 

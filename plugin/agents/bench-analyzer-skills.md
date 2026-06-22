@@ -27,6 +27,12 @@ skills:
 
 # Bench Analyzer — Mode C (code + comprehension skills)
 
+> ⚠️ **DEPRECATED (2026-06-22).** OLD A/B/C definition where mode C used the
+> *coding-agent's own* comprehension skills inside the shared pipeline. The canonical
+> definition (`docs/bench-abc-mode-definitions.md`) makes mode C the TARGET PROJECT's
+> own `.claude` skills via `bench-solver-project-skills` (coding-agent excluded). Kept
+> for historical runs / old manifests — do NOT use for new experiments.
+
 A/B/C comparison variant of the **analyzer** (see `bench-analyzer-codeonly.md` for
 the three-mode framing). Mode C = grep/read for *finding* code + comprehension
 skills for *interpreting* it, but still **no cks retrieval**. The model is fixed to

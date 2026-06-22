@@ -23,6 +23,11 @@ skills:
 
 # Bench Analyzer — Mode B (code-only)
 
+> ⚠️ **DEPRECATED (2026-06-22).** OLD A/B/C definition: B/C as analysis-only variants
+> feeding the shared coding-agent pipeline. Canonical definition is now whole-approach
+> (`docs/bench-abc-mode-definitions.md`); mode B is `bench-solver-codeonly` (excludes
+> coding-agent entirely). Kept for historical runs / old manifests — do NOT use for new experiments.
+
 A/B/C comparison variant of the **analyzer** (the analysis stage is where the
 information regime decides quality, so it is the component the benchmark
 isolates). The same task runs under three regimes:
