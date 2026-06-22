@@ -1,7 +1,11 @@
 # ADR — Domain-Pack Contract (coding-agent multi-project extension, overlay P1)
 
-문서 성격: **ADR / 설계 결정 제안 (PROPOSED — 합의 대기, 코드 변경 0).** 2026-06-19~22 오버레이
-작업의 P1. 짝 문서: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md) Part B(스케치) · [`WORKLIST.md`](./WORKLIST.md) 스트림6.
+문서 성격: **ADR / 설계 결정 (ACCEPTED 2026-06-22 — 설계 합의됨, 코드 변경 0).** 2026-06-19~22
+오버레이 작업의 P1. 짝 문서: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md) Part B(스케치) · [`WORKLIST.md`](./WORKLIST.md) 스트림6.
+
+> **상태: ACCEPTED (설계만).** §8 결정 4건 모두 확정. **구현(Phase 1~3)은 교란·대형이라 별도
+> 세션/승인 게이트 유지** — 이 문서 승인이 곧 구현 착수 승인은 아니다. Phase 1은 fcore-baseline
+> 무회귀로 §3 메커니즘 신뢰성을 라이브 확인하며 진행.
 
 > **결정 한 줄:** go-stablenet 전용 콘텐츠를 **선언적 도메인팩**으로 분리하고, 제너릭 에이전트가
 > `state.json.project_id`로 활성 팩을 **런타임 `Read`로 해석**하게 한다. frontmatter는 정적
@@ -176,11 +180,11 @@ Project B를 새로 만들지 않는다(없는 것을 위해 부담 X). 대신 *
 
 ---
 
-## 8. Decisions (합의 현황, 2026-06-22)
+## 8. Decisions (모두 확정, 2026-06-22)
 
-1. **§3 로더 메커니즘** — 미지원 하베스 기능 의존 **없음**(§3.1 in-plugin 증거: stablenet-context가
-   이미 런타임 데이터-의존 Read/cks 호출을 지시). 능력=됨 / 신뢰성=Phase 1 라이브에서 확인.
-   → **사용자 확인 대기** (이 근거로 승인 여부).
+1. **§3 로더 메커니즘** — ✅ **승인.** 미지원 하베스 기능 의존 없음(§3.1 in-plugin 증거:
+   stablenet-context가 이미 런타임 데이터-의존 Read/cks 호출을 지시) → 능력 확실. 신뢰성은
+   Phase 1 라이브 무회귀가 검증(안전망). "불가능"이 아니라 "Phase 1에서 확인할 신뢰성".
 2. **첫 추출 범위** — ✅ **invariants + context만** (chainbench 일반화는 Phase 2로 분리).
 3. **`domains/` 위치** — ✅ **`plugin/domains/`** (CC 마켓플레이스 설치는 `plugin/`만 복사 →
    repo-level은 설치 시 안 따라옴).
