@@ -31,10 +31,26 @@ Result — followed the loader end-to-end with **no ambiguity/guessing**:
 → Empirical evidence (not assertion) that the loader+runtime-Read mechanism is
   followable by an agent reading only the pack files.
 
-## 🔴 4. Full-pipeline no-regression (NOT done here — merge gate)
-Does the whole analyzer→planner→implementer→evaluator pipeline still produce an
-equivalent fix on a real go-stablenet bugfix ticket vs `fcore-baseline`? Needs live
-cks + chainbench + the full pipeline + tokens → a capable session. Layers 1-3
-de-risk the loader mechanism specifically; layer 4 confirms end-to-end equivalence.
+## 🔶 4. Full-pipeline no-regression — merge-then-test runbook
+Why not in the authoring session: the session dispatches the **installed plugin cache**
+(`~/.claude/plugins/cache/coding-agent/coding-agent/<version>/`), not the branch working
+tree — so any run there tests baseline, not the branch. Testing the branch requires the
+branch to BE the installed plugin + a session restart (agent defs load at start).
 
-**Merge rule:** do not merge `p1-phase2-domain-pack-wire` into main until layer 4 passes.
+**Decision (informed):** merge Phase 2a to main FIRST, then test on the updated plugin —
+acceptable because layers 1-3 de-risked the loader mechanism and a failed test is a cheap
+`git revert`. Version bumped 0.1.21 → **0.1.22** so re-install refreshes the cache.
+
+Runbook (post-merge, capable session):
+1. **Cleanup** other-session leftovers: kill stray gstable/wbft-node, `rm -rf /tmp/node-data`,
+   restore `test/pr-77` to clean base `0bf2f4d1b`, delete `fix/LOCAL-*` throwaway branches.
+2. **Update plugin** to 0.1.22 (re-install from main) and **restart the session**.
+3. **Confirm active = branch**: `grep -l domain-pack ~/.claude/plugins/cache/coding-agent/
+   coding-agent/0.1.22/agents/analyzer.md` (and NO `stablenet-context`).
+4. **Run** the branch pipeline on PR-77 (`bench/fixtures/tickets/STABLE-0005.json`), isolated
+   worktree at the indexed `base_commit`.
+5. **Compare vs the PR-77 oracle** (root cause `eth/gasprice/anzeon.go:54 SetCurrentBlock` +
+   `bench/fixtures/pr77/expert-fix.diff`) — the oracle is the recorded baseline-equivalent, so
+   reaching it = no-regression. One run, no baseline re-run needed.
+6. **Cleanup** (restore baseline, remove throwaway branch).
+7. **If it regresses:** `git revert` the merge on main; reopen the branch for fixes.
