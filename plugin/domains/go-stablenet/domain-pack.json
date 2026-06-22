@@ -1,0 +1,24 @@
+{
+  "_doc": "Domain pack for go-stablenet — the reference instance of the domain-pack contract (ADR docs/domain-pack-contract-adr-2026-06-22.md). Phase 1 wires identity + invariants + context_classifier only (ADR §8 Q2); build/unit_test/verification_stages are declared under _phase2 but NOT yet consumed (evaluator generalization is Phase 2). Resolved at runtime via the generic `domain-pack` loader skill keyed by state.project_id.",
+  "project_id": "go-stablenet",
+  "ticket_namespace": "STABLE",
+  "knowledge": {
+    "cks_config_env": "CKS_CONFIG",
+    "_note": "domain knowledge lives in this project's cks index (guidance.* / policy/stablenet.yaml / domain entries); the pack carries only the search-independent backstop + path classifier"
+  },
+  "invariants": "invariants.md",
+  "context_classifier": "context.md",
+
+  "_phase2": {
+    "_doc": "Declared contract shape for Phase 2 (evaluator data-driven stages); NOT consumed yet.",
+    "repo_root_env": "GO_STABLENET_ROOT",
+    "build": { "cmd": "go build ./...", "artifact": "build/bin/gstable" },
+    "unit_test": { "runner": "go", "run_tmpl": "go test -run '{name}' ./{pkg}/...", "race_tmpl": "go test -race {pkgs}" },
+    "verification_stages": [
+      { "id": "unit",  "kind": "builtin:unit_race" },
+      { "id": "lint",  "kind": "builtin:lint" },
+      { "id": "sec",   "kind": "builtin:gosec" },
+      { "id": "integ", "kind": "mcp:chainbench", "profile": "default", "oracle_enum": ["basic/tx-send", "basic/consensus"] }
+    ]
+  }
+}

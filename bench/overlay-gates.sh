@@ -45,6 +45,10 @@ echo
 echo "P5 — scoped evaluator cleanup"
 run "P5 cleanup-scope verify (foreign survives)"           bash bench/p5-cleanup-scope/verify.sh
 echo
+echo "P1 — domain-pack structure (Phase 1)"
+run "P1 domain-pack structure check"                       python3 bench/domain-pack/check.py
+run "P1 domain-pack tests"                                 python3 bench/domain-pack/tests/test_check.py
+echo
 echo "bench measurement infra"
 run "bench unit tests"                                     python3 -m unittest bench.tests.test_usage bench.tests.test_report
 

@@ -4,90 +4,16 @@ description: "go-stablenet 경로 기반 모듈 분류 + 복잡도 추정 헬퍼
 type: skill
 ---
 
-# Stablenet Context (deprecated as a knowledge source)
+# Stablenet Context — pointer (content moved to the domain pack)
 
-이 skill은 더 이상 go-stablenet 도메인 지식의 출처가 아니다. 합의 규칙,
-system contract, 불변식, 모듈별 특수성 같은 **내용은 시간이 지나면 코드와
-어긋난다(drift)** — 과거 버전이 실제와 다른 contract 이름을 박아 두어
-오답을 유발했다.
+> **P1 Phase 1 (2026-06-22):** 경로→모듈 분류 데이터와 `classify_domain`/
+> `estimate_complexity` 절차는 단일 소스로 이동했다 — **`plugin/domains/go-stablenet/context.md`**.
+> 내용·동작은 동일하다(무리팩터 이동).
 
-남은 책임은 **drift 하지 않는 것** 하나뿐이다: 파일 경로 → 모듈 분류.
-경로 규칙은 contract 이름이 아니라 디렉터리 구조에 기반하므로 안전하다.
+이 스킬을 쓰는 에이전트는 **`plugin/domains/go-stablenet/context.md` 를 `Read` 하여**
+경로 기반 모듈 분류·복잡도 추정을 수행한다. 도메인 *지식*(불변식·contract 이름·합의 규칙)은
+이 파일이 아니라 cks 라이브 + `invariants.md` backstop에서 온다.
 
----
-
-## 1. 권위 있는 도메인 지식 출처 (이 skill 아님)
-
-Planner는 도메인 판단·불변식·테스트 권장을 다음에서 가져온다:
-
-- **cks 라이브 검색** — `cks.context.get_for_task` / `cks.context.semantic_search`
-  응답의 `guidance` 필드(`watch_out` / `also_review` / `required_tests`).
-  이 값은 ckv `policy/stablenet.yaml`(런타임 SSoT 뷰)에서 주입된다.
-- **cks 도메인 엔트리** — `code-knowledge-system/docs/domain-knowledge/projects/
-  go-stablenet/entries/*.yaml` (`code_anchors`, `invariants`, `pitfalls`).
-- **항상-켜진 backstop** — `stablenet-invariants` skill (byzantine-fairness
-  핵심 불변식 L3 주입). System contract 이름·합의 엔진 등 고정 사실은 거기서
-  관리한다. 이 skill 본문에 하드코딩하지 않는다.
-
-System contract 이름이나 합의 규칙을 이 파일에서 찾지 말 것 — 위 출처를 쓴다.
-
----
-
-## 2. 경로 기반 모듈 분류 (drift-free 헬퍼)
-
-```
-file_path contains "consensus/"                        → consensus
-file_path contains "governance-wbft/" or "governance/" → governance
-file_path contains "core/txpool/"                      → txpool
-file_path contains "core/state/" or "trie/"            → state
-file_path contains "core/" (and not above)             → core
-file_path contains "p2p/"                              → p2p
-file_path contains "rpc/" or "internal/ethapi/"        → rpc
-file_path contains "miner/"                            → miner
-file_path contains "params/"                           → params
-file_path contains "cmd/"                              → cmd
-file_path contains "eth/" or "les/"                    → eth/les
-```
-
-동시성 민감 모듈(`-race` 및 `concurrency_impact` 대상): `consensus`, `core/txpool`,
-`core/state`, `miner`. 단, 권위 있는 동시성 범위는 cks
-`cks.context.concurrency_impact` 응답이며, 이 목록은 시드 선정용 힌트일 뿐이다.
-
----
-
-## 3. 제공 함수
-
-### 3.1 classify_domain(file_paths, symbols)
-
-**절차**: 각 `file_path`를 §2 규칙으로 분류 → 중복 제거 → 빈도순 정렬.
-`symbols`는 경로가 모호할 때 보조로만 쓰되, **contract 이름 기반 분류는 하지
-않는다**(drift 원인). 심볼이 어느 파일에 정의됐는지 모르면 cks
-`cks.context.find_symbol` 로 경로를 얻어 §2 규칙을 적용한다.
-
-**출력**:
-```jsonc
-{ "primary_domain": "consensus", "domains": ["consensus","core"], "confidence": "high|medium|low" }
-```
-`confidence`는 경로 신호의 일관성(같은 모듈로 수렴하면 high)으로 정한다.
-
-### 3.2 estimate_complexity(domains, change_summary)
-
-**절차**:
-```
-simple   : domains 1개 + 동시성 무관
-moderate : domains 1-2개 + 동시성 일부 관련
-complex  : 다음 중 하나라도 —
-           domains >= 3
-           consensus | txpool | state | miner 중 포함
-           change_summary 에 "genesis" | "hardfork" | "system contract" 키워드
-           cross-module 의존
-```
-동시성 키워드(`goroutine`/`race`/`mutex`/`concurrent`)가 보이면 한 단계 올린다.
-
-**출력**:
-```jsonc
-{ "complexity": "simple|moderate|complex", "reasoning": "..." }
-```
-
-도메인별 불변식·권장 테스트·byzantine-fairness 판단은 이 함수가 아니라 cks
-`get_for_task` 의 `guidance` 와 `stablenet-invariants` backstop에서 온다.
+> Phase 2 예정: 에이전트가 제너릭 `domain-pack` 로더를 참조하면, 로더가 `state.project_id`로
+> 활성 팩의 `context_classifier` 파일을 해석하고 classify/complexity 절차를 제공한다.
+> 그 시점에 이 포인터 스킬은 제거된다. (ADR `docs/domain-pack-contract-adr-2026-06-22.md`)
