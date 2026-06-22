@@ -10,7 +10,7 @@ go-stablenet task under three information regimes and compares the outcomes:
 | **B_code_only** | grep / glob / read only (no cks, no skills) | `bench-analyzer-codeonly` |
 | **C_code_skills** | grep / read + comprehension skills (no cks) | `bench-analyzer-skills` |
 
-All three fix the model to the analyzer tier (`claude-opus-4-7`) so the
+All three fix the model to the analyzer tier (`claude-opus-4-8`) so the
 comparison isolates the *information regime*, not the model. The shared `planner`,
 `implementer`, and `evaluator` consume the mode-blind artifacts. The analysis stage
 is where the information regime decides quality, so it is the isolated component.

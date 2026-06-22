@@ -1,6 +1,6 @@
 ---
 name: analyzer
-model: claude-opus-4-7
+model: claude-opus-4-8
 description: |
   The ANALYSIS stage of the pipeline (split out of the Planner). It does
   situation analysis (cks retrieval), problem reproduction (authors a test that
@@ -29,8 +29,7 @@ tools:
 skills:
   - state-machine
   - template-parse
-  - stablenet-context
-  - stablenet-invariants
+  - domain-pack
   - root-cause-lifecycle
   - reproduce-first
   - investigative-probe
@@ -112,6 +111,37 @@ record in analysis.md "Retrieval backend": health.status + health.backends
       best-effort analysis from grep alone.
 ```
 
+### 3.0b In-run cks call discipline (retry, tiers, no silent best-effort)
+§3.0 only proves the backend is serviceable *at start*. A serviceable backend can
+still drop or time out an individual call mid-run (flaky ckv, a slow graph query).
+Handle every cks call by this discipline — NEVER "record the failure and silently
+continue", which is exactly how an incomplete analysis ships a bad fix.
+
+1. **Retry.** A cks call that errors or times out is retried up to 2× with a short
+   backoff before it counts as failed. A call that succeeds on retry is `ok`.
+2. **Tier** the primitive that still failed after retries:
+   - PRIMARY — `get_for_task` (§3.1b): the evidence base.
+   - COMPLETENESS — `find_callers`, `impact_analysis`, and (for `consensus/**`,
+     `core/txpool/**`, `core/state/**`, `miner/**`, `systemcontracts/**`)
+     `concurrency_impact`: the write-site / blast-radius evidence the Planner §5.2b
+     and Evaluator §4.6 depend on.
+   - ENHANCEMENT — `semantic_search`, `get_subgraph`, `change_history`, `freshness`:
+     optional refinements.
+3. **Decide** — and record the decision; do NOT proceed "clean" with a core gap:
+   - PRIMARY failed → treat as NOT serviceable: transition BLOCKED and STOP
+     (no evidence base to analyze — same as §3.0).
+   - COMPLETENESS failed → set `retrieval_health.degraded = true`, list the missing
+     primitive+seed, write analysis.md "Retrieval backend: DEGRADED — {what is missing}".
+     Proceed, but the gap is now explicit and propagated (step 4), NOT silent.
+   - ENHANCEMENT failed → note it in analysis.md and proceed (no degraded escalation;
+     this is why §3.3b freshness staying a warning is consistent).
+4. **Persist + propagate.** `related-code.json` carries
+   `retrieval_health = { status, serviceable, degraded, missing[] }` (mirrored to
+   `states.ANALYSIS`). When `degraded`, downstream is hardened, not trusted blindly:
+   the Evaluator MUST NOT skip §4.6 and broadens `-race` to all touched packages, and
+   the Orchestrator surfaces "retrieval degraded — completeness unverified" in the PR
+   body and adds `needs-careful-review`.
+
 ### 3.1 Load + parse the ticket
 ```
 read {workspace_dir}/ticket.json → ticket
@@ -148,14 +178,14 @@ fix → EVALUATION_FAIL → a full cycle that costs far more than the retrieval 
 Only when §3.1b missed a meaning-based hit you still need. Persist in `related-code.json.ckv`.
 History is separate: use `cks_context_change_history` for a hit's modification history.
 
-### 3.3 Domain + complexity (stablenet-context skill)
+### 3.3 Domain + complexity (domain-pack loader)
 ```
-classify   = stablenet-context.classify_domain(file_paths, symbols)   # path classification only
-complexity = stablenet-context.estimate_complexity(domains, change_summary)
+classify   = domain-pack.classify_domain(file_paths, symbols)   # active pack, path classification only
+complexity = domain-pack.estimate_complexity(domains, change_summary)
 ```
 Authoritative domain guidance (invariants, required_tests, system-contract names) comes
-from cks `guidance.*` fields and the always-on `stablenet-invariants` backstop — NOT from
-hardcoded names. Carry `guidance.watch_out`/`also_review`/`required_tests` into analysis.md.
+from cks `guidance.*` fields and the active pack's always-on invariants backstop
+(domain-pack §2.3) — NOT from hardcoded names. Carry `guidance.watch_out`/`also_review`/`required_tests` into analysis.md.
 
 ### 3.3b Freshness gate
 ```

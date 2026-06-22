@@ -11,7 +11,7 @@ type: skill
 > 값의 모든 edge를 빠짐없이 열거하면 깨진 곳을 못 놓친다.
 
 **언제**: "값이 틀리다 / stale 하다 / 변경이 반영 안 된다" 류 버그 진단(diagnose, bugfix 사이클).
-**아닐 때**: 새 기능 설계(→ planner §5.2b), 프로토콜 모양·합의 안전성 판정(→ stablenet-invariants).
+**아닐 때**: 새 기능 설계(→ planner §5.2b), 프로토콜 모양·합의 안전성 판정(→ domain-pack invariants backstop).
 **관계**: cks를 대체하지 않는다. cks가 *후보 코드*를 주면, 이 절차가 *인과 사슬*로 조립한다.
 
 ## 절차 (이 순서를 강제한다)

@@ -1,0 +1,28 @@
+{
+  "experiment": "gsn-stable0005-abc",
+  "_doc": "Single-task A/B/C cell for STABLE-0005 (miner-anzeon / PR #77), whole-approach modes per docs/bench-abc-mode-definitions.md. A=coding-agent+cks pipeline; B=bare LLM+code+grep solver; C=project-native .claude solver. go_stablenet_root is the cks source_root (the indexed tree) so A's retrieval and the edit target agree.",
+  "modes": ["A_cks", "B_code_only", "C_project_skills"],
+  "mode_agents": {
+    "A_cks": "analyzer",
+    "B_code_only": "bench-solver-codeonly",
+    "C_project_skills": "bench-solver-project-skills"
+  },
+  "shared_agents": { "plan": "planner", "implement": "implementer", "evaluate": "evaluator" },
+  "tasks": [
+    {
+      "id": "STABLE-0005",
+      "ticket": "bench/fixtures/tickets/STABLE-0005.json",
+      "module": "miner-anzeon",
+      "base_commit": "0bf2f4d1b",
+      "oracle": {
+        "chainbench_test": "basic/tx-send",
+        "reference_fix": "bench/fixtures/pr77/expert-fix.diff"
+      },
+      "_pr": "#77",
+      "_quality": "clean (base==indexed head 0bf2f4d1b -> zero index drift; cross-module staleness)"
+    }
+  ],
+  "go_stablenet_root": "/Users/wm-it-25_0220/Work/github/test/pr-77",
+  "batch_size": 1,
+  "config": { "max_eval_cycles": 3 }
+}

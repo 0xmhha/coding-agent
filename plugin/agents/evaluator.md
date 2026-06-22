@@ -19,7 +19,7 @@ tools:
   - mcp__plugin_coding-agent_chainbench__chainbench_stop
 skills:
   - state-machine
-  - stablenet-invariants
+  - domain-pack
   - reproduce-first
 ---
 
@@ -93,6 +93,16 @@ The four stages are §4, §5, §6, §7 below.
 ---
 
 ## 4. Stage 1 — Unit Test (RI-21)
+
+### 4.0 Retrieval-health-aware strictness (honor analyzer §3.0b)
+Read `related-code.json.retrieval_health` (mirrored in `states.ANALYSIS`). If
+`degraded == true`, the analysis shipped with a known completeness gap (a missing
+`find_callers`/`impact_analysis`/`concurrency_impact`), so the write-site / blast-radius
+evidence is incomplete — do NOT compensate by trusting it. Harden this run:
+- the §4.6 derived-state gate is MANDATORY — never take its "skip when no derived state
+  detected" branch (the detection itself may be under-informed); require the tests.
+- broaden §4.4 `-race` scope to **all** touched packages, not just the ckg-derived set.
+- note "evaluated under DEGRADED retrieval" in test-report.md so the PR reviewer sees it.
 
 ### 4.1 Decide test scope
 
@@ -175,24 +185,32 @@ invariant is quietly broken.
 
 ```
 1. Detect derived state. It is present if EITHER:
-   - design-v{N}.md §5.2b declared it (read the write-site table), OR
+   - design-v{N}.md has a `write-site-contract` block (planner §5.2b) — parse the
+     ```yaml ... sites: [...] ``` block → { derived_state, sites[], invariant_test,
+     adversarial_test }, OR
    - git -C {go_stablenet_root} diff main...HEAD adds a field/map/counter
      maintained by paired add/sub-style helpers (e.g. addXObligation /
-     subXObligation, a *Spent / *Total / *Count map).
+     subXObligation, a *Spent / *Total / *Count map). (No contract block → the
+     design under-declared; treat as present and require the tests below anyway.)
    If neither holds, skip this gate (status unaffected).
 
-2. If derived state IS present, require BOTH to exist AND be in the --- PASS: set:
-   - a consistency-invariant test: recomputes the aggregate from its source and
-     asserts equality (the invariant named in design §5.2b; or a
-     validate*Internals-style helper that recomputes-and-compares), AND
-   - an adversarial-path test: drives the aggregate through an eviction /
-     truncation / reorg / capacity-limit path — not just add/remove — because
-     that is where maintenance hooks are typically missed.
+2. If derived state IS present, require ALL of:
+   a. a consistency-invariant test: recomputes the aggregate from its source and
+      asserts equality (`invariant_test`; or a validate*Internals-style helper), AND
+   b. an adversarial-path test: drives the aggregate through an eviction /
+      truncation / reorg / capacity-limit path — not just add/remove (`adversarial_test`), AND
+   c. **site completeness** (the contract-driven check): for EVERY `sites[]` row with
+      action != "none", its `covered_by_test` names a test that exists in the diff/tree.
+      A row with `covered_by_test: ''` or naming an absent test is an uncovered
+      write-site — verify each named test actually exercises that site (grep the test
+      body for the site's mutation path; an invariant test alone does not satisfy a
+      site that only drifts under a path the invariant test never drives).
 
-3. If either is missing:
+3. If any of (a)/(b)/(c) is missing:
    status = "FAIL"
-   finding = "derived state {name} introduced without a {consistency-invariant |
-              adversarial eviction/reorg} test (see planner §5.2b). Risk: silent
+   finding = "derived state {derived_state}: {missing piece} — e.g.
+              site(s) {uncovered list} declared in design write-site-contract but not
+              covered by a test (see planner §5.2b / implementer §4.2b). Risk: silent
               aggregate drift → false rejects under load."
    This routes a bug cycle back to the Planner rather than passing EVALUATION.
 ```
@@ -411,6 +429,10 @@ init args. Setup budget: 2 minutes.
 ### 7.3 Start + stabilize
 
 ```
+# P5: snapshot pre-existing node processes BEFORE starting, so §7.6 cleanup can
+# scope itself to only what THIS run starts and never kill a developer's instance.
+bash: pgrep -f 'gstable|wbft-node' > {workspace_dir}/logs/eval-node-prepids.txt 2>/dev/null || true
+
 mcp__plugin_coding-agent_chainbench__chainbench_start()
 
 # Poll for stabilization. Budget: 60 seconds for the first block,
@@ -499,13 +521,23 @@ if count_fail > 0:
 try:
   mcp__plugin_coding-agent_chainbench__chainbench_stop()
 finally:
-  # Defensive: kill any leftover processes named gstable or wbft-node.
-  # This is best-effort and never fails the run.
-  bash: pgrep -fl 'gstable|wbft-node' || true
-  bash: for pid in $(pgrep -f 'gstable'); do kill -TERM $pid 2>/dev/null || true; done
-  bash: sleep 2
-  bash: for pid in $(pgrep -f 'gstable'); do kill -KILL $pid 2>/dev/null || true; done
+  # Defensive net for leftovers chainbench_stop missed — but SCOPED to processes
+  # THIS run started (P5). NEVER kill a pre-existing instance (a developer's local
+  # node) or this shell itself: only PIDs that match AND are absent from the §7.3
+  # pre-start snapshot AND are not $$/$PPID. Best-effort; never fails the run.
+  bash: spare=" $(tr '\n' ' ' < {workspace_dir}/logs/eval-node-prepids.txt 2>/dev/null) $$ $PPID "
+        for sig in TERM KILL; do
+          for pid in $(pgrep -f 'gstable|wbft-node' 2>/dev/null || true); do
+            case "$spare" in *" $pid "*) continue ;; esac   # pre-existing / self → spare
+            kill -$sig "$pid" 2>/dev/null || true
+            [ "$sig" = TERM ] && echo "$pid" >> {workspace_dir}/logs/eval-killed-pids.txt
+          done
+          [ "$sig" = TERM ] && sleep 2
+        done
 ```
+
+> Reference implementation + binary safety test (foreign instance survives, only
+> ours is killed): `bench/p5-cleanup-scope/` (`cleanup_scoped.sh`, `verify.sh`).
 
 Overall ChainBench budget: 20 minutes. If exceeded at any point, run §7.6
 immediately and set `result.status = "FAIL"` with `summary = "chainbench timeout"`.

@@ -1,6 +1,6 @@
 ---
 name: bench-analyzer-skills
-model: claude-opus-4-7
+model: claude-opus-4-8
 description: |
   Benchmark mode C (code + comprehension skills) analyzer. Same job and artifacts
   as the real analyzer, but with NO cks retrieval — it locates code with grep/read
@@ -18,8 +18,7 @@ tools:
 skills:
   - state-machine
   - template-parse
-  - stablenet-context
-  - stablenet-invariants
+  - domain-pack
   - root-cause-lifecycle
   - reproduce-first
   - investigative-probe
@@ -27,10 +26,16 @@ skills:
 
 # Bench Analyzer — Mode C (code + comprehension skills)
 
+> ⚠️ **DEPRECATED (2026-06-22).** OLD A/B/C definition where mode C used the
+> *coding-agent's own* comprehension skills inside the shared pipeline. The canonical
+> definition (`docs/bench-abc-mode-definitions.md`) makes mode C the TARGET PROJECT's
+> own `.claude` skills via `bench-solver-project-skills` (coding-agent excluded). Kept
+> for historical runs / old manifests — do NOT use for new experiments.
+
 A/B/C comparison variant of the **analyzer** (see `bench-analyzer-codeonly.md` for
 the three-mode framing). Mode C = grep/read for *finding* code + comprehension
 skills for *interpreting* it, but still **no cks retrieval**. The model is fixed to
-`claude-opus-4-7` so the comparison isolates the information regime. The downstream
+`claude-opus-4-8` so the comparison isolates the information regime. The downstream
 `planner`, `implementer`, and `evaluator` are SHARED and mode-blind.
 
 ## Contract: identical artifacts
@@ -55,7 +60,7 @@ modify production code (only the reproduction test).
 ### C.0 No backend health check
 No cks in this mode. Record in analysis.md: "Retrieval backend: NONE (mode C, code
 + comprehension skills) — code located by grep/read, interpreted via the
-stablenet-context classifier, the stablenet-invariants backstop, and the
+domain-pack classifier + invariants backstop (active pack), and the
 root-cause-lifecycle scaffold; no semantic or graph retrieval."
 
 ### C.1 Load + parse the ticket
@@ -69,11 +74,10 @@ callers, impact). Persist `related-code.json` with `"mode": "code_skills"`.
 Use the granted skills to interpret what search surfaced — this is what
 distinguishes mode C from mode B:
 ```
-classify   = stablenet-context.classify_domain(file_paths, symbols)   # path-based modules
-complexity = stablenet-context.estimate_complexity(classify.domains, change_summary)
-invariants = stablenet-invariants (always-on backstop): check the change against the
-             5 byzantine-fairness invariants (equal power, epoch asymmetry,
-             round-change neutrality, integer quorum, sticky-proposer concentration)
+classify   = domain-pack.classify_domain(file_paths, symbols)   # active pack, path-based modules
+complexity = domain-pack.estimate_complexity(classify.domains, change_summary)
+invariants = domain-pack invariants backstop (always-on, §2.3): check the change against
+             the active pack's byzantine-fairness invariants (Read domains/{project_id}/invariants.md)
 ```
 Carry the classifier output and any invariant concern into analysis.md. Unlike mode
 A, these come from the static backstop skills, not from live cks `guidance` fields —

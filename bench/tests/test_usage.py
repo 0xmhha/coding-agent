@@ -98,9 +98,9 @@ class TestCapture(unittest.TestCase):
                 ],
             )
             by_model = usage_by_model_from_transcript(t)
-            self.assertIn("claude-opus-4-7", by_model)  # planner
+            self.assertIn("claude-opus-4-8", by_model)  # planner
             self.assertIn("claude-sonnet-4-6", by_model)  # implementer
-            self.assertEqual(by_model["claude-opus-4-7"].input, 100)  # 400/4
+            self.assertEqual(by_model["claude-opus-4-8"].input, 100)  # 400/4
 
     def test_session_real_groups_by_model(self):
         with tempfile.TemporaryDirectory() as d:

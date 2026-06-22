@@ -1,39 +1,29 @@
----
-name: stablenet-context
-description: "go-stablenet 경로 기반 모듈 분류 + 복잡도 추정 헬퍼. 도메인 지식(불변식·system contract·합의 규칙)은 cks 라이브 검색으로 위임한다."
-type: skill
----
+# Stablenet Context — path→module classification (drift-free helper)
 
-# Stablenet Context (deprecated as a knowledge source)
+> Domain-pack data for `go-stablenet`. The path→module map and complexity heuristic
+> below are go-stablenet-specific DATA; the `classify_domain`/`estimate_complexity`
+> *procedure* wrappers are generic and will move to the `domain-pack` loader skill in
+> Phase 2. Moved here from `skills/stablenet-context/SKILL.md` in overlay P1 Phase 1.
+> Domain *knowledge* (invariants, system-contract names, consensus rules) is NOT here
+> — it comes from cks live + the `invariants.md` backstop (see domain-pack.json).
 
-이 skill은 더 이상 go-stablenet 도메인 지식의 출처가 아니다. 합의 규칙,
-system contract, 불변식, 모듈별 특수성 같은 **내용은 시간이 지나면 코드와
-어긋난다(drift)** — 과거 버전이 실제와 다른 contract 이름을 박아 두어
-오답을 유발했다.
+## 1. 권위 있는 도메인 지식 출처 (이 데이터 아님)
 
-남은 책임은 **drift 하지 않는 것** 하나뿐이다: 파일 경로 → 모듈 분류.
-경로 규칙은 contract 이름이 아니라 디렉터리 구조에 기반하므로 안전하다.
-
----
-
-## 1. 권위 있는 도메인 지식 출처 (이 skill 아님)
-
-Planner는 도메인 판단·불변식·테스트 권장을 다음에서 가져온다:
+도메인 판단·불변식·테스트 권장은 다음에서 온다:
 
 - **cks 라이브 검색** — `cks.context.get_for_task` / `cks.context.semantic_search`
   응답의 `guidance` 필드(`watch_out` / `also_review` / `required_tests`).
   이 값은 ckv `policy/stablenet.yaml`(런타임 SSoT 뷰)에서 주입된다.
 - **cks 도메인 엔트리** — `code-knowledge-system/docs/domain-knowledge/projects/
   go-stablenet/entries/*.yaml` (`code_anchors`, `invariants`, `pitfalls`).
-- **항상-켜진 backstop** — `stablenet-invariants` skill (byzantine-fairness
-  핵심 불변식 L3 주입). System contract 이름·합의 엔진 등 고정 사실은 거기서
-  관리한다. 이 skill 본문에 하드코딩하지 않는다.
+- **항상-켜진 backstop** — `invariants.md` (byzantine-fairness 핵심 불변식 L3 주입).
+  System contract 이름·합의 엔진 등 고정 사실은 거기서 관리한다.
 
 System contract 이름이나 합의 규칙을 이 파일에서 찾지 말 것 — 위 출처를 쓴다.
 
 ---
 
-## 2. 경로 기반 모듈 분류 (drift-free 헬퍼)
+## 2. 경로 기반 모듈 분류 (drift-free)
 
 ```
 file_path contains "consensus/"                        → consensus
@@ -55,7 +45,7 @@ file_path contains "eth/" or "les/"                    → eth/les
 
 ---
 
-## 3. 제공 함수
+## 3. 제공 함수 (절차 — Phase 2에서 제너릭 로더로 이동 예정)
 
 ### 3.1 classify_domain(file_paths, symbols)
 
@@ -90,4 +80,4 @@ complex  : 다음 중 하나라도 —
 ```
 
 도메인별 불변식·권장 테스트·byzantine-fairness 판단은 이 함수가 아니라 cks
-`get_for_task` 의 `guidance` 와 `stablenet-invariants` backstop에서 온다.
+`get_for_task` 의 `guidance` 와 `invariants.md` backstop에서 온다.

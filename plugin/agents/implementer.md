@@ -52,9 +52,23 @@ in the workspace.
 ### 2.1 Initialize plan_progress if missing
 
 ```
-read plan.md → parse "## Step N: {description}" blocks
+read plan.md
+# Authoritative source = the machine-readable `plan-contract` block (planner §4.5):
+parse the ```yaml ... steps: [...] ``` block → list of { id, description,
+  target_files, target_symbols, depends_on, verification }
+if the plan-contract block is ABSENT (older plan.md):
+  fall back to parsing "## Step N: {description}" headings, AND
+  log to impl.log: "WARN: plan.md has no machine-readable plan-contract block;
+    fell back to heading parse (planner §4.5 expected)"
+# Sanity: prose `## Step N` count must equal the contract `steps[]` count.
+if counts differ → this is a contract mismatch, NOT a silent recovery:
+  log_failure(state="IMPLEMENTATION", step="plan-parse",
+    actual_outcome={type:"contract_mismatch",
+      summary:"plan.md prose steps != plan-contract steps"})
+  report to Orchestrator (do not transition; Planner must reconcile plan.md).
+
 if states.IMPLEMENTATION.plan_progress is null:
-  build plan_progress.steps from the parsed list:
+  build plan_progress.steps from the contract list (id → step_id):
     each entry: { step_id, description, status: "pending",
                   commits: [], started_at: null, completed_at: null,
                   last_checkpoint: null }
@@ -191,6 +205,43 @@ Constraints:
   - boundary input validation
   - explicit error returns (no silent error swallow)
   - no commented-out code in commits
+
+### 4.2b Write-site contract cross-check (when the design declares derived state)
+
+If design-v{final}.md contains a `write-site-contract` block (planner §5.2b), the
+new aggregate/cache/index must be maintained at **every** site listed there — not
+only the sites this step's prose is "about". After implementing this step:
+
+```
+parse the ```yaml ... write-site-contract ... sites: [...] ``` block from the design
+maintain a checklist of sites whose action != "none"
+for each such site (file:func + action add|sub|rebuild):
+  confirm the edits for this step (or a prior completed step) actually apply that
+  maintenance at that site — i.e. the mutation point now updates the derived state.
+```
+
+A `sites[]` row with `action != none` that NO implemented edit addresses is a
+**dropped write-site** — the single most common silent side-effect. Do not commit
+over it and do not transition:
+
+```
+state-machine.log_failure(workspace_dir, {
+  state: "IMPLEMENTATION", agent: "implementer", step: "write-site-coverage",
+  attempted_action: { description: "Maintain derived state {name} at all sites",
+                      related_design: "design-v{final}.md",
+                      modified_files: <git diff --name-only> },
+  expected_outcome: "every write-site-contract site (action!=none) maintained",
+  actual_outcome: { type: "write_site_dropped",
+                    summary: "site(s) {list} declared in design but not maintained" },
+  agent_analysis: { root_cause_hypothesis: "...", confidence: "high",
+                    suggested_fix: "implement maintenance at the missed site(s)" },
+  resolution: { action: "user_intervention", transitioned_to: null, retry_count: 0 }
+})
+report to Orchestrator (Orchestrator decides: hand back to Planner, or escalate).
+```
+
+This is the Implementer-side mirror of the Evaluator's §4.6 completeness check: the
+Implementer catches a dropped site *before* the build/eval cycle pays for it.
 
 ### 4.3 Build verification
 

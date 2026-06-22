@@ -1,10 +1,9 @@
----
-name: stablenet-invariants
-description: "go-stablenet의 항상-켜진 byzantine-fairness 핵심 불변식(L3 backstop). 검색 품질과 무관하게 합의 안전성·공정성 판단의 기준선을 제공한다. Planner는 설계가 이를 위반하지 않도록, Evaluator는 diff가 이를 깨지 않았는지 판정하는 데 쓴다."
-type: skill
----
-
 # StableNet Critical Invariants (always-on backstop — L3)
+
+> Domain-pack data for `go-stablenet`. Loaded as the search-independent L3 backstop
+> via the `domain-pack` loader skill (and, until Phase 2 rewires agents, via the
+> `stablenet-invariants` pointer skill). Moved here verbatim from
+> `skills/stablenet-invariants/SKILL.md` in overlay P1 Phase 1.
 
 이 불변식들은 cks 검색이 무엇을 surface 하든 **항상** 성립한다. 인덱스가
 없거나 검색이 비어도 적용된다. 아래 중 하나라도 위반하면 테스트가 통과하더라도
