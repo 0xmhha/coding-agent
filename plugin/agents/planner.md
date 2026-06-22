@@ -456,6 +456,26 @@ Write `{workspace_dir}/plan.md`:
 - {mitigations or fallback plans}
 ```
 
+Append a **machine-readable plan contract** to the same plan.md, after the prose
+above. This block — not the `## Step N` headings — is the authoritative input the
+Implementer parses (§2.1) and cross-checks against; keep it in sync with the prose:
+
+```yaml
+# --- plan-contract (machine-readable; authoritative for Implementer §2.1) ---
+steps:
+  - id: 1
+    description: "{one-line, matches '## Step 1' above}"
+    target_files: ["{path}", "..."]
+    target_symbols: ["{symbol}", "..."]
+    depends_on: []          # list of step ids
+    verification: "{build/test command or check}"
+  # ... one entry per step, in topological order
+```
+
+A step present in the prose but absent from this block (or vice-versa) is a
+contract error: the Implementer treats the block as canonical and flags the
+mismatch rather than silently heading-parsing.
+
 ### 4.6 Transition
 
 ```
@@ -533,6 +553,27 @@ graph to enumerate write-sites exhaustively:
 
 Carry the write-site table and the invariant/test names into the design doc so
 the Implementer mirrors every site and the Evaluator can verify the invariant.
+
+Emit the table **also as a machine-readable block** in design-v{N}.md. This is the
+contract the Implementer cross-checks (its §4.2b) and the Evaluator verifies for
+completeness (its §4.6) — neither re-derives it from prose:
+
+```yaml
+# --- write-site-contract (machine-readable) ---
+derived_state: "{name of the new aggregate/cache/index/counter}"
+mirrors: "{underlying structure it tracks}"
+sites:
+  - site: "{file}:{func} — {mutation, e.g. add/remove/eviction/reorg/truncate}"
+    action: add | sub | rebuild | none   # 'none' REQUIRES a reason
+    reason: "{why this action / why none}"
+    covered_by_test: "{test name driving this site, or '' if uncovered}"
+  # ... one row per mutation site found via find_callers + impact_analysis
+invariant_test: "{recompute-from-source == aggregate test name}"
+adversarial_test: "{eviction/reorg/truncation path test name}"
+```
+
+An empty `action`, or `covered_by_test: ''` on a row whose `action != none`, is a
+design hole the Evaluator FAILs on — not a default.
 
 > This is the **design-time** form of the same principle the `root-cause-lifecycle`
 > skill applies at **diagnosis time** (§6 bug cycle / `/diagnose`): a value plus every
