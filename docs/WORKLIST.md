@@ -135,6 +135,10 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 red→green 골격은 reproduce-first로 이미 존재하므로 *레벨 카탈로그/라우팅*만 추가하면 됨. 🔴 미착수
 (원 제안: `plugin/docs/HANDOFF-simulation-verification.md` §6 신규 스킬·§9 결정성 가이드).
 
+**✅ 오버레이 회귀 게이트 통합 (06-22):** `bash bench/overlay-gates.sh` — P0/P2/P3/P5 하네스 +
+bench 단위테스트 9개를 한 커맨드로 묶어 스펙 회귀를 즉시 잡는다(음성 테스트로 드리프트 주입→FAIL 확인).
+pre-commit/CI 후보. P0~P5의 "진짜 개선" 보증을 영구 고정하는 capstone.
+
 ---
 
 ## 권장 다음 순서 (2026-06-22 6/19 재검토 반영 — 조정본)

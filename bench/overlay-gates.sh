@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# overlay-gates.sh — run every stream-6 overlay regression gate in one shot.
+#
+# The overlay improvements (docs/coding-agent-overlay-improvements-and-eval-2026-06-22.md)
+# each shipped a deterministic harness proving "before vs after". This bundles them so a
+# later edit to an agent spec (or a model-pin drift) that silently breaks a contract is
+# caught immediately rather than at the next live run. Each gate exits non-zero on
+# regression; this script aggregates and exits non-zero if ANY gate fails.
+#
+# Wire as a pre-commit hook or CI step:
+#   bash bench/overlay-gates.sh
+set -u
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO" || { echo "cannot cd to repo root"; exit 2; }
+
+fail=0
+run() {  # run <label> <cmd...>
+  local label="$1"; shift
+  local out
+  if out="$("$@" 2>&1)"; then
+    printf '  PASS  %s\n' "$label"
+  else
+    printf '  FAIL  %s\n' "$label"
+    printf '%s\n' "$out" | sed 's/^/          | /'
+    fail=1
+  fi
+}
+
+echo "# coding-agent overlay regression gates (stream-6)"
+echo
+
+echo "P0 — plan/write-site contract machine-checks"
+run "P0 mutant-corpus score (after>before, no false-pos)" python3 bench/p0-mutants/score.py
+run "P0 harness tests"                                     python3 bench/p0-mutants/tests/test_rules.py
+echo
+echo "P2 — cks in-run retrieval discipline"
+run "P2 cks-fault score (silent-incomplete == 0)"          python3 bench/p2-cks-fault/score.py
+run "P2 harness tests"                                     python3 bench/p2-cks-fault/tests/test_policy.py
+echo
+echo "P3 — single-source model pins"
+run "P3 model-pins check (no drift)"                       python3 bench/model-pins/check.py
+run "P3 model-pins tests"                                  python3 bench/model-pins/tests/test_check.py
+echo
+echo "P5 — scoped evaluator cleanup"
+run "P5 cleanup-scope verify (foreign survives)"           bash bench/p5-cleanup-scope/verify.sh
+echo
+echo "bench measurement infra"
+run "bench unit tests"                                     python3 -m unittest bench.tests.test_usage bench.tests.test_report
+
+echo
+if [ "$fail" -eq 0 ]; then
+  echo "overlay-gates: ALL PASS"
+else
+  echo "overlay-gates: FAIL — a stream-6 contract regressed (see above)"
+fi
+exit "$fail"
