@@ -114,7 +114,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 
 | ID | 작업 | 평가 오라클 | 상태 |
 |---|---|---|---|
-| P0 계약 기계검증 | plan/design 구조화 스키마 + implementer write-site 표 대조 + evaluator §4.6 완전성 | mutant 코퍼스 누락-행 탐지율 / false-GREEN율 (expert reference_fix) | ◐ **스펙 패치 적용 (06-22)** — planner §4.5 plan-contract·§5.2b write-site-contract / implementer §2.1 파싱·§4.2b 대조 / evaluator §4.6 완전성. **평가(mutant 코퍼스) 대기** |
+| P0 계약 기계검증 | plan/design 구조화 스키마 + implementer write-site 표 대조 + evaluator §4.6 완전성 | mutant 코퍼스 누락-행 탐지율 / false-GREEN율 (expert reference_fix) | ✅ **스펙 패치 + 결정론 평가 완료 (06-22)** — planner §4.5/§5.2b·implementer §2.1/§4.2b·evaluator §4.6c. 하네스 `bench/p0-mutants/` (score.py·rules.py·mutate.py·contracts.py·render.py·tests 10/10). **측정: hard mutant 탐지 before 33%→after 100% (+66.7pp), clean 오탐 0**. 잔여: `contract_underdeclare`(planner §5.2b 작성규율, P0 범위밖·정직표기) / 에이전트-인-더-루프 충실도 레이어(render→실에이전트 디스패치) 미실행 |
 | P2 cks 결함강건 | 재시도·백오프 + degraded/blocked 임계 명문화 ("조용한 best-effort" 금지) | PR-77 fault-injection (0/10/30/50%) → 조용한 오답 **0** | 🔴 미착수 (비교란) |
 | P5 정리 범위 한정 | evaluator §7.6 pkill→spawn한 PID만 | 동명 더미 프로세스 생존 이진 테스트 | 🔴 미착수 (비교란·소규모) |
 | P3 모델 핀 중앙화/갱신 | 6파일 산재 핀 → 단일 설정원, 4-7→4-8 | 동일 픽스처 3-way bench A/B (정확성 무회귀·비용) | ◐ **4-8 갱신 완료 (06-22)** — opus 핀 전부 claude-opus-4-8 (agents/SKILL/capture/prices), 14/14 통과. **중앙화(단일 설정원)는 미착수** |
