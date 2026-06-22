@@ -77,7 +77,7 @@ distinguishes mode C from mode B:
 classify   = domain-pack.classify_domain(file_paths, symbols)   # active pack, path-based modules
 complexity = domain-pack.estimate_complexity(classify.domains, change_summary)
 invariants = domain-pack invariants backstop (always-on, §2.3): check the change against
-             the active pack's byzantine-fairness invariants (Read domains/{project_id}/invariants.md)
+             the active pack's byzantine-fairness invariants (Read ${CLAUDE_PLUGIN_ROOT}/domains/{project_id}/invariants.md)
 ```
 Carry the classifier output and any invariant concern into analysis.md. Unlike mode
 A, these come from the static backstop skills, not from live cks `guidance` fields —
