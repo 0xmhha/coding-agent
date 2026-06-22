@@ -145,6 +145,12 @@ the design depends on — so it is now a hard stop, not a warning. This is a
 serviceability gate, distinct from §3.3b freshness (staleness), which remains
 a warning.
 
+The same **in-run call discipline** the Analyzer codifies applies to every cks call
+here: retry a dropped/timed-out call up to 2× before counting it failed; a PRIMARY
+(`get_for_task`) loss is BLOCKED, a COMPLETENESS (`find_callers`/`impact_analysis`/
+`concurrency_impact`) loss sets `retrieval_health.degraded` and is propagated — never
+an unflagged best-effort continue. See **Analyzer §3.0b**.
+
 ### 3.1 Load + parse the ticket
 
 ```

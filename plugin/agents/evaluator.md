@@ -94,6 +94,16 @@ The four stages are §4, §5, §6, §7 below.
 
 ## 4. Stage 1 — Unit Test (RI-21)
 
+### 4.0 Retrieval-health-aware strictness (honor analyzer §3.0b)
+Read `related-code.json.retrieval_health` (mirrored in `states.ANALYSIS`). If
+`degraded == true`, the analysis shipped with a known completeness gap (a missing
+`find_callers`/`impact_analysis`/`concurrency_impact`), so the write-site / blast-radius
+evidence is incomplete — do NOT compensate by trusting it. Harden this run:
+- the §4.6 derived-state gate is MANDATORY — never take its "skip when no derived state
+  detected" branch (the detection itself may be under-informed); require the tests.
+- broaden §4.4 `-race` scope to **all** touched packages, not just the ckg-derived set.
+- note "evaluated under DEGRADED retrieval" in test-report.md so the PR reviewer sees it.
+
 ### 4.1 Decide test scope
 
 ```
