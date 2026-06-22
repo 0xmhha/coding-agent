@@ -99,6 +99,25 @@ P3 제약(frontmatter 정적) 때문에 **정적 frontmatter + 동적 Read**로 
 대안 검토(기각): 별칭식 단순화는 model 핀(P3)에선 됐지만, 도메인 지식은 "값 하나"가 아니라
 *문서·표·규칙 집합*이라 별칭으로 표현 불가 → 로더+Read가 유일하게 성립하는 길.
 
+### 3.1 Feasibility — in-plugin 증거 (단정 아님)
+
+"이게 정말 되나?"의 정직한 답: **새 하베스 기능에 의존하지 않는다.** 메커니즘은 둘만 쓴다 —
+(1) frontmatter가 *정적* 스킬 이름 하나를 로드(모든 스킬이 이렇게 로드됨, bedrock), (2) 에이전트가
+스킬 지시에 따라 *데이터-의존 경로를 런타임 `Read`*. 둘 다 기존 기능.
+
+**플러그인 안 증거** (`skills/stablenet-context/SKILL.md` 정독): 스킬은 마크다운 지시문이고
+`classify_domain(...)`은 "절차:"로 적힌 프로즈(함수 디스패치 없음). 이 스킬은 이미 — "심볼 경로를
+모르면 cks `find_symbol`로 *런타임 조회*해 규칙 적용"(§3.1), "도메인 지식은 cks 라이브 +
+`…/go-stablenet/entries/*.yaml`(*계산된 경로*)에서"(§1)라고 지시한다. 즉 **스킬이 런타임에
+데이터-의존 조회·파일 참조를 지시하는 패턴이 이미 작동 중**. `domain-pack` 로더는 동일 패턴.
+
+**P3와의 결정적 차이**: P3의 `frontmatter ${VAR}`는 하베스 미지원 → *진짜 불가능*이었다. 여기엔
+그런 미지원 기능이 없다 — "에이전트가 지시대로 파일 Read"는 가장 기본 능력.
+
+**정직한 한계**: 라이브 에이전트로 *끝까지 돌려본 건 아니다* → "검증 완료"라곤 안 한다. 남은 리스크는
+*능력*(됨)이 아니라 *프롬프트 신뢰성*(매 런 지시 준수)이며, 완전 증명은 Phase 1 라이브(§7-3)에서.
+즉 리스크가 **"불가능" → "Phase 1에서 확인할 신뢰성"** 으로 내려갔다.
+
 ---
 
 ## 4. Decision 3 — generic vs pack 재분류
@@ -130,33 +149,42 @@ evaluator는 chainbench·Go 툴체인·repo 레이아웃이 §2/§4/§7에 35곳
 | **0 (이 ADR)** | 계약·메커니즘·재분류 합의 | ✗ | — |
 | **1 무리팩터 이동** | `stablenet-*` 콘텐츠 → `domains/go-stablenet/{invariants,context}.md` + `domain-pack.json`. `domain-pack` 로더 스킬 신설. 에이전트는 *아직* 활성 팩=go-stablenet 고정. **동작 불변.** | ✗ | overlay-gates + (타세션) bench 무회귀 |
 | **2 일반화** | 에이전트 frontmatter `stablenet-*` 호명 → `domain-pack`. 본문 `stablenet-context.*` → 로더 해석. evaluator stage 데이터화(§5). state.json에 `project_id`. | ✓ | **fcore-baseline 대비 stablenet bench 무회귀** |
-| **3 Project B + 수용** | 토이/소형 비-stablenet 팩 작성 → `/analyze` 완주 | ✗ | 수용 테스트(§7) |
+| **3 Project A 검증** | go-stablenet 무회귀 + 코어 grep-clean 검증 (Project B는 안 만듦, §7) | ✗ | 수용 테스트(§7) |
 
 > 원칙: **무리팩터 이동 → 무회귀 락 → 일반화 → 신규 프로젝트로 계약 누수 검출.**
 > Phase 1·2·3은 별도 세션/승인하에(대공사·교란). **이 ADR는 Phase 0만.**
 
 ---
 
-## 7. 수용/평가 (eval 오라클 — 오버레이 문서 Part B와 동일)
+## 7. 수용/평가 (Project A 검증으로 재정의 — Q4 결정)
 
-1. **수용 테스트 (이진)**: Project B 팩으로 `/coding-agent:analyze` 완주 → PR.
-   성공조건 `git diff plugin/agents/*.md plugin/skills/{generic 7종}` == **빈 diff**
-   (오직 `domains/B/` + 설정만 추가).
-2. **무회귀 (필수)**: 리팩터 후 go-stablenet bench가 `fcore-baseline` 대비 정확성·토큰 노이즈밴드 이내.
-3. **도메인 격리**: Project B 산출물에 stablenet 용어·불변식 누출 0 (grep).
-4. **하네스화**: P0/P2/P5처럼 위 3개를 결정론적으로 검증하는 게이트를 overlay-gates에 추가.
+Project B를 새로 만들지 않는다(없는 것을 위해 부담 X). 대신 **있는 프로젝트(go-stablenet=A)에서
+리팩터가 (i) 동작을 보존하고 (ii) 코어에 도메인 결합을 남기지 않음**을 증명한다 — 이 둘이면
+"새 프로젝트 = 팩 추가뿐"이 *구조적으로* 따라온다(코어에 프로젝트명이 없으므로).
+
+1. **무회귀 (행위 보존)**: 리팩터 후 go-stablenet 파이프라인이 `fcore-baseline` 대비 동등 —
+   overlay-gates 통과 + (타세션) bench 정확성·토큰 노이즈밴드 이내.
+2. **구조적 확장성 증명 (grep, 라이브 불필요)**: 추출 후 코어(`plugin/agents/*.md` + generic 스킬
+   7종)에 "stablenet"·도메인 용어 **0건**. 도메인 콘텐츠는 전부 `plugin/domains/go-stablenet/`.
+   → "코어 편집 없이 새 팩만 추가 가능"이 *부재로* 증명됨(B 없이).
+3. **메커니즘 신뢰성 (§3.1)**: Phase 1 라이브 런에서 로더가 활성 팩을 실제로 해석·적용하는지
+   확인(= 무회귀가 곧 신뢰성 증명).
+4. **하네스화**: 위 1·2를 결정론적으로 검증하는 게이트(grep-clean 체크 + 무회귀 비교)를
+   overlay-gates에 추가.
+
+> Project B(합성/실재)를 통한 라이브 확장 검증은 *나중 별도 단계*로 미룬다 — P1 게이트엔 불필요.
 
 ---
 
-## 8. Open Decisions (당신에게 — 합의 필요)
+## 8. Decisions (합의 현황, 2026-06-22)
 
-1. **§3 로더 메커니즘 승인?** "제너릭 `domain-pack` 스킬 + 런타임 Read(project_id)"로 갈지.
-   (대안 없음에 가깝다고 보지만, 더 단순한 길을 원하면 논의.)
-2. **첫 추출 범위**: Phase 1에서 invariants+context만 vs verification_stages(chainbench)까지 한 번에.
-   (추천: invariants+context 먼저 — evaluator 일반화(§5)는 위험해 Phase 2로 분리.)
-3. **`domains/` 위치**: `plugin/domains/` (추천 — 플러그인과 함께 배포) vs repo-level.
-4. **Project B 정체**: 실재 소형 repo vs 합성 토이(수용 테스트 전용). (추천: 합성 토이 — 계약
-   누수만 검출하면 되므로 가볍게.)
+1. **§3 로더 메커니즘** — 미지원 하베스 기능 의존 **없음**(§3.1 in-plugin 증거: stablenet-context가
+   이미 런타임 데이터-의존 Read/cks 호출을 지시). 능력=됨 / 신뢰성=Phase 1 라이브에서 확인.
+   → **사용자 확인 대기** (이 근거로 승인 여부).
+2. **첫 추출 범위** — ✅ **invariants + context만** (chainbench 일반화는 Phase 2로 분리).
+3. **`domains/` 위치** — ✅ **`plugin/domains/`** (CC 마켓플레이스 설치는 `plugin/`만 복사 →
+   repo-level은 설치 시 안 따라옴).
+4. **Project B** — ✅ **만들지 않음.** Project A(go-stablenet) 무회귀 + 코어 grep-clean으로 검증(§7).
 
 ---
 
