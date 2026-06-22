@@ -1,6 +1,6 @@
 ---
 name: analyzer
-model: claude-opus-4-7
+model: claude-opus-4-8
 description: |
   The ANALYSIS stage of the pipeline (split out of the Planner). It does
   situation analysis (cks retrieval), problem reproduction (authors a test that

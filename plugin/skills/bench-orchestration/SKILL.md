@@ -13,7 +13,7 @@ type: skill
 - **B_code_only** — `bench-analyzer-codeonly`(grep/read만) → 공유 planner → implementer → evaluator
 - **C_code_skills** — `bench-analyzer-skills`(grep/read + 이해 skill) → 공유 planner → implementer → evaluator
 
-세 모드 모두 모델은 `claude-opus-4-7`(planner tier)로 고정 — 비교는 *정보 regime*을
+세 모드 모두 모델은 `claude-opus-4-8`(planner tier)로 고정 — 비교는 *정보 regime*을
 격리한다. 측정은 결정적 tool(`bench/compare.py`)이, 실행 구동은 이 skill(skill 중심)
 + Agent tool(별도 mode-variant agent) + transcript hook이 담당한다.
 

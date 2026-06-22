@@ -25,11 +25,13 @@ from .usage import CanonicalUsage
 # Estimate path lacks a model field, so map the dispatched sub-agent to its
 # model (mirrors the agent .md frontmatter). Override via collect.py if needed.
 DEFAULT_AGENT_MODEL: dict[str, str] = {
-    "orchestrator": "claude-opus-4-7",
-    "planner": "claude-opus-4-7",
-    "analyzer": "claude-opus-4-7",
-    "bench-analyzer-codeonly": "claude-opus-4-7",
-    "bench-analyzer-skills": "claude-opus-4-7",
+    "orchestrator": "claude-opus-4-8",
+    "planner": "claude-opus-4-8",
+    "analyzer": "claude-opus-4-8",
+    "bench-analyzer-codeonly": "claude-opus-4-8",
+    "bench-analyzer-skills": "claude-opus-4-8",
+    "bench-solver-codeonly": "claude-opus-4-8",
+    "bench-solver-project-skills": "claude-opus-4-8",
     "implementer": "claude-sonnet-4-6",
     "evaluator": "claude-sonnet-4-6",
 }
