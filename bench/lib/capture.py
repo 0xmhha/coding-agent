@@ -22,20 +22,33 @@ from pathlib import Path
 
 from .usage import CanonicalUsage
 
-# Estimate path lacks a model field, so map the dispatched sub-agent to its
-# model (mirrors the agent .md frontmatter). Override via collect.py if needed.
-DEFAULT_AGENT_MODEL: dict[str, str] = {
-    "orchestrator": "claude-opus-4-8",
-    "planner": "claude-opus-4-8",
-    "analyzer": "claude-opus-4-8",
-    "bench-analyzer-codeonly": "claude-opus-4-8",
-    "bench-analyzer-skills": "claude-opus-4-8",
-    "bench-solver-codeonly": "claude-opus-4-8",
+# Estimate path lacks a model field, so map the dispatched sub-agent to its model.
+# SINGLE SOURCE: bench/model-pins/models.json (tier -> model id, agent -> tier).
+# Read it at runtime so this is not a second copy that can drift from frontmatter
+# (check.py enforces frontmatter == models.json). Fall back to a literal map only
+# if the file is missing/unparseable, so the bench still runs.
+_MODELS_JSON = Path(__file__).resolve().parents[1] / "model-pins" / "models.json"
+_FALLBACK_AGENT_MODEL: dict[str, str] = {
+    "orchestrator": "claude-opus-4-8", "planner": "claude-opus-4-8",
+    "analyzer": "claude-opus-4-8", "bench-analyzer-codeonly": "claude-opus-4-8",
+    "bench-analyzer-skills": "claude-opus-4-8", "bench-solver-codeonly": "claude-opus-4-8",
     "bench-solver-project-skills": "claude-opus-4-8",
-    "implementer": "claude-sonnet-4-6",
-    "evaluator": "claude-sonnet-4-6",
+    "implementer": "claude-sonnet-4-6", "evaluator": "claude-sonnet-4-6",
 }
 _FALLBACK_MODEL = "claude-sonnet-4-6"
+
+
+def _load_agent_model() -> dict[str, str]:
+    """Resolve {agent: model_id} from models.json; fall back to the literal map."""
+    try:
+        doc = json.loads(_MODELS_JSON.read_text())
+        tiers = doc["tiers"]
+        return {agent: tiers[tier] for agent, tier in doc["agents"].items()}
+    except (OSError, json.JSONDecodeError, KeyError):
+        return dict(_FALLBACK_AGENT_MODEL)
+
+
+DEFAULT_AGENT_MODEL: dict[str, str] = _load_agent_model()
 
 
 def _iter_jsonl(path: Path):
