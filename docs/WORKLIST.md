@@ -119,11 +119,16 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | P5 정리 범위 한정 | evaluator §7.6 pkill→spawn한 PID만 | 동명 더미 프로세스 생존 이진 테스트 | ✅ **완료 (06-22)** — evaluator §7.3 pre-start PID 스냅샷 + §7.6 scoped cleanup(스냅샷 차집합 ∖ $$/$PPID, self-match 버그도 제거). 하네스 `bench/p5-cleanup-scope/` (cleanup_scoped.sh + verify.sh). **실프로세스 이진 테스트 PASS: foreign 생존·ours 종료, naive pkill는 foreign 죽임(버그 실증)** |
 | P3 모델 핀 중앙화/갱신 | 6파일 산재 핀 → 단일 설정원, 4-7→4-8 | 동일 픽스처 3-way bench A/B (정확성 무회귀·비용) | ◐ **4-8 갱신 완료 (06-22)** — opus 핀 전부 claude-opus-4-8 (agents/SKILL/capture/prices), 14/14 통과. **중앙화(단일 설정원)는 미착수** |
 | P1 도메인팩 계약 | `domain-pack.json`+`project_id`, `stablenet-*` 정적 호명 → 활성 팩 해석, chainbench→`mcp:` 스테이지 일반화 | ① Project B 코어 0편집 완주(빈 diff) ② stablenet bench 무회귀 ③ 도메인 누출 0 | 🔴 미착수 (**최대 효용·교란·대형**) |
-| P4 문서 드리프트 | HANDOFF-simulation-verification supersede (reproduce-first/§4.7로 충족분 반영) | doc-truth 대조표: 활성문서 ↔ 코드 모순 0건 | 🔴 미착수 (비런타임) |
+| P4 문서 드리프트 | HANDOFF-simulation-verification supersede (reproduce-first/§4.7로 충족분 반영) | doc-truth 대조표: 활성문서 ↔ 코드 모순 0건 | ✅ **완료 (06-22)** — `plugin/docs/HANDOFF-simulation-verification.md` 상단에 STATUS+doc-truth 대조표(7행) prepend, §8 NEXT supersede. 제안 (1)~(5)는 reproduce-first 트랙으로 충족 확인, **활성 잔여 1건만 분리**: 신규 `simulation-harness` 스킬(L1/L2/L3 라우팅 + L2 in-process 시뮬 + ChainBench L2 down-push) → 아래 잔여항목 추적 |
 
 > **시퀀싱 핵심**: P0·P1·P3은 파이프라인 동작을 *바꾼다* → 스트림1 thesis bench(F-core)의 측정을
 > 교란한다. **F-core 베이스라인을 먼저 캡처**한 뒤 착수하거나, 각 항목을 *자체 before/after A/B*로
 > 측정해야 한다(Part C 변수격리). P2·P4·P5는 비교란이라 아무 때나 가능.
+
+**P4 분리 잔여 (신규 추적 항목):** `simulation-harness` 스킬 — 재현 테스트의 시뮬레이션 레벨
+라우팅(L1 단위 / L2 in-process 체인·합의 / L3 ChainBench) + ChainBench(L3, 20분)를 L2로 down-push.
+red→green 골격은 reproduce-first로 이미 존재하므로 *레벨 카탈로그/라우팅*만 추가하면 됨. 🔴 미착수
+(원 제안: `plugin/docs/HANDOFF-simulation-verification.md` §6 신규 스킬·§9 결정성 가이드).
 
 ---
 

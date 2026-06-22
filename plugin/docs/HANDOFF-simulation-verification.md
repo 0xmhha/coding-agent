@@ -1,3 +1,24 @@
+> ## ⚠️ STATUS (2026-06-22): 대부분 SUPERSEDED — `reproduce-first` 트랙으로 구현됨
+>
+> 이 문서(2026-06-19)가 제안한 **"재현 테스트를 1급 시민으로 + red→green 기계검증"의 코어는
+> 이미 구현·머지됐다** — 단, 제안서의 `simulation-harness` 스킬 경로가 아니라 **`reproduce-first`
+> 스킬 + analyzer/implementer/evaluator 분업**으로. §1~§9는 *역사적 제안 원문*으로 보존한다
+> (supersede-not-delete). 코드와의 1:1 대조:
+>
+> | 제안 항목(§5/§6) | 현재 코드 (2026-06-22) | 판정 |
+> |---|---|---|
+> | (1) `/diagnose` 실행 falsification | `commands/diagnose.md` §3 → `investigative-probe` 스킬(throwaway 관찰) + reproduce-first 오라클 | ✅ 충족 (이름은 `--repro`가 아니라 investigative-probe) |
+> | (2) planner red→green 버그캡처 *요구* | `reproduce-first` 스킬: analyzer **§5 REPRODUCE**가 RED 테스트 작성 + `reproduction.json` | ✅ 실질 충족 (단 L1/L2/L3 시뮬레벨 선택은 미구현) |
+> | (3) implementer red-before-green | implementer **§3.4**(재현 테스트 FIRST 커밋=RED) + **§6.0**(GREEN 선확인) | ✅ 충족 |
+> | (4) evaluator red→green 회귀게이트 (핵심 enabler) | evaluator **§4.7** Reproduction GREEN gate (HEAD green + repro_commit red 재확인 + 테스트파일 무수정) | ✅ 충족 — §7이 제안한 격리 red→green 기계검증 그대로 |
+> | (5) 리포트/상태 연결 | `reproduction.json.{green_confirmed,green_at_head,red_at_parent}` evaluator 기록 | ✅ 충족 |
+> | (신규) `simulation-harness` 스킬 (L1/L2/L3 라우팅 + L2 in-process 체인·합의 시뮬 레시피) | **없음** | 🔴 **미구현 — 유일한 살아있는 잔여** |
+> | ChainBench L2 down-push (무거운 L3 → 경량 L2 우선) | 여전히 §7 generic L3 | 🔴 **미구현 (잔여)** |
+>
+> **활성 잔여는 단 하나**: 재현 테스트의 **시뮬레이션 레벨 라우팅(특히 L2 in-process)** 을
+> `simulation-harness` 스킬로 카탈로그화하는 것. red→green 골격 자체는 reproduce-first로 닫혔으므로
+> 이 문서의 §0·§8 "범위 결정 대기" 서술은 **더 이상 유효하지 않다**(§8 갱신 참조). 추적: WORKLIST 스트림6 P4.
+
 # HANDOFF — 시뮬레이션 기반 "수정 검증/재현" 도입 (coding-agent plugin)
 
 > 목적: 다른 머신/세션에서 이 문서만 읽고도 직전 작업 상태로 복귀해 곧바로 이어서
@@ -187,6 +208,15 @@ evaluator §4.6 철학("green suite는 필요조건일 뿐")을 회귀 테스트
 
 ## 8. 다음 행동 (NEXT — 여기서 재개)
 
+> **⚠️ 이 NEXT는 SUPERSEDED (2026-06-22).** 당시의 "범위 결정 대기"는 더 이상 유효하지 않다.
+> 코어(제안 (2)·(4) + (3)·(5))는 `reproduce-first` 트랙으로 **이미 구현됐다**(상단 STATUS 표 참조).
+> 남은 살아있는 작업은 **단 하나 — 제안의 신규 스킬 (`simulation-harness`)** 뿐이다:
+> 재현 테스트의 **시뮬레이션 레벨 라우팅(L1 단위 / L2 in-process 체인·합의 / L3 ChainBench)** 을
+> 카탈로그화하고 ChainBench(L3, 20분)를 L2로 down-push. red→green *골격*은 손대지 말 것(이미 있음).
+> 아래 "구현 착수 후 권장 순서"는 이제 그 잔여(harness 스킬)에만 적용된다.
+
+<details><summary>역사적 원문 (당시 막힌 지점 — 보존용)</summary>
+
 **막힌 지점**: 사용자에게 "구현 범위"를 묻는 `AskUserQuestion`을 던졌으나 사용자가 reject하고,
 대신 이 핸드오프 문서 작성을 요청함. 즉 **범위 결정이 아직 안 남.**
 
@@ -196,8 +226,7 @@ evaluator §4.6 철학("green suite는 필요조건일 뿐")을 회귀 테스트
 3. **harness 스킬만** — 레벨 정의 + 레시피 + PR77 예시부터.
 4. **설계문서만** — 코드 수정 없이 이 제안을 plugin 안 설계 제안 .md로 정리(사실상 이 문서가 초안).
 
-> 주의: 사용자가 방금 범위 질문을 reject했으므로, 재개 시 **장황한 재질문보다** 이 문서를
-> 근거로 "코어 3종부터 가겠다"는 식의 권고안 1개를 제시하고 동의를 받는 편이 매끄럽다.
+</details>
 
 구현 착수 후 권장 순서(코어 3종 기준):
 1. `skills/simulation-harness/SKILL.md` 신설(다른 스킬들 톤·길이 참고: 50~90줄, frontmatter `name`/`description`/`type: skill`).
