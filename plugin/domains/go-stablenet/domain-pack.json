@@ -13,13 +13,16 @@
     "_doc": "Build/test contract the Evaluator consumes (Phase 2b). Commands are run in repo_root; templates use {pkgs}/{cover_out} placeholders the Evaluator fills. `stages` drives the §3 loop (kind: builtin:* | mcp:*) — data-driven dispatch lands in Phase 2b-β. NOTE: a stage's MCP tool (e.g. chainbench) must still be granted in the Evaluator frontmatter — MCP grants are static (not pack-driven).",
     "repo_root_env": "GO_STABLENET_ROOT",
     "build": {
+      "_doc": "binary_cmd builds the node binary the chain runs (via the project Makefile), at `artifact`. cmd is a compile-all sanity gate only.",
       "cmd": "go build ./...",
-      "binary_cmd": "go build -o build/bin/gstable ./cmd/gstable",
+      "binary_cmd": "make gstable",
       "artifact": "build/bin/gstable"
     },
     "unit_test": {
       "runner": "go",
-      "full": "go test ./... -v -count=1 -timeout=600s",
+      "_scope_doc": "targeted_tmpl runs per bug-cycle on changed packages (fast feedback). full runs ONCE as the final regression gate (Evaluator §8.0), only when every other gate is green — not on every failing iteration.",
+      "full": "go test ./... -count=1 -timeout=600s",
+      "targeted_tmpl": "go test {pkgs} -count=1 -timeout=300s",
       "coverage_tmpl": "go test {pkgs} -coverprofile={cover_out} -covermode=atomic",
       "cover_report_tmpl": "go tool cover -func={cover_out}",
       "race_tmpl": "go test -race {pkgs} -count=1 -timeout=300s",
@@ -29,7 +32,7 @@
       { "id": "unit",  "kind": "builtin:unit_race" },
       { "id": "lint",  "kind": "builtin:lint" },
       { "id": "sec",   "kind": "builtin:gosec" },
-      { "id": "integ", "kind": "mcp:chainbench", "profile": "default", "oracle_enum": ["basic/tx-send", "basic/consensus"] }
+      { "id": "integ", "kind": "mcp:chainbench", "profile": "default", "oracle_enum": ["basic/tx-send", "basic/consensus"], "run_when": "prod_go_changed", "_run_when_doc": "Evaluator skips this stage when the diff has no non-test .go change (docs/test/tooling-only) — the node binary behavior is unchanged, so integration e2e is not informative. Override is forced when an e2e reproduction oracle needs a running chain. Omit run_when to always run." }
     ]
   }
 }

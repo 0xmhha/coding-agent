@@ -346,19 +346,55 @@ across bug cycles. The tier-aware contract (RED/CARRY/GREEN, reproduction.json) 
 **`reproduce-first` skill** — apply it. Two tiers exist (point 1):
 
 - **`simulation`** — an in-process Go test in the go-stablenet tree (§5a). Fast, deterministic,
-  no binary/nodes. The default.
+  no binary/nodes. The default **only** for symptoms one process can faithfully exhibit (§5.0 rule 3).
 - **`e2e`** — a chainbench `.sh` test run against the **project-built binary** on a real
-  multi-node network (§5b). For symptoms that only manifest across nodes/consensus/sync/
-  P2P/txpool-propagation/hardfork, or when §5a cannot reproduce.
+  multi-node network (§5b). **Mandatory** for consensus/sync/P2P/txpool-propagation/partition/
+  hardfork/cross-node-divergence symptoms (§5.0 rule 1), default for safety-critical domains
+  (§5.0 rule 2), and the escalation target when §5a cannot honestly reproduce (§5.0 rule 4).
 
-### 5.0 Tier selection
+### 5.0 Tier selection (decision procedure — be strict, simulation is the *exception* for these)
+
+simulation is the default ONLY for symptoms a single-process Go test can faithfully exhibit.
+The danger to avoid: picking simulation because it is faster, then writing a test that **fakes
+the very mechanism that is broken** (hand-rolled consensus, stubbed networking, a forced state)
+— that "passes for the wrong reason" and proves nothing. Decide in this order:
+
+1. **MUST be e2e (chainbench) — not negotiable.** If the §4 root cause OR the ticket's
+   "재현 방법" involves any of these, the only trustworthy reproduction is on a real
+   multi-node chain; do NOT attempt a simulation shortcut:
+   - consensus / finality / fork-choice / leader (proposer) rotation / view-change
+   - block production, timing, or empty-block behavior **across validators**
+   - sync / snap-sync / fast-sync / state-healing between nodes
+   - P2P peering, discovery, topology, or message propagation
+   - txpool propagation / re-broadcast / nonce gaps **between nodes**
+   - network partition, node crash/restart, or recovery
+   - hardfork transition at a block height (pre/post fork behavior)
+   - cross-node state or balance **divergence** (nodes disagree on the head/state)
+   - governance / system-contract effects that require the on-chain tx → block → apply flow
+
+2. **Default-e2e for safety-critical domains unless simulation provably exercises the real
+   mechanism.** If §3.3 `primary_domain ∈ {consensus, txpool, core/state, miner,
+   systemcontracts, p2p}` AND the symptom is a runtime/observable behavior, prefer e2e.
+   Choose simulation here ONLY if a deterministic in-process test drives the **actual** failing
+   code path (not a reimplemented stand-in) and exhibits the exact wrong observable. Justify
+   that in findings.log; if you cannot make that case, go e2e.
+
+3. **simulation is fine** for symptoms fully contained in one process and exhibitable without a
+   live chain: pure functions, encoding/decoding (RLP/ABI), gas/fee math, a single-node state
+   transition or validation rule, signature/key handling, a data-structure bug. The test must
+   drive the real production function and assert the real wrong value.
+
+4. **Escalate, never settle.** If you pick simulation and §5a's RED gate cannot make it fail
+   (or the only way to make it fail is to fake the broken mechanism), ESCALATE to e2e (§5b)
+   before declaring `reproduction_unobtainable`. "simulation passed for the wrong reason" is a
+   reproduction failure, not a pass.
+
+Record the chosen tier AND the one-line justification (which rule above fired) in findings.log.
 ```
-Pick simulation UNLESS the symptom is inherently multi-process — i.e. the §4 root cause
-or the ticket's "재현 방법" involves: consensus/leader rotation, block production across
-validators, sync/snap-sync, P2P peering/topology, txpool propagation between nodes,
-network partition, or a hardfork transition at a block height. Those → e2e.
-If you pick simulation and §5a's RED gate cannot make it fail, ESCALATE to e2e (§5b)
-before declaring reproduction_unobtainable. Journal the chosen tier + why (findings.log).
+tier = e2e  if any rule-1 trigger present
+     | e2e  if rule-2 domain + runtime symptom and no faithful in-process path
+     | simulation  if rule-3 (contained, real-path test) holds
+escalate simulation → e2e when §5a RED cannot be honestly obtained
 ```
 
 ### 5a. simulation tier — in-process Go test
