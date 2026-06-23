@@ -48,7 +48,8 @@ short summary.
 Required prompt fields:
 
 - `workspace_dir`: absolute path to the ticket workspace
-- `go_stablenet_root`: absolute path to the go-stablenet repo
+- `repo_root`: absolute path to the target project repo (the active domain pack's
+  `verification.repo_root_env` names the env var that also holds it, e.g. `GO_STABLENET_ROOT`)
 
 Optional:
 
@@ -61,15 +62,22 @@ Optional:
 ## 2. Bootstrap
 
 ```
+0. Resolve the active project's verification contract (domain-pack, Phase 2b):
+   project_id = state.project_id (default "go-stablenet")
+   pack = Read(${CLAUDE_PLUGIN_ROOT}/domains/{project_id}/domain-pack.json)
+   ver  = pack.verification          # build/unit_test commands (below) + stages (§3)
+   repo_root = the prompt's repo_root, else the path held by env ${ver.repo_root_env}
+   (every go build / go test / binary command below comes from ver.build / ver.unit_test —
+    do NOT hardcode them; the stage set comes from ver.stages.)
 1. Read {workspace_dir}/state.json
    verify current_state == "EVALUATION"
    verify states.IMPLEMENTATION.plan_progress.steps[*].status == "completed"
-2. Read {go_stablenet_root}/state of git:
-   bash: git -C {go_stablenet_root} rev-parse --abbrev-ref HEAD → branch
+2. Read {repo_root}/state of git:
+   bash: git -C {repo_root} rev-parse --abbrev-ref HEAD → branch
    verify branch == states.IMPLEMENTATION.branch
-   bash: git -C {go_stablenet_root} status --porcelain → must be empty
+   bash: git -C {repo_root} status --porcelain → must be empty
 3. Confirm build cache is reusable
-   bash: go -C {go_stablenet_root} build ./... 2>&1 | tee {workspace_dir}/logs/eval-build.log
+   bash: cd {repo_root} && {ver.build.cmd} 2>&1 | tee {workspace_dir}/logs/eval-build.log
    if exit != 0:
      this is a Stage 0 failure — report immediately, do NOT continue.
      log_failure with stage="build" before stopping.
@@ -80,15 +88,32 @@ code that doesn't compile.
 
 ---
 
-## 3. Run all four stages
+## 3. Run the verification stages (data-driven from the pack)
 
-Run stages sequentially. Each stage:
+Iterate `ver.stages` (resolved in §2.0) in order and dispatch each by its `kind`.
+Each stage:
 
-1. Captures its own log file under `{workspace_dir}/logs/eval-{stage}.log`.
+1. Captures its own log under `{workspace_dir}/logs/eval-{stage.id}.log`.
 2. Produces a structured result `{ status, summary, details, log_file, ... }`.
 3. **Does not stop the run on failure** — record and continue.
 
-The four stages are §4, §5, §6, §7 below.
+Dispatch by `kind` (the stage bodies are §4–§7):
+
+| `kind` | runs | notes |
+|---|---|---|
+| `builtin:unit_race` | §4 (unit + coverage + -race) | uses `ver.unit_test.*` |
+| `builtin:lint`      | §5 (lint & format) | |
+| `builtin:gosec`     | §6 (security scan) | |
+| `mcp:<tool>` (e.g. `mcp:chainbench`) | §7 (integration) | uses `stage.profile`/`stage.oracle_enum` |
+
+Skip rules (record, never fail the run):
+- a `kind` not implemented here → SKIP (log "unknown stage kind: {kind}").
+- an `mcp:<tool>` stage whose MCP tool is NOT granted in this agent's frontmatter →
+  SKIP (see §7.0). **MCP grants are static frontmatter, not pack-driven** — this is the
+  documented pack-vs-grant residual (a project needing a different integration MCP must
+  add its grant here).
+
+The go-stablenet pack declares unit/lint/sec + `mcp:chainbench`, so all of §4–§7 run.
 
 ---
 
@@ -108,7 +133,7 @@ evidence is incomplete — do NOT compensate by trusting it. Harden this run:
 
 ```
 changed_pkgs = bash:
-  git -C {go_stablenet_root} diff main...HEAD --name-only '*.go' \
+  git -C {repo_root} diff main...HEAD --name-only '*.go' \
     | xargs -I{} dirname {} \
     | sort -u
 ```
@@ -116,8 +141,8 @@ changed_pkgs = bash:
 ### 4.2 Full test run
 
 ```
-bash: cd {go_stablenet_root} && \
-      go test ./... -v -count=1 -timeout=600s 2>&1 \
+bash: cd {repo_root} && \
+      {ver.unit_test.full} 2>&1 \
       | tee {workspace_dir}/logs/eval-unit-test.log
 exit_code = $?
 ```
@@ -127,13 +152,11 @@ exit_code = $?
 Skip if `changed_pkgs` is empty (e.g., no Go files changed):
 
 ```
-bash: cd {go_stablenet_root} && \
-      go test ${changed_pkgs[@]} \
-        -coverprofile={workspace_dir}/logs/coverage.out \
-        -covermode=atomic 2>&1 \
+bash: cd {repo_root} && \
+      {ver.unit_test.coverage_tmpl, fill {pkgs}=${changed_pkgs[@]} {cover_out}={workspace_dir}/logs/coverage.out} 2>&1 \
         | tee -a {workspace_dir}/logs/eval-unit-test.log
-bash: cd {go_stablenet_root} && \
-      go tool cover -func={workspace_dir}/logs/coverage.out \
+bash: cd {repo_root} && \
+      {ver.unit_test.cover_report_tmpl, fill {cover_out}={workspace_dir}/logs/coverage.out} \
         > {workspace_dir}/logs/coverage-summary.txt
 ```
 
@@ -146,8 +169,8 @@ race_pkgs = unique parent packages of every symbol with
 also include packages in changed_pkgs that touch consensus|core/txpool|miner
 
 if race_pkgs is non-empty:
-  bash: cd {go_stablenet_root} && \
-        go test -race ${race_pkgs[@]} -count=1 -timeout=300s 2>&1 \
+  bash: cd {repo_root} && \
+        {ver.unit_test.race_tmpl, fill {pkgs}=${race_pkgs[@]}} 2>&1 \
         | tee {workspace_dir}/logs/eval-race.log
 ```
 
@@ -188,7 +211,7 @@ invariant is quietly broken.
    - design-v{N}.md has a `write-site-contract` block (planner §5.2b) — parse the
      ```yaml ... sites: [...] ``` block → { derived_state, sites[], invariant_test,
      adversarial_test }, OR
-   - git -C {go_stablenet_root} diff main...HEAD adds a field/map/counter
+   - git -C {repo_root} diff main...HEAD adds a field/map/counter
      maintained by paired add/sub-style helpers (e.g. addXObligation /
      subXObligation, a *Spent / *Total / *Count map). (No contract block → the
      design under-declared; treat as present and require the tests below anyway.)
@@ -247,16 +270,16 @@ read reproduction.json → { run_cmd, test_name, test_file }
 repro_commit = states.IMPLEMENTATION.reproduction_commit
 
 # GREEN at HEAD — the bug must no longer reproduce:
-bash: cd {go_stablenet_root} && {run_cmd}            → green_at_head = (exit == 0)
+bash: cd {repo_root} && {run_cmd}            → green_at_head = (exit == 0)
 
 # RED re-confirm — the same test must FAIL at the reproduction commit (test present,
 # fix absent), proving a real red→green on the branch:
-bash: git -C {go_stablenet_root} checkout {repro_commit}
-bash: cd {go_stablenet_root} && {run_cmd}            → red_at_repro = (exit != 0)
-bash: git -C {go_stablenet_root} checkout {branch}   # restore HEAD
+bash: git -C {repo_root} checkout {repro_commit}
+bash: cd {repo_root} && {run_cmd}            → red_at_repro = (exit != 0)
+bash: git -C {repo_root} checkout {branch}   # restore HEAD
 
 # The implementer must NOT have edited the oracle:
-bash: git -C {go_stablenet_root} diff {repro_commit} HEAD -- {test_file}   → must be empty
+bash: git -C {repo_root} diff {repro_commit} HEAD -- {test_file}   → must be empty
 ```
 
 **tier == "e2e"** (chainbench `.sh` on the project-built binary) — the oracle needs a
@@ -296,7 +319,7 @@ Inputs:
 ```
 analysis.md "## Root cause" (broken edge file:line) + related-code.json.affected_sites (§4.1)
 design-v{N}.md write-site-contract (planner §5.2b), if present
-diff = git -C {go_stablenet_root} diff main...HEAD        (the fix surface; for e2e the diff is the only fix)
+diff = git -C {repo_root} diff main...HEAD        (the fix surface; for e2e the diff is the only fix)
 ```
 
 **Mechanical checks — hybrid policy: any failure ⇒ `fix_validity_verdict = FAIL` (hard, routes a bug cycle):**
@@ -340,7 +363,7 @@ flagged checks). The two verdicts are reported separately in §8 — a reader mu
 ### 5.1 Lint
 
 ```
-bash: cd {go_stablenet_root} && \
+bash: cd {repo_root} && \
       golangci-lint run ./... --timeout=300s --out-format=json 2>&1 \
       | tee {workspace_dir}/logs/eval-lint.log
 ```
@@ -351,9 +374,9 @@ installed, fall back to `go vet ./...` and add a warning.
 ### 5.2 Format check
 
 ```
-bash: cd {go_stablenet_root} && \
+bash: cd {repo_root} && \
       gofmt -l . 2>&1 | tee {workspace_dir}/logs/eval-gofmt.log
-bash: cd {go_stablenet_root} && \
+bash: cd {repo_root} && \
       goimports -l . 2>&1 | tee {workspace_dir}/logs/eval-goimports.log
 ```
 
@@ -383,7 +406,7 @@ Implementer to run `goimports -w` and re-commit rather than ship style drift.
 ### 6.1 Static analysis
 
 ```
-bash: cd {go_stablenet_root} && go vet ./... 2>&1 \
+bash: cd {repo_root} && go vet ./... 2>&1 \
         | tee {workspace_dir}/logs/eval-vet.log
 bash: if command -v gosec >/dev/null; then
         gosec -fmt=json -out={workspace_dir}/logs/eval-gosec.json ./...
@@ -397,7 +420,7 @@ bash: if command -v gosec >/dev/null; then
 Only scan files that the Implementer changed (cheaper + more focused):
 
 ```
-bash: git -C {go_stablenet_root} diff main...HEAD --name-only '*.go' \
+bash: git -C {repo_root} diff main...HEAD --name-only '*.go' \
         > {workspace_dir}/logs/eval-security-files.txt
 
 for each changed .go file:
@@ -466,27 +489,27 @@ if missing is non-empty:
 
 ### 7.1 Resolve the modified binary (handoff from the Implementer)
 
-The Implementer emits the built binary at `build/bin/gstable` and records it in
-state.json (implementer §6.1). Prefer that artifact; rebuild only if it is
-missing or its commit no longer matches HEAD.
+The Implementer emits the built binary at the pack's `verification.build.artifact`
+(e.g. `build/bin/gstable`) and records it in state.json (implementer §6.1). Prefer that
+artifact; rebuild only if it is missing or its commit no longer matches HEAD.
 
 ```
 read state.json → states.IMPLEMENTATION.{binary_path, binary_commit}
-head = bash: git -C {go_stablenet_root} rev-parse HEAD
+head = bash: git -C {repo_root} rev-parse HEAD
 
 if binary_path is set AND that file exists AND binary_commit == head:
   binary_path = states.IMPLEMENTATION.binary_path     # use the handoff artifact
 else:
   # Fallback: artifact absent or stale; rebuild at the convention path + warn.
   log warning: "binary handoff absent/stale (commit {binary_commit} vs HEAD {head}); rebuilding"
-  bash: cd {go_stablenet_root} && \
-        go build -o {go_stablenet_root}/build/bin/gstable ./cmd/gstable 2>&1 \
+  bash: cd {repo_root} && \
+        {ver.build.binary_cmd} 2>&1 \
           | tee {workspace_dir}/logs/eval-build-gstable.log
   if exit != 0:
     result.status = "FAIL"
     result.summary = "binary build failed; cannot run ChainBench"
     goto §7.6 cleanup (which is a no-op if nothing was started)
-  binary_path = "{go_stablenet_root}/build/bin/gstable"
+  binary_path = "{repo_root}/{ver.build.artifact}"
 ```
 
 Build budget (fallback only): 5 minutes. Use the agent's wall-clock to enforce.
@@ -498,7 +521,7 @@ mcp__plugin_coding-agent_chainbench__chainbench_init({
   profile: "default",          # default.yaml IS the go-stablenet/stablenet-adapter
                                # profile; there is no "go-stablenet" profile.
   binary_path: binary_path,    # resolved in §7.1 (implementer artifact or fallback)
-  project_root: go_stablenet_root,
+  project_root: repo_root,
 })
 ```
 
@@ -615,15 +638,15 @@ bash: git -C "$CB" diff -- {chainbench_test_file}      → must be empty (else f
 
 # RED re-confirm (best-effort, bounded) — rebuild the PARENT/base binary and re-run; the same
 # test must FAIL without the fix. Reuses §7.1's build path with a parent checkout:
-parent = states.IMPLEMENTATION.reproduction_commit (or `git -C {go_stablenet_root} merge-base main HEAD`)
-bash: git -C {go_stablenet_root} stash -u 2>/dev/null; git -C {go_stablenet_root} checkout {parent}
-bash: cd {go_stablenet_root} && {binary_build_cmd}     # e.g. make gstable → build/bin/gstable
-chainbench_restart({ binary_path: "{go_stablenet_root}/build/bin/gstable", project_root: {go_stablenet_root} })
+parent = states.IMPLEMENTATION.reproduction_commit (or `git -C {repo_root} merge-base main HEAD`)
+bash: git -C {repo_root} stash -u 2>/dev/null; git -C {repo_root} checkout {parent}
+bash: cd {repo_root} && {binary_build_cmd}     # e.g. make gstable → build/bin/gstable
+chainbench_restart({ binary_path: "{repo_root}/{ver.build.artifact}", project_root: {repo_root} })
   # wait for blocks (reuse §7.3 stabilization budget)
 red_at_parent = ( chainbench_test_run({ test: chainbench_test }) FAILED )
-bash: git -C {go_stablenet_root} checkout {branch}; git -C {go_stablenet_root} stash pop 2>/dev/null
+bash: git -C {repo_root} checkout {branch}; git -C {repo_root} stash pop 2>/dev/null
 # restore the HEAD binary so any later step uses the fix build:
-bash: cd {go_stablenet_root} && {binary_build_cmd}
+bash: cd {repo_root} && {binary_build_cmd}
 ```
 Hand `green_at_head`, `red_at_parent`, and the oracle-unmodified result back to §4.7's
 verdict. If the parent rebuild/restart exceeds budget, skip it and record

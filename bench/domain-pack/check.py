@@ -60,6 +60,23 @@ def check(*, domains_dir: Path = DOMAINS, skills_dir: Path = SKILLS,
             ref = doc.get(ref_key)
             if ref and not (pack_path.parent / ref).is_file():
                 problems.append(f"{pid}: {ref_key} -> {ref} not found in {pack_path.parent}")
+        # verification contract the Evaluator consumes (Phase 2b)
+        ver = doc.get("verification")
+        if not isinstance(ver, dict):
+            problems.append(f"{pid}: missing 'verification' block (Evaluator Phase 2b contract)")
+        else:
+            if not ver.get("repo_root_env"):
+                problems.append(f"{pid}: verification.repo_root_env missing")
+            b = ver.get("build", {})
+            for k in ("cmd", "binary_cmd", "artifact"):
+                if not b.get(k):
+                    problems.append(f"{pid}: verification.build.{k} missing")
+            u = ver.get("unit_test", {})
+            for k in ("full", "coverage_tmpl", "cover_report_tmpl", "race_tmpl"):
+                if not u.get(k):
+                    problems.append(f"{pid}: verification.unit_test.{k} missing")
+            if not isinstance(ver.get("stages"), list) or not ver.get("stages"):
+                problems.append(f"{pid}: verification.stages must be a non-empty list")
 
     # generic loader skill present
     if not (skills_dir / "domain-pack" / "SKILL.md").is_file():
@@ -84,6 +101,15 @@ def check(*, domains_dir: Path = DOMAINS, skills_dir: Path = SKILLS,
                 wired += 1
         if wired == 0:
             problems.append("no agent references the generic 'domain-pack' loader skill")
+
+        # Phase 3 grep-clean: core agents must not hardcode domain coupling.
+        allow = re.compile(r"go-stablenet|stablenet-review-code|stablenet-features\.md|policy/stablenet\.yaml")
+        for md in sorted(agents_dir.glob("*.md")):
+            for ln, line in enumerate(md.read_text().splitlines(), 1):
+                if "go_stablenet_root" in line:
+                    problems.append(f"{md.name}:{ln} hardcodes go_stablenet_root — use repo_root")
+                elif "stablenet" in line and not allow.search(line):
+                    problems.append(f"{md.name}:{ln} domain term 'stablenet' (generalize or allowlist)")
 
     if problems:
         print(f"DOMAIN-PACK STRUCTURE PROBLEMS ({len(problems)}):")

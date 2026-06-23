@@ -89,7 +89,7 @@ sites. Be explicit in analysis.md about what you could NOT find (search has no
 semantic recall) so the cost/coverage trade-off is measurable.
 
 ### B.3 Domain + complexity
-Path-based heuristic inline (no stablenet-context skill in mode B): classify each
+Path-based heuristic inline (no domain-pack skill in mode B): classify each
 touched file by directory (`consensus/` → consensus, `core/txpool/` → txpool …)
 and estimate complexity from module count + concurrency-sensitive paths. Note that
 domain invariants are NOT available in this mode.

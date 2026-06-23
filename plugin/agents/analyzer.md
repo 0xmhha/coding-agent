@@ -96,7 +96,7 @@ BREAKS the pipeline. Write the files; your returned text is a short status (see 
 Required prompt fields:
 - `workspace_dir`: absolute path
 - `mode`: `fresh` | `bugfix` | `code_review`
-- `go_stablenet_root`: absolute path to the target-project (go-stablenet) repo. If not
+- `repo_root`: absolute path to the target-project (go-stablenet) repo. If not
   passed, resolve it from `state.json` / settings the same way the Evaluator does.
 
 Environment (for the e2e reproduction tier, §5b):
@@ -366,7 +366,7 @@ before declaring reproduction_unobtainable. Journal the chosen tier + why (findi
 1. From "재현 방법" + the §4 root cause, author a minimal deterministic Go test named
    TestReproduce_{slug} at the correct package (or extend an existing _test.go).
 2. Run ONLY that test against the current tree:
-     Bash: cd {go_stablenet_root} && go test -run '{TestName}' ./{pkg}/...   (add -race if concurrency)
+     Bash: cd {repo_root} && go test -run '{TestName}' ./{pkg}/...   (add -race if concurrency)
 3. Apply the RED gate (§5.2).
 ```
 
@@ -377,11 +377,11 @@ AND accumulates as regression (§5.3, point 5).
 ```
 0. Resolve roots:  CB=$(echo "$CHAINBENCH_DIR")   (unset → e2e unavailable; see §5.0)
 1. BUILD the target binary from the CURRENT (unfixed) tree — this is what proves RED:
-     Bash: cd {go_stablenet_root} && make gstable        # or: go build -o build/bin/gstable ./cmd/gstable
-   binary_path = {go_stablenet_root}/build/bin/gstable   (must exist; build fail → journal + escalate/BLOCK)
+     Bash: cd {repo_root} && make gstable        # or: go build -o build/bin/gstable ./cmd/gstable
+   binary_path = {repo_root}/build/bin/gstable   (must exist; build fail → journal + escalate/BLOCK)
 2. INIT + START a local network on that binary (pick the smallest profile that exhibits the
    symptom; `regression` gives 4 BP + 1 EN with test accounts; `minimal` for simpler repros):
-     chainbench_init({ profile: "<profile>", project_root: {go_stablenet_root}, binary_path })
+     chainbench_init({ profile: "<profile>", project_root: {repo_root}, binary_path })
      chainbench_start({ binary_path })
      Poll chainbench_status / chainbench_consensus_health until blocks are produced (budget ~90s).
 3. PRECONDITIONS — build the environment the symptom needs: deploy contracts

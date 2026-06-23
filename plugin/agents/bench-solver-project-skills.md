@@ -33,7 +33,7 @@ model.
 
 ## Hard regime constraints (isolation by tool/knowledge absence)
 - **NO cks** — no MCP retrieval tools are granted to this agent.
-- **NO coding-agent skills** — no `root-cause-lifecycle`, `stablenet-context`,
+- **NO coding-agent skills** — no `root-cause-lifecycle`, `domain-pack`,
   `reproduce-first`, etc. (those belong to the coding-agent plugin, which mode C
   excludes). The ONLY knowledge aids allowed are the target project's own
   `.claude/` assets.
