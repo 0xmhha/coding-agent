@@ -428,6 +428,13 @@ e2e:         { "tier":"e2e", "test_name":"repro/<ticket>-<slug>",
 ```
 Set the marker `states.ANALYSIS.reproduction_confirmed = true`.
 
+> **This is HARD-gated, not advisory.** For `ticket_type == "bugfix"` the
+> `ANALYSIS → PLANNING` transition (state-machine §2.3) BLOCKS unless `reproduction.json`
+> exists with `red_confirmed == true` AND `states.ANALYSIS.reproduction_confirmed == true`.
+> You cannot reach PLANNING by writing analysis.md alone and skipping §5 — authoring the
+> test and observing RED is mandatory. If the symptom genuinely cannot be reproduced, take
+> the `reproduction_unobtainable` → BLOCKED path (§5.2); do NOT proceed to PLANNING.
+
 > simulation oracle: left uncommitted in the go-stablenet tree → Implementer commits it FIRST
 > (red/test commit). e2e oracle: lives in the chainbench repo, NOT in the fix PR → Implementer
 > leaves it untouched and references it. Either way the Implementer must NOT modify the oracle;

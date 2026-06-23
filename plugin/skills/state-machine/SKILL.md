@@ -223,7 +223,19 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
    - `Bash`: `test -f {workspace_dir}/analysis.md && test -f {workspace_dir}/related-code.json && echo OK`
    - **아티팩트 완전성 검증 (RI-13)**:
      - analysis.md 내용 길이 > 200 자 (빈 파일 차단)
-     - related-code.json을 파싱하여 `results` 배열이 존재하고 비어있지 않은지 확인
+     - related-code.json을 파싱하여 분석 페이로드가 비어있지 않은지 확인 —
+       `pack`/`ckv`/`ckg`/`impacts` 중 **최소 하나가 비어있지 않음**. (구 스키마의 `results`
+       배열은 analyzer가 더 이상 쓰지 않는다 — 존재하지 않는 키를 검사하면 게이트가 무력화된다.)
+   - **재현 게이트 (bugfix 전용, HARD)**: `state.ticket_type == "bugfix"` 이면 위 검사에 더해
+     재현이 **실제로 RED로 확인**됐어야 PLANNING으로 갈 수 있다. 이것이 "테스트를 작성하지 않고,
+     재현 확인 없이 통과"를 막는 단 하나의 강제 지점이다(본문 prose의 "MUST"는 강제력이 없다):
+     - `Bash`: `test -f {workspace_dir}/reproduction.json && echo OK`
+     - `states.ANALYSIS.reproduction_confirmed == true` (analyzer가 RED를 본 마커)
+     - reproduction.json을 파싱하여 `red_confirmed == true`
+     - 하나라도 불충족 → TRANSITION_BLOCKED, `missing`:
+       `["bugfix requires a reproduction test confirmed RED (reproduction.json + reproduction_confirmed + red_confirmed)"]`.
+     - 정당하게 재현 불가한 경우는 analyzer가 `reproduction_unobtainable`로 **BLOCKED 전이**하지
+       PLANNING으로 오지 않는다 → 이 게이트를 우회하는 합법 경로는 없다.
 
    **PLANNING → DESIGN**:
    - `Bash`: `test -f {workspace_dir}/plan.md && echo OK`
@@ -420,7 +432,7 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
 | From → To | 핵심 조건 |
 |-----------|----------|
 | TICKET_INTAKE → ANALYSIS | ticket.json 존재 + sensitive_check CLEAN/REDACTED |
-| ANALYSIS → PLANNING | analysis.md (>200자) + related-code.json (results 비어있지 않음) |
+| ANALYSIS → PLANNING | analysis.md (>200자) + related-code.json (pack/ckv/ckg/impacts 중 ≥1 비어있지 않음) + **(bugfix) reproduction.json & reproduction_confirmed==true & red_confirmed==true** |
 | PLANNING → DESIGN | plan.md 존재 + ## Step 헤더 ≥1 |
 | DESIGN → IMPLEMENTATION | design-v{N}.md 존재 + revision ≤ max_design_revisions |
 | IMPLEMENTATION → EVALUATION | 모든 step completed + commits 존재 + uncommitted 없음 |
