@@ -48,6 +48,18 @@ REQUIRED = [
     ("JIRA_API_TOKEN", SECRET, "Jira API token (secret)"),
 ]
 
+# --autonomous: granular permissions.allow (ADR §5.2) — the plugin's own MCP tools +
+# safe read-only bash. Pipeline WRITE actions (build/commit/edits) are intentionally
+# NOT auto-allowed; for fully hands-off runs the user sets permissions.defaultMode.
+AUTONOMOUS_ALLOW = [
+    "mcp__plugin_coding-agent_cks__*",
+    "mcp__plugin_coding-agent_chainbench__*",
+    "mcp__plugin_coding-agent_jira-gateway__*",
+    "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
+    "Bash(git rev-parse:*)", "Bash(git show:*)", "Bash(git branch:*)",
+    "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)", "Bash(find:*)",
+]
+
 
 def _repo_root() -> Path:
     try:
@@ -130,6 +142,43 @@ def _merge_env(path: Path, values: dict[str, str], force: bool) -> list[str]:
     return written
 
 
+def _plugin_root() -> Path:
+    """The installed plugin root (scripts/ lives directly under it)."""
+    return Path(__file__).resolve().parent.parent
+
+
+def _repo_root_env(plugin_root: Path, repo_root: Path, override: str | None) -> str | None:
+    """Active domain pack's verification.repo_root_env name (e.g. GO_STABLENET_ROOT).
+
+    project_id: --project override > single pack > repo-name match (mirrors doctor.py).
+    """
+    domains = plugin_root / "domains"
+    packs = sorted(d.name for d in domains.glob("*")
+                   if (d / "domain-pack.json").is_file()) if domains.is_dir() else []
+    pid = override or (packs[0] if len(packs) == 1 else None)
+    if not pid:
+        base = repo_root.name
+        pid = next((p for p in packs if p and p in base), None)
+    if not pid:
+        return None
+    pack = _load_json(plugin_root / "domains" / pid / "domain-pack.json")
+    return (pack.get("verification") or {}).get("repo_root_env")
+
+
+def _merge_allow(path: Path, entries: list[str]) -> list[str]:
+    """Merge entries into permissions.allow (dedup). Returns newly-added entries."""
+    doc = _load_json(path)
+    perms = doc.get("permissions") if isinstance(doc.get("permissions"), dict) else {}
+    allow = perms.get("allow") if isinstance(perms.get("allow"), list) else []
+    added = [e for e in entries if e not in allow]
+    allow.extend(added)
+    perms["allow"] = allow
+    doc["permissions"] = perms
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, indent=2) + "\n")
+    return added
+
+
 def _ensure_gitignored(repo_root: Path, rel: str) -> None:
     gi = repo_root / ".gitignore"
     line = rel
@@ -150,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="explicit value (repeatable), wins over detection")
     ap.add_argument("--interactive", action="store_true", help="prompt for missing values")
     ap.add_argument("--force", action="store_true", help="overwrite existing settings values")
+    ap.add_argument("--autonomous", action="store_true",
+                    help="also register a granular permissions.allow (plugin MCP + read-only bash)")
+    ap.add_argument("--project", default=None, help="domain pack project_id (else auto-detect)")
     args = ap.parse_args(argv)
 
     overrides: dict[str, str] = {}
@@ -162,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
 
     repo_root = _repo_root()
     detected = _detect(repo_root)
+    rre = _repo_root_env(_plugin_root(), repo_root, args.project)
 
     resolved: dict[str, tuple[str | None, str]] = {}
     for key, _where, _desc in REQUIRED:
@@ -193,8 +246,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {key:<18} {src.upper():<10} {shown}  [{where}]")
     print(f"  {'chainbench-mcp':<18} {'OK' if chainbench_mcp else 'NOT ON PATH':<10} "
           f"{chainbench_mcp or '-> install chainbench so chainbench-mcp is on PATH'}")
+    if rre:
+        print(f"  {rre:<18} {'REPO-ROOT':<10} {repo_root}  [{PUBLIC}] (active pack repo_root_env)")
+    else:
+        print(f"  {'repo_root_env':<18} {'UNKNOWN':<10} "
+              "could not resolve active pack — pass --project <id>")
     print(f"  {'permissions':<18} {'NOTE':<10} "
-          "for hands-off runs set permissions.defaultMode=bypassPermissions (not auto-set)")
+          "--autonomous registers granular allow (MCP + read-only bash); for build/commit/edits "
+          "also set permissions.defaultMode (not auto-set)")
 
     if not args.fix:
         if missing:
@@ -207,6 +266,8 @@ def main(argv: list[str] | None = None) -> int:
     # --fix: write resolved values into the two settings files.
     public_vals = {k: resolved[k][0] for k, w, _ in REQUIRED if w == PUBLIC and resolved[k][0]}
     secret_vals = {k: resolved[k][0] for k, w, _ in REQUIRED if w == SECRET and resolved[k][0]}
+    if rre:
+        public_vals[rre] = str(repo_root)   # pin active pack's repo_root_env to this repo
 
     claude_dir = repo_root / ".claude"
     w_pub = _merge_env(claude_dir / "settings.json", public_vals, args.force)
@@ -214,8 +275,16 @@ def main(argv: list[str] | None = None) -> int:
     if w_sec:
         _ensure_gitignored(repo_root, ".claude/settings.local.json")
 
+    w_allow = []
+    if args.autonomous:
+        w_allow = _merge_allow(claude_dir / "settings.local.json", AUTONOMOUS_ALLOW)
+        _ensure_gitignored(repo_root, ".claude/settings.local.json")
+
     print(f"\nwrote {len(w_pub)} key(s) to .claude/settings.json: {', '.join(w_pub) or '(none)'}")
     print(f"wrote {len(w_sec)} key(s) to .claude/settings.local.json: {', '.join(w_sec) or '(none)'}")
+    if args.autonomous:
+        print(f"registered {len(w_allow)} permission(s) to .claude/settings.local.json allow"
+              + (f": {', '.join(w_allow)}" if w_allow else " (already present)"))
     if missing:
         print(f"still MISSING (provide via --set / --interactive): {', '.join(missing)}")
         return 1
