@@ -138,11 +138,16 @@ changed_pkgs = bash:
     | sort -u
 ```
 
-### 4.2 Full test run
+### 4.2 Targeted test run (changed packages — per cycle)
+
+Run the tests for the packages this fix changed — fast per-cycle feedback. The whole-repo
+`go test ./...` regression suite is **NOT** run here; it is deferred to the single final gate
+(§8.0), so a failing bug cycle never pays for the entire suite. Skip if `changed_pkgs` is empty
+(no Go changed → unit status PASS, nothing to run).
 
 ```
 bash: cd {repo_root} && \
-      {ver.unit_test.full} 2>&1 \
+      {ver.unit_test.targeted_tmpl, fill {pkgs}=${changed_pkgs[@]}} 2>&1 \
       | tee {workspace_dir}/logs/eval-unit-test.log
 exit_code = $?
 ```
@@ -335,8 +340,9 @@ diff = git -C {repo_root} diff main...HEAD        (the fix surface; for e2e the 
    sibling → FAIL, reason "sibling path {site} still produces the symptom, uncovered", route
    **to the Planner** (completeness/design miss; this generalizes §4.6(c) beyond derived state).
 3. **Derived-state consistency** (§4.6): fold its result in — a §4.6 FAIL is also a validity FAIL.
-4. **No regression**: Stage-1 full suite + `-race` (and §4.6 invariants) must be green. A
-   regression introduced by the fix → FAIL even though the oracle is green.
+4. **No regression**: the §4.2 targeted unit run (changed packages) + §4.4 `-race` + §4.6
+   invariants must be green. The whole-repo regression is the §8.0 final gate — a FAIL there is
+   also a fix-validity failure (a regression outside the changed set must not ship).
 
 **Judgmental check — hybrid policy: `fix_validity_verdict = WARN` + `needs-careful-review` (does NOT block PASS):**
 5. **Overfit suspicion**: the fix appears keyed to the oracle's exact scenario rather than the
@@ -487,6 +493,34 @@ if missing is non-empty:
   skip §7.1–§7.6
 ```
 
+### 7.0b Change-relevance gate (skip ChainBench when the binary can't have changed)
+
+ChainBench builds the node binary and runs a multi-node chain — pure waste when the diff
+cannot alter the binary's runtime behavior (docs-only, test-only, tooling/CI, or any non-Go
+change). Gate the `mcp:chainbench` stage on its pack `run_when` predicate before §7.1:
+
+```
+run_when = stage.run_when           # from the pack (go-stablenet integ stage: "prod_go_changed")
+prod_go = bash: git -C {repo_root} diff main...HEAD --name-only '*.go' | grep -v '_test\.go$'
+
+# Forced-on exception: an e2e reproduction oracle needs a running chain (§7.5c piggybacks on
+# §7.1–§7.3), so it must run regardless of run_when.
+e2e_oracle = (reproduction.json exists AND reproduction.json.tier == "e2e")
+
+if run_when == "prod_go_changed" AND prod_go is EMPTY AND NOT e2e_oracle:
+  result.status = "SKIPPED"
+  result.summary = "ChainBench skipped — no production .go change (docs/test/tooling only);
+                    node binary behavior unchanged from base, integration e2e not informative"
+  record changed files for the report; skip §7.1–§7.6.   # SKIPPED is not a stage failure
+```
+
+Be **conservative**: this skips ONLY when there is provably no production Go change. Any
+non-test `.go` edit → run the stage (a change you cannot prove is runtime-irrelevant is
+treated as runtime-relevant — a false skip could pass a consensus/txpool regression). When
+`run_when` is absent the stage always runs. (Module-level scaling — e.g. running only the
+consensus oracle for a consensus-only diff — is a possible future refinement via the pack's
+classifier; not done here to avoid false skips.)
+
 ### 7.1 Resolve the modified binary (handoff from the Implementer)
 
 The Implementer emits the built binary at the pack's `verification.build.artifact`
@@ -564,10 +598,14 @@ if not ok_steady:
   goto §7.6 cleanup
 ```
 
-### 7.4 Block production monitoring (5 minutes)
+### 7.4 Block production monitoring (2 minutes)
+
+go-stablenet's block time is ~1s, so a 2-minute window already observes ~120 blocks —
+more than enough to detect interval drift, empty-block runs, and consistency violations.
+A longer window adds wall-clock without adding signal.
 
 ```
-metrics = sample every 5s for 5 minutes:
+metrics = sample every 5s for 2 minutes:
   status.height, status.avg_block_interval_ms,
   status.empty_block_ratio, status.consensus_consistency
 
@@ -620,14 +658,15 @@ if count_fail > 0:
 ### 7.5c e2e reproduction GREEN gate (only when reproduction.json.tier == "e2e")
 
 This is the §4.7 deferral for an e2e oracle. The §7.1–§7.3 chain is already running on the
-**HEAD (fix) binary**, so the GREEN check runs the specific reproduction test here; the RED
-re-confirm rebuilds the parent/base binary on a second pass.
+**HEAD (fix) binary**, so the GREEN check piggybacks on it — **zero extra builds or restarts**
+by default. The RED side is taken from the Analyzer's authoring-time proof, not re-proved here.
 
 ```
-read reproduction.json → { chainbench_test, chainbench_test_file, binary_build_cmd }
+read reproduction.json → { chainbench_test, chainbench_test_file, red_confirmed }
 CB = bash: echo "$CHAINBENCH_DIR"      # unset → §4.7 already FAILed this as unevaluable
 
-# GREEN at HEAD — run ONLY the reproduction test against the running fix-binary chain:
+# GREEN at HEAD — run ONLY the reproduction test against the already-running fix-binary chain
+# (no rebuild, no restart — reuse §7.1–§7.3):
 res = chainbench_test_run({ test: chainbench_test, format: "jsonl" })
 green_at_head = (res passed)           # confirm via chainbench_report parse, not text scrape
 if not green_at_head:
@@ -636,21 +675,30 @@ if not green_at_head:
 # Oracle-unmodified — the fix (in go-stablenet) must not have touched the chainbench oracle:
 bash: git -C "$CB" diff -- {chainbench_test_file}      → must be empty (else false GREEN)
 
-# RED re-confirm (best-effort, bounded) — rebuild the PARENT/base binary and re-run; the same
-# test must FAIL without the fix. Reuses §7.1's build path with a parent checkout:
-parent = states.IMPLEMENTATION.reproduction_commit (or `git -C {repo_root} merge-base main HEAD`)
-bash: git -C {repo_root} stash -u 2>/dev/null; git -C {repo_root} checkout {parent}
-bash: cd {repo_root} && {binary_build_cmd}     # e.g. make gstable → build/bin/gstable
-chainbench_restart({ binary_path: "{repo_root}/{ver.build.artifact}", project_root: {repo_root} })
-  # wait for blocks (reuse §7.3 stabilization budget)
-red_at_parent = ( chainbench_test_run({ test: chainbench_test }) FAILED )
-bash: git -C {repo_root} checkout {branch}; git -C {repo_root} stash pop 2>/dev/null
-# restore the HEAD binary so any later step uses the fix build:
-bash: cd {repo_root} && {binary_build_cmd}
+# RED re-confirm — DEFAULT: trust the Analyzer. It already proved THIS exact .sh oracle FAILs
+# on the UNFIXED tree (the base) when it authored it: reproduction.json.red_confirmed == true
+# with red_output on record. Re-proving it here would cost a full PARENT rebuild + a SECOND
+# chain restart (~build + ~90s stabilize) to re-establish a fact already proven. So:
+red_at_parent = reproduction.json.red_confirmed        # provenance: "proven at authoring (analyzer §5b)"
+
+# OPT-IN strict re-confirm — only when explicitly enabled (config.strict_repro_reconfirm == true,
+# OR retrieval_health.degraded == true where extra assurance is warranted). This is the ONLY path
+# that pays for a parent rebuild + restart:
+if strict_repro_reconfirm:
+  parent = states.IMPLEMENTATION.reproduction_commit (or `git -C {repo_root} merge-base main HEAD`)
+  bash: git -C {repo_root} stash -u 2>/dev/null; git -C {repo_root} checkout {parent}
+  bash: cd {repo_root} && {ver.build.binary_cmd}       # go-stablenet: make gstable → {ver.build.artifact}
+  chainbench_restart({ binary_path: "{repo_root}/{ver.build.artifact}", project_root: {repo_root} })
+    # wait for blocks (reuse §7.3 stabilization budget)
+  red_at_parent = ( chainbench_test_run({ test: chainbench_test }) FAILED )
+  bash: git -C {repo_root} checkout {branch}; git -C {repo_root} stash pop 2>/dev/null
+  bash: cd {repo_root} && {ver.build.binary_cmd}        # restore the HEAD (fix) binary
 ```
-Hand `green_at_head`, `red_at_parent`, and the oracle-unmodified result back to §4.7's
-verdict. If the parent rebuild/restart exceeds budget, skip it and record
-`red_at_parent = null` (→ §4.7 treats a missing red re-confirm as a WARN, never a pass-cover).
+Hand `green_at_head`, `red_at_parent`, and the oracle-unmodified result back to §4.7's verdict.
+**Cost**: the default path adds no builds and no restarts (only the GREEN test run on the live
+chain); only the opt-in strict re-confirm pays for the parent rebuild + restart. The RED proof
+is not weakened — it is the Analyzer's recorded `red_confirmed` (gated true by state-machine
+§2.3 before this fix branch ever existed); the strict path merely re-proves it in-evaluator.
 
 Then, if `reproduction_verdict == PASS`, evaluate the **§4.8 fix-validity verdict** for the
 e2e oracle here (its diff-based checks 1/2/5 and the §4.6/regression results are all available
@@ -680,22 +728,59 @@ finally:
 > Reference implementation + binary safety test (foreign instance survives, only
 > ours is killed): `bench/p5-cleanup-scope/` (`cleanup_scoped.sh`, `verify.sh`).
 
-Overall ChainBench budget: 20 minutes. If exceeded at any point, run §7.6
+Overall ChainBench budget: 12 minutes. If exceeded at any point, run §7.6
 immediately and set `result.status = "FAIL"` with `summary = "chainbench timeout"`.
+(Tightened from 20m: with the 2-minute monitor (§7.4) and the no-rebuild e2e GREEN path
+(§7.5c) the healthy spend is well under this — 12m fails a genuinely stuck chain faster.
+Component budgets stand: build fallback 5m (§7.1), setup 2m (§7.2), stabilize ~2m (§7.3).)
 
 ---
 
 ## 8. Consolidate → test-report.md
 
-After all stages run:
+### 8.0 Final full-suite regression gate (run ONCE, only when otherwise green)
+
+The whole-repo `go test ./...` is a broad regression check; it does NOT belong in every
+bug-cycle iteration (a cycle that fails its reproduction oracle, lint, or chainbench gains
+nothing from running the entire suite). Run it **exactly once** — as the LAST gate, only when
+every other signal is already green, i.e. immediately before this evaluation would PASS and the
+Orchestrator opens the PR. This is the §9 reorder: targeted per cycle (§4.2), full suite once here.
 
 ```
-# Stage gates AND the two bugfix verdicts both feed the overall status.
+otherwise_green =
+  every stage.status in {PASS, WARN, SKIPPED}
+  AND reproduction_verdict in {PASS, "n/a"}
+  AND fix_validity_verdict in {PASS, WARN, "n/a"}
+
+if not otherwise_green:
+  full_regression = { status: "SKIPPED",
+    summary: "not reached — an earlier gate failed; fix that before the full suite" }
+  # overall is already FAIL from the failing gate; spending the full suite now is wasted.
+else:
+  bash: cd {repo_root} && {ver.unit_test.full} 2>&1 \
+        | tee {workspace_dir}/logs/eval-full-regression.log
+  parse "--- PASS:" / "--- FAIL:" counts
+  if failed > 0:
+    full_regression = { status: "FAIL", failures: [ {package, test, file:line, error} ] }
+  else:
+    full_regression = { status: "PASS" }
+```
+
+Because it runs only on an otherwise-green evaluation, the full suite executes ~once per fix
+(the final cycle) instead of every iteration — that is the cost this reorder removes. A FAIL
+here is a genuine regression in a package **outside** `changed_pkgs`; it feeds overall_status
+below and routes the bug cycle (the failing package guides the re-analysis).
+
+### 8.1 Overall status
+
+```
+# Stage gates, the two bugfix verdicts, AND the final regression gate feed the overall status.
 overall_status =
   "FAIL" if any stage.status == "FAIL"
        OR reproduction_verdict == "FAIL"     # §4.7 — bug not fixed
        OR fix_validity_verdict == "FAIL"     # §4.8 — fix unsound/incomplete
-  "PASS" otherwise   # (stage WARN and fix_validity_verdict WARN do not block)
+       OR full_regression.status == "FAIL"   # §8.0 — whole-repo regression outside changed set
+  "PASS" otherwise   # (stage WARN and fix_validity_verdict WARN do not block; SKIPPED is not FAIL)
 
 needs_careful_review =
   any stage.status == "WARN" OR fix_validity_verdict == "WARN" OR retrieval_health.degraded
@@ -718,10 +803,11 @@ HEAD: {commit hash}
 ## Summary
 | Stage | Status | Duration |
 |-------|--------|----------|
-| Unit Test | {status} | {ms}ms |
+| Unit Test (changed pkgs) | {status} | {ms}ms |
 | Lint & Format | {status} | {ms}ms |
 | Security Scan | {status} | {ms}ms |
 | ChainBench | {status} | {ms}ms |
+| Full Regression (§8.0, once) | {full_regression.status} | {ms}ms |
 | **Overall** | **{overall}** | **{total ms}** |
 
 ## Bugfix verdicts (only for bugfix)
@@ -753,7 +839,7 @@ HEAD: {commit hash}
 ## ChainBench
 - build: {status} ({ms}ms)
 - network startup: {first_block_at_ms}ms
-- block production: {total_blocks} blocks in 5min, max interval {ms}ms
+- block production: {total_blocks} blocks in 2min, max interval {ms}ms
 - consistency violations: {count}
 - transactions:
   - ✓ {name} ({ms}ms)
@@ -832,7 +918,7 @@ else:
   state.current_state = "EVALUATION_FAIL"
 states.EVALUATION.status = "completed"
 states.EVALUATION.completed_at = now()
-states.EVALUATION.results = { unit_test, lint, security, chainbench,
+states.EVALUATION.results = { unit_test, lint, security, chainbench, full_regression,
                               reproduction_verdict, fix_validity_verdict, needs_careful_review }
 states.EVALUATION.report_path = "test-report.md"
 states.EVALUATION.log_paths = { unit_test:..., lint:..., security:..., chainbench:... }

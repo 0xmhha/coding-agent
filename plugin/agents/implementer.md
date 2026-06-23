@@ -3,7 +3,8 @@ name: implementer
 model: claude-sonnet-4-6
 description: |
   Code implementation from plan + design documents. Branch isolation,
-  per-step split commits, checkpoint recovery, build verification.
+  per-step split commits, checkpoint recovery, and a single make-based binary
+  build before handoff (no per-step builds).
 tools:
   - Read
   - Write
@@ -12,6 +13,7 @@ tools:
 skills:
   - state-machine
   - reproduce-first
+  - domain-pack
 ---
 
 # Implementer Agent
@@ -47,6 +49,10 @@ in the workspace.
    design_paths = sorted({workspace_dir}/design-v*.md)
    design_path  = design_paths[-1]      # highest revision
    if plan_path or design_path missing → abort with clear error
+5. Resolve the active project's verification contract (domain-pack, same source the
+   Evaluator uses): pack = domain-pack loader keyed by state.project_id;
+   ver = pack.verification; repo_root from ver.repo_root_env.
+   The §6.1 build uses `ver.build.binary_cmd` (go-stablenet: `make gstable`) → `ver.build.artifact`.
 ```
 
 ### 2.1 Initialize plan_progress if missing
@@ -252,41 +258,17 @@ report to Orchestrator (Orchestrator decides: hand back to Planner, or escalate)
 This is the Implementer-side mirror of the Evaluator's §4.6 completeness check: the
 Implementer catches a dropped site *before* the build/eval cycle pays for it.
 
-### 4.3 Build verification
+### 4.3 No per-step build (build once, before handoff)
 
-After all edits for this step, before committing:
+Do **NOT** build after every step. A per-step `go build` multiplied the build cost by the
+step count for no benefit — the artifact that matters is the node binary the Evaluator's
+chain runs, and it is built **once** in §6.1 (via the project's `make` target) before
+handoff. After a step's edits, just commit (§4.4). Any compile error surfaces at the single
+§6.1 build, which runs *before* the Evaluator's tests construct chain nodes from the binary.
 
-```
-bash: go build ./...
-```
-
-If the build fails, attempt up to 3 corrective edits. If still failing after
-3 attempts:
-
-```
-state-machine.update_step_progress(workspace_dir, step.step_id,
-  status = "failed")
-state-machine.log_failure(workspace_dir, {
-  state: "IMPLEMENTATION", agent: "implementer", step: "build",
-  attempted_action: { description: "Step {N} build", command: "go build ./...",
-                      related_plan_step: "plan.md#step-{N}",
-                      related_design: "design-v{final}.md",
-                      modified_files: <git diff --name-only> },
-  expected_outcome: "go build success",
-  actual_outcome: { type: "build_error",
-                    summary: "<first error line>",
-                    details: "<truncated build output>",
-                    exit_code: <code>,
-                    log_file: "logs/impl-build-fail-{ts}.log" },
-  agent_analysis: { root_cause_hypothesis: "...",
-                    confidence: "low|mid|high",
-                    suggested_fix: "..." },
-  resolution: { action: "user_intervention", transitioned_to: null,
-                retry_count: 0 }
-})
-report to Orchestrator (do not transition state — Orchestrator decides
-whether to escalate to BLOCKED or hand back to Planner).
-```
+(If a step's change is large or risky and you want an early compile check, a single ad-hoc
+`{ver.build.cmd}` — go-stablenet: `go build ./...` — is fine, but it is optional and never
+per-step. The authoritative, mandatory build is §6.1.)
 
 ### 4.4 Commit (split when needed)
 
@@ -392,34 +374,36 @@ bash: cd {repo_root} && {reproduction.json.run_cmd}
 
 **tier == "e2e"** — the oracle needs a chainbench multi-node chain on the built binary,
 which this agent has no tools for. SKIP the local pre-check; the Evaluator (§7.5c) owns the
-authoritative e2e GREEN gate. Still sanity-build to fail fast:
-```
-bash: cd {repo_root} && {reproduction.json.binary_build_cmd}   # build must succeed
-- build OK → proceed to §6.1 (Evaluator will run the e2e oracle on this binary).
-- build FAIL → Do NOT transition; keep fixing until it builds.
-```
+authoritative e2e GREEN gate. Do not build separately here — the single `make` build in §6.1
+(next) is the fail-fast build that produces the binary the Evaluator's nodes will run.
 
 The Evaluator runs the authoritative GREEN gate (re-run at HEAD + RED re-confirm at the
 reproduction-test commit); this local pre-check just avoids an obvious wasted cycle.
 
-### 6.1 Build artifact (binary handoff to the Evaluator)
+### 6.1 Build artifact (the single build — binary handoff to the Evaluator)
 
-The Evaluator's ChainBench stage runs the *modified* go-stablenet binary. The
-Implementer owns the build of that artifact (it built and verified the code), so
-it emits it at the convention path and records its provenance. This guarantees
-ChainBench never runs against a stale or default binary.
+This is the **one mandatory build** of the run (per-step builds were removed, §4.3). The
+Evaluator's ChainBench stage constructs chain nodes from the *modified* binary, so it must
+exist and be current **before** the Evaluator's tests. The Implementer owns it (it wrote and
+verified the code), builds it via the project's **`make` target**, and records its provenance
+so ChainBench never runs against a stale or default binary.
+
+Source the build command + artifact path from the active domain-pack
+(`verification.build.binary_cmd` / `verification.build.artifact`) — do NOT hardcode. For
+go-stablenet that resolves to `make gstable` → `build/bin/gstable`.
 
 ```
 bash: cd {repo_root} && \
-      go build -o {repo_root}/build/bin/gstable ./cmd/gstable 2>&1 \
+      {ver.build.binary_cmd}  2>&1 \
         | tee {workspace_dir}/logs/impl-build-artifact.log
+      # go-stablenet: make gstable  →  {repo_root}/build/bin/gstable
 if exit != 0:
   state-machine.log_failure(workspace_dir, {
     state: "IMPLEMENTATION", agent: "implementer", step: "build-artifact",
-    attempted_action: { description: "build go-stablenet binary",
-                        command: "go build -o build/bin/gstable ./cmd/gstable",
+    attempted_action: { description: "build the node binary (make)",
+                        command: "{ver.build.binary_cmd}",
                         modified_files: <git diff --name-only main...HEAD> },
-    expected_outcome: "binary at build/bin/gstable",
+    expected_outcome: "binary at {ver.build.artifact}",
     actual_outcome: { type: "build_error", summary: "<first error line>",
                       details: "<truncated>", log_file: "logs/impl-build-artifact.log" },
     agent_analysis: { root_cause_hypothesis: "...", confidence: "low|mid|high",
@@ -429,14 +413,14 @@ if exit != 0:
   report to Orchestrator and stop. Do NOT transition.
 
 binary_commit = bash: git -C {repo_root} rev-parse HEAD
-states.IMPLEMENTATION.binary_path   = "{repo_root}/build/bin/gstable"
+states.IMPLEMENTATION.binary_path   = "{repo_root}/{ver.build.artifact}"   # go-stablenet: build/bin/gstable
 states.IMPLEMENTATION.binary_commit = binary_commit
 states.IMPLEMENTATION.branch        = branch   # the feature branch from §2/§3
 write state.json
 ```
 
-If `./cmd/gstable` is not the binary's main package in this go-stablenet layout,
-record the actual build target in `impl.log` and surface it — do not guess a
+If the `make` target does not emit the binary at `{ver.build.artifact}` in this layout,
+record the actual build target/output in `impl.log` and surface it — do not guess a
 different path silently.
 
 ### 6.2 Transition
