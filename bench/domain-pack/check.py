@@ -102,6 +102,15 @@ def check(*, domains_dir: Path = DOMAINS, skills_dir: Path = SKILLS,
         if wired == 0:
             problems.append("no agent references the generic 'domain-pack' loader skill")
 
+        # Phase 3 grep-clean: core agents must not hardcode domain coupling.
+        allow = re.compile(r"go-stablenet|stablenet-review-code|stablenet-features\.md|policy/stablenet\.yaml")
+        for md in sorted(agents_dir.glob("*.md")):
+            for ln, line in enumerate(md.read_text().splitlines(), 1):
+                if "go_stablenet_root" in line:
+                    problems.append(f"{md.name}:{ln} hardcodes go_stablenet_root — use repo_root")
+                elif "stablenet" in line and not allow.search(line):
+                    problems.append(f"{md.name}:{ln} domain term 'stablenet' (generalize or allowlist)")
+
     if problems:
         print(f"DOMAIN-PACK STRUCTURE PROBLEMS ({len(problems)}):")
         for p in problems:

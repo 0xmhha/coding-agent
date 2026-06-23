@@ -411,12 +411,12 @@ Agent(
   prompt = """
     workspace_dir={path}
     mode={mode}   # e.g., fresh|bugfix|code_review
-    go_stablenet_root={path}   # target-project repo; required by analyzer (e2e tier)/implementer/evaluator
+    repo_root={path}   # target-project repo; required by analyzer (e2e tier)/implementer/evaluator
     {extra context fields as needed}
   """
 )
 ```
-The `analyzer`/`implementer`/`evaluator` resolve `go_stablenet_root` from this field (or
+The `analyzer`/`implementer`/`evaluator` resolve `repo_root` from this field (or
 state.json/settings if absent). The e2e reproduction tier additionally relies on the
 `$CHAINBENCH_DIR` env (verified in the §pre-flight); when it is unset the Analyzer stays on
 the simulation tier.

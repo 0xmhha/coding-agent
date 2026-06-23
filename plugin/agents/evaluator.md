@@ -88,15 +88,32 @@ code that doesn't compile.
 
 ---
 
-## 3. Run all four stages
+## 3. Run the verification stages (data-driven from the pack)
 
-Run stages sequentially. Each stage:
+Iterate `ver.stages` (resolved in §2.0) in order and dispatch each by its `kind`.
+Each stage:
 
-1. Captures its own log file under `{workspace_dir}/logs/eval-{stage}.log`.
+1. Captures its own log under `{workspace_dir}/logs/eval-{stage.id}.log`.
 2. Produces a structured result `{ status, summary, details, log_file, ... }`.
 3. **Does not stop the run on failure** — record and continue.
 
-The four stages are §4, §5, §6, §7 below.
+Dispatch by `kind` (the stage bodies are §4–§7):
+
+| `kind` | runs | notes |
+|---|---|---|
+| `builtin:unit_race` | §4 (unit + coverage + -race) | uses `ver.unit_test.*` |
+| `builtin:lint`      | §5 (lint & format) | |
+| `builtin:gosec`     | §6 (security scan) | |
+| `mcp:<tool>` (e.g. `mcp:chainbench`) | §7 (integration) | uses `stage.profile`/`stage.oracle_enum` |
+
+Skip rules (record, never fail the run):
+- a `kind` not implemented here → SKIP (log "unknown stage kind: {kind}").
+- an `mcp:<tool>` stage whose MCP tool is NOT granted in this agent's frontmatter →
+  SKIP (see §7.0). **MCP grants are static frontmatter, not pack-driven** — this is the
+  documented pack-vs-grant residual (a project needing a different integration MCP must
+  add its grant here).
+
+The go-stablenet pack declares unit/lint/sec + `mcp:chainbench`, so all of §4–§7 run.
 
 ---
 
