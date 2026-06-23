@@ -212,6 +212,10 @@ When the Evaluator reports all stages green:
    Add risk label when any impacts[].impact_analysis has a non-empty
      "concurrent" or "distributed" coupling group (high blast radius)
      → "needs-careful-review"
+   Also add "needs-careful-review" when the Evaluator set
+     states.EVALUATION.results.needs_careful_review (e.g. fix_validity_verdict == WARN /
+     overfit suspicion / retrieval degraded) — and note the reason in the PR body so a human
+     judges the soundness the §4.8 verdict could not mechanically decide.
    Add module labels from related-code.json scope.
 
 6. Jira updates (failures are warnings, not fatal)
@@ -402,15 +406,20 @@ description of why this dispatch is happening.
 
 ```
 Agent(
-  subagent_type = "planner" | "implementer" | "evaluator",
+  subagent_type = "analyzer" | "planner" | "implementer" | "evaluator",
   description = "<short, e.g., 'Plan STABLE-1234 bugfix'>",
   prompt = """
     workspace_dir={path}
     mode={mode}   # e.g., fresh|bugfix|code_review
+    go_stablenet_root={path}   # target-project repo; required by analyzer (e2e tier)/implementer/evaluator
     {extra context fields as needed}
   """
 )
 ```
+The `analyzer`/`implementer`/`evaluator` resolve `go_stablenet_root` from this field (or
+state.json/settings if absent). The e2e reproduction tier additionally relies on the
+`$CHAINBENCH_DIR` env (verified in the §pre-flight); when it is unset the Analyzer stays on
+the simulation tier.
 
 Wait for the sub-agent's textual summary. Do NOT spawn parallel sub-agents in
 this pipeline: state transitions must be serialized.

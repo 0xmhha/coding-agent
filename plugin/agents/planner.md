@@ -538,6 +538,14 @@ paths and silently drifts at an unrelated path (capacity eviction, reorg,
 truncation, GC), because that path's vocabulary (e.g. "GlobalSlots", "spammers",
 "truncate") never mentions the feature — so a semantic search never surfaces it.
 
+For a **bugfix**, seed this completeness work from the Analyzer's
+`related-code.json.affected_sites` (analyzer §4.1): every row with `produces_symptom:true`
+is a path the fix must either change or cover with a test. The Evaluator's fix-validity
+verdict (§4.8) FAILs the cycle if any such sibling site is left uncovered — so a plan that
+greens the reproduction oracle but skips a sibling path is *incomplete by contract*, not done.
+Fold those sites into the write-site table below (or an equivalent "sites to fix/cover" table
+when the bug is not derived-state per se).
+
 Do NOT rely on `semantic_search` here; it ranks by feature similarity. Use the
 graph to enumerate write-sites exhaustively:
 

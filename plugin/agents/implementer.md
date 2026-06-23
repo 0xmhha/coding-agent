@@ -142,22 +142,31 @@ if current_branch in {"main", "master"}:
 
 ### 3.4 Bugfix: commit the reproduction test FIRST (reproduce-first CARRY)
 
-If `{workspace_dir}/reproduction.json` exists (the Analyzer's bugfix oracle), the
-reproduction test file is already in the working tree (untracked, authored by the
-Analyzer). Commit it as the FIRST commit on the branch — before any fix — so the
-branch records a real RED → GREEN:
+If `{workspace_dir}/reproduction.json` exists (the Analyzer's bugfix oracle), CARRY it
+per its `tier` (reproduce-first skill):
 
+**tier == "simulation"** — the Go reproduction test is in *this* working tree (untracked,
+authored by the Analyzer). Commit it as the FIRST commit on the branch — before any fix —
+so the branch records a real RED → GREEN:
 ```
-read reproduction.json → { test_file, test_name, run_cmd }
+read reproduction.json → { tier, test_file, test_name, run_cmd }
 bash: git add {test_file}
 bash: git commit -m "{ticket_id}: add reproduction test (red)"
 states.IMPLEMENTATION.reproduction_commit = bash: git rev-parse HEAD
 ```
 
+**tier == "e2e"** — the oracle is a chainbench `.sh` in the *chainbench* repo
+(`reproduction.json.chainbench_test_file`), NOT in this branch. There is nothing to
+commit here. Record the base for the Evaluator's RED re-confirm and move on:
+```
+states.IMPLEMENTATION.reproduction_commit = bash: git -C {repo_root} merge-base main HEAD
+```
+Never touch the chainbench repo or the `.sh` oracle.
+
 INVARIANT (reproduce-first): the reproduction test is the **acceptance oracle**.
-Do NOT edit, weaken, or delete `{test_file}` in any step — you make it pass by
-fixing *production code*, never by changing the test. (Editing the test to go green
-is a false GREEN and the Evaluator will reject it.)
+Do NOT edit, weaken, or delete it in any step (the Go `{test_file}` for simulation, or the
+chainbench `.sh` for e2e) — you make it pass by fixing *production code*, never by changing
+the test. (Editing the oracle to go green is a false GREEN and the Evaluator will reject it.)
 
 ---
 
@@ -369,15 +378,25 @@ if any of the above fail: report and stop. Do NOT transition.
 
 ### 6.0 Bugfix: confirm the reproduction test passes locally (reproduce-first GREEN pre-check)
 
-If `reproduction.json` exists, re-run the reproduction test on the finished branch
-before handing off — this catches an incomplete fix without spending an evaluation cycle:
+If `reproduction.json` exists, pre-check the oracle on the finished branch before handing
+off — this catches an incomplete fix without spending an evaluation cycle. Branch on `tier`:
 
+**tier == "simulation"** — re-run the Go oracle locally:
 ```
 bash: cd {repo_root} && {reproduction.json.run_cmd}
 - PASS → the bug no longer reproduces. Proceed to §6.1.
 - FAIL → the fix is incomplete. Do NOT transition. Keep fixing *production code*
   (never the test) until it passes; if you cannot, report to the Orchestrator with the
   failing output so the bug cycle re-enters the Analyzer.
+```
+
+**tier == "e2e"** — the oracle needs a chainbench multi-node chain on the built binary,
+which this agent has no tools for. SKIP the local pre-check; the Evaluator (§7.5c) owns the
+authoritative e2e GREEN gate. Still sanity-build to fail fast:
+```
+bash: cd {repo_root} && {reproduction.json.binary_build_cmd}   # build must succeed
+- build OK → proceed to §6.1 (Evaluator will run the e2e oracle on this binary).
+- build FAIL → Do NOT transition; keep fixing until it builds.
 ```
 
 The Evaluator runs the authoritative GREEN gate (re-run at HEAD + RED re-confirm at the

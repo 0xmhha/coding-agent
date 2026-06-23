@@ -220,11 +220,28 @@ security + chainbench yet leaked its fee-payer aggregate on the pool-truncation
 path; only a recompute-from-source invariant test caught it. This gate makes
 that invariant mandatory whenever derived state appears.
 
-### 4.7 Reproduction GREEN gate (bugfix — reproduce-first)
+### 4.7 Reproduction verdict (bugfix — NECESSARY condition, reproduce-first)
+
+A bugfix is judged by **two independent verdicts**, and they must not be conflated:
+- **§4.7 Reproduction verdict (necessary)** — does the defect actually stop reproducing?
+  Mechanical, binary. The reproduction test is mandatory; RED→GREEN on it is required.
+- **§4.8 Fix-validity verdict (sufficient)** — given GREEN, is the fix *sound*? Did it fix the
+  root cause (not mask a symptom), cover every sibling path, and avoid regressions/overfit?
+
+Reproduction GREEN is **necessary but NOT sufficient** (cf. §4.6): a fix can green the oracle
+while masking the symptom, overfitting the test, or leaving a sibling path broken. §4.7
+establishes the necessary condition only; §4.8 establishes sufficiency. Evaluate §4.8 **only
+when §4.7 passes**.
 
 If `{workspace_dir}/reproduction.json` exists, the reproduction test is the
-**acceptance oracle** for this fix. Run the authoritative red→green check:
+**acceptance oracle** for this fix. It is keyed by `tier` (reproduce-first skill) —
+branch on it:
 
+```
+read reproduction.json → { tier, ... }
+```
+
+**tier == "simulation"** (Go in-process test in go-stablenet) — run inline here:
 ```
 read reproduction.json → { run_cmd, test_name, test_file }
 repro_commit = states.IMPLEMENTATION.reproduction_commit
@@ -242,17 +259,79 @@ bash: git -C {go_stablenet_root} checkout {branch}   # restore HEAD
 bash: git -C {go_stablenet_root} diff {repro_commit} HEAD -- {test_file}   → must be empty
 ```
 
-- `green_at_head == false` → the fix does NOT resolve the symptom. This is the
-  PRIMARY bugfix failure: set the unit_test result to FAIL, summary
-  "reproduction still RED — bug not fixed", and route the bug cycle.
-- non-empty `{test_file}` diff → **false GREEN** (the test was changed to pass) → FAIL,
-  summary "reproduction test was modified".
-- `red_at_repro == false` → the test passed even before the fix (weak oracle, did not
-  prove the bug) → WARN (not a hard FAIL).
+**tier == "e2e"** (chainbench `.sh` on the project-built binary) — the oracle needs a
+running multi-node chain, so it is run in the ChainBench stage. **Defer to §7.5c**
+(run after the §7.3 chain is up on the HEAD/fix binary). §7.5c produces `green_at_head`,
+`red_at_parent`, and the oracle-unmodified check; come back and apply the verdict below
+with those values. If `$CHAINBENCH_DIR` is unset or the chain could not start, this is a
+hard FAIL for a bugfix whose oracle is e2e (the spine could not be evaluated) → route the
+bug cycle with summary "e2e reproduction oracle could not be evaluated".
 
-Record into reproduction.json: `green_confirmed`, `green_at_head`, `red_at_parent`
-(= red_at_repro). This gate is the bugfix's correctness spine — a green unit suite
-without it does not prove the reported bug is fixed.
+**Reproduction verdict (both tiers):**
+- `green_at_head == false` → the fix does NOT resolve the symptom. `reproduction_verdict =
+  FAIL`, reason **"bug not fixed"** (the root cause itself may be wrong). Set unit_test FAIL,
+  summary "reproduction still RED — bug not fixed", route the bug cycle **to the Analyzer**
+  (§3b RE-ANALYZE: re-diagnose what the fix missed).
+- oracle file changed since RED (simulation: non-empty `{test_file}` diff; e2e: non-empty
+  `git -C $CHAINBENCH_DIR diff -- {chainbench_test_file}`) → **false GREEN** (the oracle was
+  changed to pass) → `reproduction_verdict = FAIL`, summary "reproduction test was modified".
+- `red_at_parent == false` → the test passed even before the fix (weak oracle, did not
+  prove the bug) → WARN (not a hard FAIL).
+- otherwise → `reproduction_verdict = PASS` (necessary condition met). Proceed to §4.8.
+
+Record into reproduction.json: `green_confirmed`, `green_at_head`, `red_at_parent`,
+`reproduction_verdict`. A PASS here means the symptom no longer reproduces — it does NOT yet
+mean the fix is sound. That is §4.8's job.
+
+### 4.8 Fix-validity verdict (bugfix — SUFFICIENCY)
+
+**Run only when `reproduction_verdict == PASS`** (no GREEN → the question "is the fix sound?"
+is moot; §4.7 already routed it). Skip entirely for features (no reproduction.json). For
+`tier=="simulation"` evaluate here; for `tier=="e2e"` the reproduction verdict is known only
+after §7.5c, so apply this verdict there (§7.5c tail). This verdict asks the *separate*
+question: given the symptom stopped, is the fix actually correct — or did it mask the symptom,
+overfit the oracle, or leave a sibling path broken?
+
+Inputs:
+```
+analysis.md "## Root cause" (broken edge file:line) + related-code.json.affected_sites (§4.1)
+design-v{N}.md write-site-contract (planner §5.2b), if present
+diff = git -C {go_stablenet_root} diff main...HEAD        (the fix surface; for e2e the diff is the only fix)
+```
+
+**Mechanical checks — hybrid policy: any failure ⇒ `fix_validity_verdict = FAIL` (hard, routes a bug cycle):**
+1. **Root-cause-edge touched** (anti symptom-masking): the diff must touch at least one
+   `affected_sites` row with `must_fix:true` — i.e. the producer/broken edge from §4, not only
+   a downstream cache/consumer. If the diff touches NO must_fix site (the symptom went green via
+   an unrelated guard), that is symptom-masking → FAIL, reason "fix does not touch the root-cause
+   edge", route **to the Analyzer** (§3b — the diagnosed location was wrong or incomplete).
+2. **Sibling-path coverage** (anti partial-fix): for EVERY `affected_sites` row with
+   `produces_symptom:true`, the path is either (a) changed by the diff, OR (b) named by a test
+   in the diff/tree that actually drives that site (grep the test body for the site's path — an
+   oracle that only hits one path does not cover its siblings). An uncovered symptom-producing
+   sibling → FAIL, reason "sibling path {site} still produces the symptom, uncovered", route
+   **to the Planner** (completeness/design miss; this generalizes §4.6(c) beyond derived state).
+3. **Derived-state consistency** (§4.6): fold its result in — a §4.6 FAIL is also a validity FAIL.
+4. **No regression**: Stage-1 full suite + `-race` (and §4.6 invariants) must be green. A
+   regression introduced by the fix → FAIL even though the oracle is green.
+
+**Judgmental check — hybrid policy: `fix_validity_verdict = WARN` + `needs-careful-review` (does NOT block PASS):**
+5. **Overfit suspicion**: the fix appears keyed to the oracle's exact scenario rather than the
+   general cause — e.g. the diff branches on a literal/identifier that occurs only in the
+   reproduction test, or the changed surface is suspiciously narrower than the `must_fix` sites.
+   This is not mechanically decidable → do NOT hard-FAIL; record the suspicion, set WARN, add the
+   `needs-careful-review` label, and surface it in the PR body for a human to judge.
+
+**Verdict:**
+```
+fix_validity_verdict =
+  "FAIL" if any of checks 1–4 fail        (→ bug cycle; route per the failing check above)
+  "WARN" else if check 5 flags overfit    (→ PASS allowed, needs-careful-review)
+  "PASS" otherwise
+```
+Persist `reproduction.json.fix_validity_verdict` (+ a `validity_findings[]` list of the failing/
+flagged checks). The two verdicts are reported separately in §8 — a reader must be able to tell
+"bug not fixed" (§4.7) apart from "fix unsound/incomplete" (§4.8).
 
 ---
 
@@ -515,6 +594,45 @@ if count_fail > 0:
   save ctx into {workspace_dir}/logs/eval-chainbench-failure.json
 ```
 
+### 7.5c e2e reproduction GREEN gate (only when reproduction.json.tier == "e2e")
+
+This is the §4.7 deferral for an e2e oracle. The §7.1–§7.3 chain is already running on the
+**HEAD (fix) binary**, so the GREEN check runs the specific reproduction test here; the RED
+re-confirm rebuilds the parent/base binary on a second pass.
+
+```
+read reproduction.json → { chainbench_test, chainbench_test_file, binary_build_cmd }
+CB = bash: echo "$CHAINBENCH_DIR"      # unset → §4.7 already FAILed this as unevaluable
+
+# GREEN at HEAD — run ONLY the reproduction test against the running fix-binary chain:
+res = chainbench_test_run({ test: chainbench_test, format: "jsonl" })
+green_at_head = (res passed)           # confirm via chainbench_report parse, not text scrape
+if not green_at_head:
+  ctx = chainbench_failure_context();  save to {workspace_dir}/logs/eval-repro-e2e-failure.json
+
+# Oracle-unmodified — the fix (in go-stablenet) must not have touched the chainbench oracle:
+bash: git -C "$CB" diff -- {chainbench_test_file}      → must be empty (else false GREEN)
+
+# RED re-confirm (best-effort, bounded) — rebuild the PARENT/base binary and re-run; the same
+# test must FAIL without the fix. Reuses §7.1's build path with a parent checkout:
+parent = states.IMPLEMENTATION.reproduction_commit (or `git -C {go_stablenet_root} merge-base main HEAD`)
+bash: git -C {go_stablenet_root} stash -u 2>/dev/null; git -C {go_stablenet_root} checkout {parent}
+bash: cd {go_stablenet_root} && {binary_build_cmd}     # e.g. make gstable → build/bin/gstable
+chainbench_restart({ binary_path: "{go_stablenet_root}/build/bin/gstable", project_root: {go_stablenet_root} })
+  # wait for blocks (reuse §7.3 stabilization budget)
+red_at_parent = ( chainbench_test_run({ test: chainbench_test }) FAILED )
+bash: git -C {go_stablenet_root} checkout {branch}; git -C {go_stablenet_root} stash pop 2>/dev/null
+# restore the HEAD binary so any later step uses the fix build:
+bash: cd {go_stablenet_root} && {binary_build_cmd}
+```
+Hand `green_at_head`, `red_at_parent`, and the oracle-unmodified result back to §4.7's
+verdict. If the parent rebuild/restart exceeds budget, skip it and record
+`red_at_parent = null` (→ §4.7 treats a missing red re-confirm as a WARN, never a pass-cover).
+
+Then, if `reproduction_verdict == PASS`, evaluate the **§4.8 fix-validity verdict** for the
+e2e oracle here (its diff-based checks 1/2/5 and the §4.6/regression results are all available
+by now) — for `tier=="e2e"` §4.8 is gated on this point, not on the Stage-1 pass.
+
 ### 7.6 Cleanup (always runs)
 
 ```
@@ -549,10 +667,22 @@ immediately and set `result.status = "FAIL"` with `summary = "chainbench timeout
 After all stages run:
 
 ```
+# Stage gates AND the two bugfix verdicts both feed the overall status.
 overall_status =
-  "PASS" if every stage.status in {"PASS","WARN"}
-  "FAIL" otherwise
+  "FAIL" if any stage.status == "FAIL"
+       OR reproduction_verdict == "FAIL"     # §4.7 — bug not fixed
+       OR fix_validity_verdict == "FAIL"     # §4.8 — fix unsound/incomplete
+  "PASS" otherwise   # (stage WARN and fix_validity_verdict WARN do not block)
+
+needs_careful_review =
+  any stage.status == "WARN" OR fix_validity_verdict == "WARN" OR retrieval_health.degraded
+# When set on a PASS, the Orchestrator adds the `needs-careful-review` label + a PR note.
 ```
+
+For a bugfix, the report MUST show the two verdicts **separately** so the next cycle is routed
+correctly: a `reproduction_verdict==FAIL` re-enters the **Analyzer** (re-diagnose), while a
+`fix_validity_verdict==FAIL` re-enters per its failing check (symptom-masking → Analyzer;
+sibling-path/derived-state → Planner). Do not collapse them into one "bugfix failed" line.
 
 Write `{workspace_dir}/test-report.md`:
 
@@ -570,6 +700,14 @@ HEAD: {commit hash}
 | Security Scan | {status} | {ms}ms |
 | ChainBench | {status} | {ms}ms |
 | **Overall** | **{overall}** | **{total ms}** |
+
+## Bugfix verdicts (only for bugfix)
+| Verdict | Result | Meaning |
+|---------|--------|---------|
+| Reproduction (§4.7, necessary) | {reproduction_verdict} | symptom RED→GREEN on the oracle ({tier}) |
+| Fix validity (§4.8, sufficient) | {fix_validity_verdict} | root-cause-edge touched, siblings covered, no regression/overfit |
+- validity findings: {validity_findings[] — failing checks 1–4 / overfit flag (5)}
+- needs-careful-review: {yes/no + why}
 
 ## Unit Test
 - passed/failed/skipped: {numbers}
@@ -671,7 +809,8 @@ else:
   state.current_state = "EVALUATION_FAIL"
 states.EVALUATION.status = "completed"
 states.EVALUATION.completed_at = now()
-states.EVALUATION.results = { unit_test, lint, security, chainbench }
+states.EVALUATION.results = { unit_test, lint, security, chainbench,
+                              reproduction_verdict, fix_validity_verdict, needs_careful_review }
 states.EVALUATION.report_path = "test-report.md"
 states.EVALUATION.log_paths = { unit_test:..., lint:..., security:..., chainbench:... }
 write state.json
