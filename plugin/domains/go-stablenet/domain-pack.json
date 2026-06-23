@@ -1,5 +1,5 @@
 {
-  "_doc": "Domain pack for go-stablenet — the reference instance of the domain-pack contract (ADR docs/domain-pack-contract-adr-2026-06-22.md). Phase 1 wires identity + invariants + context_classifier only (ADR §8 Q2); build/unit_test/verification_stages are declared under _phase2 but NOT yet consumed (evaluator generalization is Phase 2). Resolved at runtime via the generic `domain-pack` loader skill keyed by state.project_id.",
+  "_doc": "Domain pack for go-stablenet — the reference instance of the domain-pack contract (ADR docs/domain-pack-contract-adr-2026-06-22.md). Phase 2a wires identity + invariants + context_classifier into the agents. Phase 2b (this) promotes the former `_phase2` block to the live `verification` contract: the Evaluator sources repo root + build/test commands from here. The stage LOOP (verification.stages) is data-driven in Phase 2b-β. Resolved at runtime via the generic `domain-pack` loader skill keyed by state.project_id.",
   "project_id": "go-stablenet",
   "ticket_namespace": "STABLE",
   "knowledge": {
@@ -9,12 +9,23 @@
   "invariants": "invariants.md",
   "context_classifier": "context.md",
 
-  "_phase2": {
-    "_doc": "Declared contract shape for Phase 2 (evaluator data-driven stages); NOT consumed yet.",
+  "verification": {
+    "_doc": "Build/test contract the Evaluator consumes (Phase 2b). Commands are run in repo_root; templates use {pkgs}/{cover_out} placeholders the Evaluator fills. `stages` drives the §3 loop (kind: builtin:* | mcp:*) — data-driven dispatch lands in Phase 2b-β. NOTE: a stage's MCP tool (e.g. chainbench) must still be granted in the Evaluator frontmatter — MCP grants are static (not pack-driven).",
     "repo_root_env": "GO_STABLENET_ROOT",
-    "build": { "cmd": "go build ./...", "artifact": "build/bin/gstable" },
-    "unit_test": { "runner": "go", "run_tmpl": "go test -run '{name}' ./{pkg}/...", "race_tmpl": "go test -race {pkgs}" },
-    "verification_stages": [
+    "build": {
+      "cmd": "go build ./...",
+      "binary_cmd": "go build -o build/bin/gstable ./cmd/gstable",
+      "artifact": "build/bin/gstable"
+    },
+    "unit_test": {
+      "runner": "go",
+      "full": "go test ./... -v -count=1 -timeout=600s",
+      "coverage_tmpl": "go test {pkgs} -coverprofile={cover_out} -covermode=atomic",
+      "cover_report_tmpl": "go tool cover -func={cover_out}",
+      "race_tmpl": "go test -race {pkgs} -count=1 -timeout=300s",
+      "single_tmpl": "go test -run '{name}' ./{pkg}/..."
+    },
+    "stages": [
       { "id": "unit",  "kind": "builtin:unit_race" },
       { "id": "lint",  "kind": "builtin:lint" },
       { "id": "sec",   "kind": "builtin:gosec" },

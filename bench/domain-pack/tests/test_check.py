@@ -24,7 +24,13 @@ def _sandbox(tmp: Path, *, with_invariants=True, drop_key=None):
     (skills / "domain-pack" / "SKILL.md").write_text("---\nname: domain-pack\n---\nloader\n")
     pack = {"project_id": "proj-x", "ticket_namespace": "PX",
             "invariants": "invariants.md", "context_classifier": "context.md",
-            "knowledge": {"cks_config_env": "CKS_CONFIG"}}
+            "knowledge": {"cks_config_env": "CKS_CONFIG"},
+            "verification": {
+                "repo_root_env": "PROJ_X_ROOT",
+                "build": {"cmd": "go build ./...", "binary_cmd": "go build -o bin/x ./cmd/x", "artifact": "bin/x"},
+                "unit_test": {"full": "go test ./...", "coverage_tmpl": "go test {pkgs} -coverprofile={cover_out}",
+                              "cover_report_tmpl": "go tool cover -func={cover_out}", "race_tmpl": "go test -race {pkgs}"},
+                "stages": [{"id": "unit", "kind": "builtin:unit_race"}]}}
     if drop_key:
         pack.pop(drop_key)
     (domains / "domain-pack.json").write_text(json.dumps(pack))
