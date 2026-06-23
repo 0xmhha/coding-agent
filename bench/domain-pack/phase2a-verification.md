@@ -54,3 +54,26 @@ Runbook (post-merge, capable session):
    reaching it = no-regression. One run, no baseline re-run needed.
 6. **Cleanup** (restore baseline, remove throwaway branch).
 7. **If it regresses:** `git revert` the merge on main; reopen the branch for fixes.
+
+## ✅ Layer 4 — RESULT (executed 2026-06-23)
+
+Ran the Phase 2a analyzer on PR-77 on a clean checkout (`test/dev-test/pr-77` @0bf2f4d1b,
+pr-77 cks serviceable; used the separate clean tree, not the contaminated `test/pr-77`).
+
+- **Analysis no-regression: PASS.** Reached the PRIMARY oracle root cause
+  `eth/gasprice/anzeon.go:54 SetCurrentBlock` (+ the secondary `anzeonTipCap` / `RemotesBelowTip`
+  staleness) and confirmed RED (`TestReproduce_STABLE0005_...`). Matches the 06-22 baseline
+  analyzer (#1 exact). The domain-pack loader resolved + classified (txpool/miner/...) correctly.
+- **Real bug found by the live run:** the loader's `plugin/domains/...` path does not resolve for
+  an installed plugin (subagent cwd is the target repo; the cache has no `plugin/` prefix). The
+  analyzer worked around it by locating the dir, so analysis still passed — but the path was wrong.
+- **Fixed:** `${CLAUDE_PLUGIN_ROOT}/domains/...` (PR #17, merged; current main 0.1.25).
+- **Substitution verified live (0.1.25 installed + reloaded):** an agent loading the domain-pack
+  skill sees the plugin-root token replaced inline with the absolute path
+  (`/Users/.../0.1.25/domains/{project_id}/...`); `{project_id}` stays a runtime token. The loader
+  now reads the correct absolute pack path with no workaround — the ADR §3.1 reliability caveat is
+  empirically resolved.
+
+**Conclusion:** Phase 2a (domain-pack wiring) + the path fix are verified clean. Remaining for P1:
+Phase 2b (evaluator `go_stablenet_root` / `verification_stages` generalization) and Phase 3 (full
+grep-clean acceptance).
