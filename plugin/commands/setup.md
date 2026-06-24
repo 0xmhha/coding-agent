@@ -23,17 +23,23 @@ argument-hint: "[--check | --fix] [--autonomous] [--project <id>]   (생략 시 
 
 ---
 
-## 0. 인자
-- 기본(인자 없음): 점검 → 미완이면 등록까지 제안·수행.
-- `--check`: 점검만(기록하지 않음).
-- `--fix`: 곧바로 등록 시도.
+## 0. 인자 (사용자가 준 플래그를 그대로 setup.py 에 전달)
+- 기본(인자 없음): 점검(--check 동등) → 미완이면 §2 로 등록 제안·수행.
+- `--check`: 점검만(기록 안 함).
+- `--fix`: env 를 settings.json 에 기록(활성 팩 `repo_root_env` 포함 — 단 cwd 가 plugin repo 면 MISMATCH 로 건너뜀).
+- `--autonomous`: granular allowlist 등록(**`--fix` 없이도 동작**).
+- `--project <id>`: 활성 도메인팩 명시(auto-detect 모호 시).
 
-## 1. 점검
+## 1. 실행 (플래그 전달)
 ```
-1.1. bash: python3 ${CLAUDE_PLUGIN_ROOT}/scripts/setup.py --check
-1.2. 출력 표를 사용자에게 그대로 보여준다(KEY/STATUS/SOURCE).
-1.3. exit 0 (전부 해소) 이고 인자가 --check 거나 모두 OK → 여기서 종료:
-     "설정이 모두 갖춰져 있습니다. (필요 시 /coding-agent:setup --fix 로 settings.json 기록)"
+1.1. bash: python3 ${CLAUDE_PLUGIN_ROOT}/scripts/setup.py {사용자 플래그; 없으면 --check}
+     # 예: /coding-agent:setup --autonomous        → setup.py --autonomous (allowlist 등록)
+     #     /coding-agent:setup --fix --autonomous   → env + repo_root_env + allowlist 기록
+1.2. 출력 표·기록 결과를 사용자에게 그대로 보여준다(KEY/STATUS/SOURCE).
+1.3. repo_root_env 가 **MISMATCH** 면 안내: "현재 plugin repo 라 repo_root_env 미기록 —
+     실제 작업은 타깃 프로젝트(예: go-stablenet) 루트에서 setup 을 실행하라."
+1.4. exit 0 이고 (--fix/--autonomous 없이) 전부 해소 → 종료: "설정이 모두 갖춰져 있습니다."
+     MISSING 이 있으면 §2.
 ```
 
 ## 2. 미완 항목 처리 (자동탐지 → 대화형)

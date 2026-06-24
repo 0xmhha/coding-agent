@@ -246,8 +246,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {key:<18} {src.upper():<10} {shown}  [{where}]")
     print(f"  {'chainbench-mcp':<18} {'OK' if chainbench_mcp else 'NOT ON PATH':<10} "
           f"{chainbench_mcp or '-> install chainbench so chainbench-mcp is on PATH'}")
-    if rre:
+    is_plugin_repo = bool(repo_root) and (
+        (repo_root / ".claude-plugin").is_dir() or (repo_root / "plugin" / ".claude-plugin").is_dir())
+    pin_rre = bool(rre) and not (is_plugin_repo and not args.project)
+    if rre and pin_rre:
         print(f"  {rre:<18} {'REPO-ROOT':<10} {repo_root}  [{PUBLIC}] (active pack repo_root_env)")
+    elif rre:
+        print(f"  {rre:<18} {'MISMATCH':<10} cwd is the coding-agent plugin repo, not a target "
+              "project — repo_root_env NOT written (run from the target repo, or pass --project)")
     else:
         print(f"  {'repo_root_env':<18} {'UNKNOWN':<10} "
               "could not resolve active pack — pass --project <id>")
@@ -255,36 +261,39 @@ def main(argv: list[str] | None = None) -> int:
           "--autonomous registers granular allow (MCP + read-only bash); for build/commit/edits "
           "also set permissions.defaultMode (not auto-set)")
 
+    claude_dir = repo_root / ".claude"
+
+    # --autonomous: register the allowlist independent of --fix / env resolution.
+    if args.autonomous:
+        w_allow = _merge_allow(claude_dir / "settings.local.json", AUTONOMOUS_ALLOW)
+        _ensure_gitignored(repo_root, ".claude/settings.local.json")
+        print(f"\nregistered {len(w_allow)} permission(s) to .claude/settings.local.json allow"
+              + (f": {', '.join(w_allow)}" if w_allow else " (already present)"))
+
     if not args.fix:
         if missing:
             print(f"\n{len(missing)} value(s) unresolved: {', '.join(missing)}")
             print("run again with --fix (and --set KEY=VALUE for the missing ones, or --interactive)")
             return 1
-        print("\nall required values resolved. run with --fix to write them.")
+        if not args.autonomous:
+            print("\nall required values resolved. run with --fix to write them.")
         return 0
 
-    # --fix: write resolved values into the two settings files.
+    # --fix: write resolved env into the two settings files (claude_dir defined above).
     public_vals = {k: resolved[k][0] for k, w, _ in REQUIRED if w == PUBLIC and resolved[k][0]}
     secret_vals = {k: resolved[k][0] for k, w, _ in REQUIRED if w == SECRET and resolved[k][0]}
-    if rre:
+    if pin_rre:
         public_vals[rre] = str(repo_root)   # pin active pack's repo_root_env to this repo
 
-    claude_dir = repo_root / ".claude"
     w_pub = _merge_env(claude_dir / "settings.json", public_vals, args.force)
     w_sec = _merge_env(claude_dir / "settings.local.json", secret_vals, args.force)
     if w_sec:
         _ensure_gitignored(repo_root, ".claude/settings.local.json")
 
-    w_allow = []
-    if args.autonomous:
-        w_allow = _merge_allow(claude_dir / "settings.local.json", AUTONOMOUS_ALLOW)
-        _ensure_gitignored(repo_root, ".claude/settings.local.json")
-
     print(f"\nwrote {len(w_pub)} key(s) to .claude/settings.json: {', '.join(w_pub) or '(none)'}")
     print(f"wrote {len(w_sec)} key(s) to .claude/settings.local.json: {', '.join(w_sec) or '(none)'}")
-    if args.autonomous:
-        print(f"registered {len(w_allow)} permission(s) to .claude/settings.local.json allow"
-              + (f": {', '.join(w_allow)}" if w_allow else " (already present)"))
+    if rre and not pin_rre:
+        print(f"skipped {rre} (cwd is the plugin repo, not a target project)")
     if missing:
         print(f"still MISSING (provide via --set / --interactive): {', '.join(missing)}")
         return 1

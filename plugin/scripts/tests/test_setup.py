@@ -4,6 +4,8 @@
 Run:  python3 plugin/scripts/tests/test_setup.py
 """
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -14,6 +16,17 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 import setup  # noqa: E402
+
+SETUP_PY = _SCRIPTS / "setup.py"
+
+# A clean env: REQUIRED keys unset so resolution is deterministic regardless of
+# the developer's shell. PATH is kept so `chainbench-mcp`/`git` lookups behave.
+_CLEAN_ENV = {"PATH": os.environ.get("PATH", "")}
+
+
+def _run(cwd: Path, *flags: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(SETUP_PY), *flags],
+                          cwd=str(cwd), capture_output=True, text=True, env=_CLEAN_ENV)
 
 
 def _plugin_root(tmp: Path, packs: dict) -> Path:
@@ -68,6 +81,60 @@ class TestMergeAllow(unittest.TestCase):
             doc = json.loads(p.read_text())
             self.assertEqual(doc["env"], {"FOO": "bar"})          # untouched
             self.assertEqual(doc["permissions"]["allow"], ["keep", "new"])
+
+
+class TestAutonomousIndependentOfFix(unittest.TestCase):
+    """--autonomous must register the allowlist even without --fix (bug fix)."""
+
+    def test_autonomous_alone_writes_allow_no_env(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            r = _run(d, "--autonomous")
+            local = json.loads((d / ".claude" / "settings.local.json").read_text())
+            self.assertEqual(local["permissions"]["allow"], setup.AUTONOMOUS_ALLOW)
+            # no --fix -> no env block, no settings.json
+            self.assertNotIn("env", local)
+            self.assertFalse((d / ".claude" / "settings.json").exists())
+            # secret-file path is gitignored
+            self.assertIn(".claude/settings.local.json", (d / ".gitignore").read_text())
+            self.assertIn("registered", r.stdout)
+
+
+class TestPluginRepoGuard(unittest.TestCase):
+    """repo_root_env must NOT be pinned when cwd is the coding-agent plugin repo."""
+
+    def test_plugin_repo_reports_mismatch(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / ".claude-plugin").mkdir()           # marker => is_plugin_repo
+            r = _run(d, "--check")
+            self.assertIn("MISMATCH", r.stdout)
+            self.assertNotIn("REPO-ROOT", r.stdout)
+
+    def test_target_repo_pins_repo_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)                              # no marker => target repo
+            r = _run(d, "--check")
+            self.assertIn("REPO-ROOT", r.stdout)
+            self.assertIn("GO_STABLENET_ROOT", r.stdout)
+
+    def test_fix_in_plugin_repo_skips_repo_root_env(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / ".claude-plugin").mkdir()
+            r = _run(d, "--fix")
+            self.assertIn("skipped GO_STABLENET_ROOT", r.stdout)
+            settings = d / ".claude" / "settings.json"
+            env = json.loads(settings.read_text()).get("env", {}) if settings.exists() else {}
+            self.assertNotIn("GO_STABLENET_ROOT", env)
+
+    def test_project_override_pins_even_in_plugin_repo(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / ".claude-plugin").mkdir()
+            # explicit --project means the user asserts the active pack -> pin it
+            r = _run(d, "--check", "--project", "go-stablenet")
+            self.assertIn("REPO-ROOT", r.stdout)
 
 
 if __name__ == "__main__":
