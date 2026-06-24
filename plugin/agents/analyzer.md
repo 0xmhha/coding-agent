@@ -119,13 +119,16 @@ Optional (bugfix re-entry, set by the Orchestrator on EVALUATION_FAIL):
 | mode         | Sections (in order)                                        |
 +--------------+------------------------------------------------------------+
 | fresh        | §3 SITUATION → (bugfix-only: skip §5) → §6 hand off         |
-| bugfix       | §3 SITUATION → §4 ROOT CAUSE → §5 REPRODUCE → §6 hand off   |
-| bugfix (re)  | §3b RE-ANALYZE (reuse reproduction) → §6 hand off           |
+| bugfix       | §3 SITUATION → §4 ROOT CAUSE → §5 REPRODUCE → §5c DIAGNOSE → §6 |
+| bugfix (re)  | §3b RE-ANALYZE (reuse repro; §5c loop if e2e) → §6 hand off  |
 | code_review  | §3 SITUATION (light) → §7 Review report → DONE              |
 +--------------+------------------------------------------------------------+
 ```
 For a `fresh` **feature**, §4/§5 are skipped (nothing to reproduce). For `bugfix`,
-§4 and §5 are mandatory. Each path ends by writing artifacts and calling
+§4 and §5 are mandatory; and for an `e2e`-tier bug the §5c diagnosis loop pins the
+broken edge by **runtime observation** (instrument → rebuild → rerun repro → read logs)
+before hand-off, so a wrong static guess never costs a full IMPLEMENT→EVALUATION bounce.
+Each path ends by writing artifacts and calling
 `state-machine.transition`; if it returns an error, report the missing artifacts and stop.
 
 ---
@@ -300,10 +303,14 @@ the get_for_task pack / hits for evidence against your leading guess (e.g. a com
 value is computed "during validation"). Evidence in hand outranks your static reasoning; do not
 assert against the pack.
 ★ **If competing candidates remain, static falsification is shaky, or ≥2 paths produce the same
-observable, do NOT guess.** Use the `investigative-probe` skill: write a throwaway instrumented
-test that drives the symptom scenario, observe the suspect value at each candidate site, run it,
-let the runtime observation pick the real cause (then revert the probe). Static code alone often
-cannot tell which of two plausible candidates actually fires — observe, don't assume.
+observable, do NOT guess.** Use the `investigative-probe` skill to observe the suspect value at
+each candidate site at runtime, then let the observation pick the real cause (then revert the probe).
+Static code alone often cannot tell which of two plausible candidates actually fires — observe, don't
+assume. **Pick the variant by tier:** for a `simulation`-tier candidate (contained in one process),
+write a throwaway instrumented in-process Go test. For an `e2e`-tier bug, the probe IS the **§5c
+diagnosis loop** (instrument the binary → `make gstable` → `chainbench_restart` → rerun the
+reproduction → read node logs) — run it after the §5 RED gate and finalize this `## Root cause`
+section from its runtime evidence.
 
 Write the `## Root cause` section of analysis.md. It MUST name:
 - the value(s) + lifecycle (producer / every copy / consumers),
@@ -479,6 +486,76 @@ Set the marker `states.ANALYSIS.reproduction_confirmed = true`.
 
 ---
 
+## 5c. e2e ROOT-CAUSE diagnosis loop (instrument → rebuild → rerun repro → observe → iterate)
+
+**Why this exists.** For an `e2e`-tier bug, static cks reasoning (§4) often leaves competing
+candidate edges (cycle 1 of the GasTip stall guessed "remote-only eviction" and was wrong — the
+tx was actually in `t.locals`). Settling that statically and handing a *guess* to the Planner
+makes the pipeline pay a full IMPLEMENT → EVALUATION bounce (~30-min chainbench + suite) **per
+wrong hypothesis**. Instead, **pin the broken edge HERE, by runtime observation, before handing
+off** — so the FIRST fix is correct. This is the `investigative-probe` skill applied at the e2e
+tier (its e2e/binary-instrumentation variant), and it runs the **reproduction test each iteration**
+(that is how you exercise the symptom and read the discriminating value from the node logs).
+
+**When to run it.** `tier == "e2e"` AND the §4 root cause is not already runtime-confirmed
+(≥2 candidate edges survive static falsification, or any candidate sits on a sibling path —
+local vs remote, two validation stages, producer vs cache). If §4 already named the broken edge
+with a runtime-confirmed observation, skip to §5.3/§6. Never run a fix design on an unconfirmed
+multi-candidate root cause for an e2e bug.
+
+**The loop** (keep the network from §5b UP across iterations — do NOT re-init each time):
+```
+candidates = the competing edges/sites from §4 root-cause-lifecycle (+ §4.1 affected_sites)
+iter = 0
+while root cause NOT runtime-confirmed AND iter < 4:        # time-boxed; see budget below
+  iter += 1
+  1. DISCRIMINATOR: pick the single observation that separates candidate A from B
+     ("at site P, value/branch V is X if A, Y if B"). No discriminator → narrow statically, not here.
+  2. INSTRUMENT (observation only — NEVER change production logic/behavior): add temporary
+     log lines (log.Info/Warn or a guarded fmt.Fprintf to stderr) at each candidate site P that
+     print V and the relevant identifiers (tx hash, sender, pool map, branch taken). These are
+     THROWAWAY scratch edits to production files.
+  3. REBUILD + SWAP: cd {repo_root} && make gstable    # ver.build.binary_cmd
+     chainbench_restart({ binary_path: "{repo_root}/{ver.build.artifact}", project_root: {repo_root} })
+     (restart reuses the SAME running network/profile on the freshly built binary — fast; no full init)
+  4. RERUN THE REPRO ONLY (point C — every diagnosis iteration runs the reproduction):
+       chainbench_test_run({ test: reproduction.json.chainbench_test, format: "jsonl" })
+     Do NOT run the 3×-repeat / regression / parent-rebuild here — that is the Evaluator's final
+     confirmation, not diagnosis. One run is enough to emit the instrumented logs.
+  5. OBSERVE: read the instrumented lines from the node logs —
+       chainbench_log_search / chainbench_log_timeline / chainbench_failure_context /
+       chainbench_node_rpc / chainbench_txpool_inspect. Record the ACTUAL value of V.
+  6. DECIDE: the candidate whose predicted value actually appears is confirmed; the others are
+     REFUTED BY OBSERVATION (stronger than static refutation). If still ambiguous, move the
+     instrumentation one hop deeper down the value lifecycle (producer → cache → consumer) and
+     loop. Journal each observation to findings.log ("iter {n}: at P, V={observed} → A confirmed, B refuted").
+```
+
+**Stop + revert (mandatory).**
+- STOP when the broken edge is runtime-confirmed (observed value/branch proves which site produces
+  the symptom), or at the iteration cap — then hand off the **best-supported** hypothesis and record
+  the still-open discriminator in findings.log (do NOT spin past the budget).
+- REVERT ALL instrumentation from the production tree — `git -C {repo_root} checkout -- <files>` (or
+  delete the scratch lines). The diagnosis logs are throwaway and **must NOT reach the fix branch/PR**;
+  the Implementer starts from a clean tree. The reproduction oracle `.sh` STAYS (permanent oracle) —
+  only the production-code instrumentation is reverted. Rebuild once clean if a later step needs the binary.
+- chainbench_stop the diagnosis network when done (the Evaluator brings its own up, §7.x).
+
+**Then finalize §4 output with the runtime evidence:** rewrite analysis.md `## Root cause` to name
+the **runtime-confirmed broken edge** (`file:line` + the observed log line as evidence, e.g. "node-1
+log: sender marked local → tx stored in t.locals; RemotesBelowTip Range(false,true) never visits
+locals → not evicted"), and make `## Affected sites` / `related-code.json.affected_sites` exhaustive
+(add the sibling path the observation revealed — here the `t.locals` eviction path — as a
+`must_fix` row, so the Planner's §5.2b and the Evaluator's §4.8 both cover it). This is the report
+the loop produces; the fix is still the Planner/Implementer's job (§8 boundaries).
+
+**Budget.** Each iteration ≈ rebuild (~1–2 min) + restart + one repro run (a few min) — far cheaper
+than a full IMPLEMENT→EVALUATION cycle. The whole loop replaces N wrong fix-evaluate bounces with a
+handful of cheap observations. If `$CHAINBENCH_DIR` is unset or the binary won't build, you cannot
+run this loop — fall back to the static §4 conclusion and mark confidence accordingly.
+
+---
+
 ## 3b. RE-ANALYZE (bugfix EVALUATION_FAIL re-entry) — find what was missed
 
 The Orchestrator already transitioned EVALUATION → ANALYSIS and passed `failure_doc` +
@@ -501,6 +578,10 @@ existing one (read `reproduction.json`).
 3. Re-apply the root-cause-lifecycle skill DEEPER on the failure: which edge/copy/site did the
    last fix miss? The first fix usually patched a symptom cache, not the source — trace one hop
    further (skill steps 5-6-7). Falsify the previous hypothesis with the new failure evidence.
+   For an `e2e`-tier reproduction, do NOT re-guess statically — **re-run the §5c diagnosis loop**
+   to runtime-confirm the missed edge: instrument the suspected sibling site (e.g. the local-vs-remote
+   path the §4.8 finding flagged), rebuild, rerun the repro, read the logs, then revert. The cheap
+   instrument/observe iteration here is exactly what avoids another full IMPLEMENT→EVALUATION bounce.
 4. Write `analysis-revisited-{cycle}.md`: what the last cycle missed, the revised broken edge
    (file:line), and the **updated `affected_sites`** (add any sibling path §4.8 flagged uncovered)
    the Planner must cover this time. Append a "Cycle {N} revision" note to analysis.md and update

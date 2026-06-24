@@ -52,5 +52,33 @@ type: skill
   `t.Logf`. 관찰: 유휴 내내 일관되게 옛값 → **(B) 가드 확정**, (A) race 반증(간헐적이지 않으므로).
 - 원복하고 "유휴 구간 내내 stale = 가드 경로" 를 진단 근거로 기록.
 
+## 두 변종 — 재현 티어를 따른다 (in-process / e2e)
+
+프로브는 재현 티어와 같은 티어로 돈다:
+
+- **in-process (simulation)**: 위 절차 그대로 — 버리는 go test에서 후보 값을 `t.Logf`로 찍어 관찰.
+  단일 프로세스로 충실히 재현되는 증상(순수 함수, 인코딩, gas/fee, 단일 노드 상태전이)일 때.
+
+- **e2e (바이너리 계측 — chainbench)**: 단일 프로세스로 재현 못 하는 증상(합의·txpool·멀티노드·
+  거버넌스·노드 간 발산 등)은 **프로덕션 바이너리에 임시 로그를 박아** 관찰한다. analyzer **§5c
+  diagnosis loop**가 이 변종의 운영 절차다:
+  1. 후보 지점 P에 임시 로그 라인(`log.Info/Warn` 또는 stderr `fmt.Fprintf`) 추가 — **관찰만,
+     프로덕션 로직/동작 불변**.
+  2. `make gstable` 재빌드 → `chainbench_restart({binary_path, project_root})`로 **같은 네트워크에
+     새 바이너리만 스왑**(매 iter마다 init 새로 하지 말 것 — 느림).
+  3. **재현 테스트만 1회 재실행**(`chainbench_test_run repro/<...>`). 3×반복·회귀·parent 재빌드는
+     여기서 하지 않는다(그건 evaluator의 최종 확인이지 진단이 아님). 1회면 계측 로그가 나온다.
+  4. `chainbench_log_search` / `log_timeline` / `failure_context` / `node_rpc` / `txpool_inspect`
+     로 계측 라인의 **실제 값**을 읽는다.
+  5. 예측값이 실제로 나오는 후보 = 확정, 나머지는 **관찰로 반증**. 안 갈리면 값 생애주기를 한 hop
+     더 깊이 계측하고 2로.
+  6. **원복**: `git -C {repo_root} checkout -- <files>` 로 계측 제거 — **절대 fix 브랜치/PR에 남기지
+     말 것**(Implementer는 깨끗한 트리에서 시작). 재현 오라클 `.sh`는 유지. 끝나면 `chainbench_stop`.
+  7. 관찰값을 `analysis.md`의 `## Root cause`(broken edge `file:line` + 관측 로그 한 줄)와
+     `affected_sites`(관찰이 드러낸 sibling 경로 포함)에 **증거로** 남긴다.
+
+  비용: iter당 재빌드 ~1–2분 + 재시작 + 재현 1회 — 풀 IMPLEMENT→EVALUATION 바운스(~30분 e2e)보다
+  훨씬 싸다. **시간상자 ≤3–4 iter**; 못 갈리면 최선 가설 + 남은 판별변수를 기록하고 넘긴다.
+
 ---
-한 줄 트리거: **후보가 갈리면 — 판별변수 정하고 → 최소 시나리오 돌리며 그 값을 찍어보고 → 관찰로 확정 → 원복·기록.**
+한 줄 트리거: **후보가 갈리면 — 판별변수 정하고 → (티어에 맞는) 최소 시나리오 돌리며 그 값을 찍어보고 → 관찰로 확정 → 원복·기록.**

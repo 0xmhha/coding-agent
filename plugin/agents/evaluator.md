@@ -738,13 +738,17 @@ Component budgets stand: build fallback 5m (§7.1), setup 2m (§7.2), stabilize 
 
 ## 8. Consolidate → test-report.md
 
-### 8.0 Final full-suite regression gate (run ONCE, only when otherwise green)
+### 8.0 Final affected-closure regression gate (run ONCE, only when otherwise green)
 
-The whole-repo `go test ./...` is a broad regression check; it does NOT belong in every
-bug-cycle iteration (a cycle that fails its reproduction oracle, lint, or chainbench gains
-nothing from running the entire suite). Run it **exactly once** — as the LAST gate, only when
-every other signal is already green, i.e. immediately before this evaluation would PASS and the
-Orchestrator opens the PR. This is the §9 reorder: targeted per cycle (§4.2), full suite once here.
+The per-cycle unit run (§4.2) covers only `changed_pkgs`. Before PASS, run one broader
+regression over the change's **affected closure** — the changed packages PLUS every package
+whose transitive dependencies include a changed package (its reverse-dependency importers).
+This catches a regression a *dependent* package would surface, WITHOUT paying for the whole
+repo: a `go test ./...` wastes minutes on packages the change cannot reach (e.g. a pre-existing
+`accounts/abi/bind` 600s test timeout, `core` ~7min) which add no signal for a localized fix.
+Run it **exactly once** — the LAST gate, only when every other signal is already green (just
+before this evaluation would PASS and the Orchestrator opens the PR). §9 reorder: targeted per
+cycle (§4.2), affected closure once here.
 
 ```
 otherwise_green =
@@ -754,22 +758,36 @@ otherwise_green =
 
 if not otherwise_green:
   full_regression = { status: "SKIPPED",
-    summary: "not reached — an earlier gate failed; fix that before the full suite" }
-  # overall is already FAIL from the failing gate; spending the full suite now is wasted.
+    summary: "not reached — an earlier gate failed; fix that before the regression gate" }
+  # overall is already FAIL from the failing gate; spending the regression run now is wasted.
 else:
-  bash: cd {repo_root} && {ver.unit_test.full} 2>&1 \
-        | tee {workspace_dir}/logs/eval-full-regression.log
-  parse "--- PASS:" / "--- FAIL:" counts
-  if failed > 0:
-    full_regression = { status: "FAIL", failures: [ {package, test, file:line, error} ] }
+  # Compute the AFFECTED CLOSURE = changed packages + their reverse-dependency importers.
+  module = bash: cd {repo_root} && go list -m                 # e.g. github.com/ethereum/go-ethereum
+  changed_ipaths = { "{module}/{p}" for p in changed_pkgs }   # §4.1 changed dir → full import path
+  bash: cd {repo_root} && go list -e -f '{{.ImportPath}}{{"\t"}}{{join .Deps " "}}' ./... \
+        > {workspace_dir}/logs/eval-pkg-deps.txt
+  affected_pkgs = every import path P in that file where
+        P ∈ changed_ipaths  OR  (P's Deps ∩ changed_ipaths) ≠ ∅
+  # i.e. P is "affected" iff it IS a changed package or it transitively imports one.
+  if affected_pkgs is empty (no Go changed):
+    full_regression = { status: "SKIPPED", summary: "no Go changes in closure" }
   else:
-    full_regression = { status: "PASS" }
+    bash: cd {repo_root} && {ver.unit_test.affected_tmpl, fill {pkgs}=${affected_pkgs[@]}} 2>&1 \
+          | tee {workspace_dir}/logs/eval-full-regression.log
+    parse "--- PASS:" / "--- FAIL:" counts
+    if failed > 0:
+      full_regression = { status: "FAIL", failures: [ {package, test, file:line, error} ] }
+    else:
+      full_regression = { status: "PASS" }
 ```
 
-Because it runs only on an otherwise-green evaluation, the full suite executes ~once per fix
-(the final cycle) instead of every iteration — that is the cost this reorder removes. A FAIL
-here is a genuine regression in a package **outside** `changed_pkgs`; it feeds overall_status
-below and routes the bug cycle (the failing package guides the re-analysis).
+Because it runs only on an otherwise-green evaluation and only over the affected closure, this
+gate executes ~once per fix (the final cycle) and skips packages the change cannot reach. A FAIL
+here is a genuine regression in a *dependent* package **outside** `changed_pkgs` (but within the
+import closure); it feeds overall_status below and routes the bug cycle (the failing package
+guides the re-analysis). Scope note: packages that do NOT import the changed set are not run —
+acceptable because a localized change cannot alter their behavior (modulo reflection / build-tag
+edge cases; for a paranoid whole-repo pass, run `ver.unit_test.full` manually).
 
 ### 8.1 Overall status
 
@@ -807,7 +825,7 @@ HEAD: {commit hash}
 | Lint & Format | {status} | {ms}ms |
 | Security Scan | {status} | {ms}ms |
 | ChainBench | {status} | {ms}ms |
-| Full Regression (§8.0, once) | {full_regression.status} | {ms}ms |
+| Affected Regression (§8.0, once) | {full_regression.status} | {ms}ms |
 | **Overall** | **{overall}** | **{total ms}** |
 
 ## Bugfix verdicts (only for bugfix)
