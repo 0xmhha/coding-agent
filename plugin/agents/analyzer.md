@@ -391,10 +391,14 @@ the very mechanism that is broken** (hand-rolled consensus, stubbed networking, 
    transition or validation rule, signature/key handling, a data-structure bug. The test must
    drive the real production function and assert the real wrong value.
 
-4. **Escalate, never settle.** If you pick simulation and §5a's RED gate cannot make it fail
-   (or the only way to make it fail is to fake the broken mechanism), ESCALATE to e2e (§5b)
-   before declaring `reproduction_unobtainable`. "simulation passed for the wrong reason" is a
-   reproduction failure, not a pass.
+4. **Escalate, never settle — and never pivot.** If you pick simulation and §5a's RED gate cannot
+   make it fail (or the only way to make it fail is to fake the broken mechanism), ESCALATE to e2e
+   (§5b) before declaring `reproduction_unobtainable`. "simulation passed for the wrong reason" is a
+   reproduction failure, not a pass. Equally (D-2): if the ticket symptom won't reproduce but some
+   *other* defect does, do NOT silently retarget the run onto that other defect — the RED must be of
+   the ticket symptom (§5.2 symptom-bound RED). A high-confidence root cause that won't reproduce
+   usually means the SETUP is missing the symptom's conditions (idle/empty-block window, timing) —
+   fix the setup first (§5b step 3b), don't abandon the cause.
 
 Record the chosen tier AND the one-line justification (which rule above fired) in findings.log.
 ```
@@ -430,6 +434,17 @@ AND accumulates as regression (§5.3, point 5).
 3. PRECONDITIONS — build the environment the symptom needs: deploy contracts
    (chainbench_contract_deploy), fund/seed accounts and send tx (chainbench_tx_send /
    chainbench_tx_wait), induce faults (chainbench_network_partition) as the scenario requires.
+   Start from a known-clean baseline (assert/restore the relevant policy state) so prior-run
+   pollution cannot mask or fake the symptom.
+3b. IDLE / EMPTY-BLOCK WINDOW (D-3 — REQUIRED for staleness / "persists-then-clears" symptoms).
+   If the symptom only manifests while the chain is IDLE and self-heals on the next state change
+   (stale cache/env, a head-tracking miss, "after trigger X the symptom persists then clears"),
+   construct a SUSTAINED empty-block window AFTER the trigger: STOP sending state-changing txs and
+   let several empty blocks be produced (poll chainbench_status until height advances by N with no
+   tx), THEN assert the symptom INSIDE that window. Continuing to send txs changes the state root
+   every block and advances the stale cache → the symptom (correctly) will NOT reproduce. This idle
+   window IS the RED precondition for `symptom_assertion` (§5.2); omitting it is the classic way a
+   real staleness bug "passes on base" and the run pivots to the wrong defect.
 4. AUTHOR the repro test as a bash script following the chainbench convention
    (---chainbench-meta--- header, `source lib/common.sh`, assert_* helpers):
      test_path = $CB/tests/repro/{ticket-id}-{slug}.sh         # category = "repro" (§5.3)
@@ -442,15 +457,39 @@ AND accumulates as regression (§5.3, point 5).
 6. Apply the RED gate (§5.2). chainbench_stop when done (leave the .sh in the chainbench tree).
 ```
 
-### 5.2 RED gate (both tiers)
+### 5.2 RED gate (both tiers) — the SYMPTOM assertion must be the one that fails (D-1)
+The RED must be of the **ticket's symptom**, not of *any* assertion that happens to fail. A test
+that greens the ticket symptom on base while a sibling assertion fails has reproduced a DIFFERENT
+defect — that is not a reproduction of this ticket. Name which assertion encodes the symptom in
+`reproduction.json.symptom_assertion`, and gate on IT:
+
 ```
-- test FAILS  → reproduction CONFIRMED. Record the failure tail as red_output evidence.
-- test PASSES → the bug does NOT reproduce at this tier. Do NOT proceed. Either the test is
-  wrong, the understanding is, or the tier is too low. Revise once (simulation → consider
-  escalating to e2e per §5.0); if it still won't fail, this is `reproduction_unobtainable`:
+- symptom assertion FAILS on base  → reproduction CONFIRMED. Set symptom_red_confirmed=true,
+  red_confirmed=true; record the failure tail as red_output. Proceed.
+- symptom assertion PASSES on base, but a DIFFERENT assertion fails  → reproduction_inadequate.
+  Do NOT set red_confirmed. Do NOT retarget the run onto the other failing defect as if it were the
+  bug (journal it as a separate observation; it does not satisfy THIS ticket). The setup is missing
+  the symptom's necessary conditions → go to Anti-pivot below.
+- nothing fails on base  → the bug does not reproduce at this tier; revise the test once
+  (simulation → consider escalating to e2e per §5.0).
+```
+
+**Anti-pivot (D-2) — a strong hypothesis that won't reproduce means the SETUP is wrong, not the
+hypothesis.** When the §4 root cause is high-confidence — corroborated by an existing regression
+test, or a known pattern (stale cache/env, a head-tracking miss, a timing/idle window) — yet the
+symptom assertion won't go RED, do NOT abandon the hypothesis. First enumerate the symptom's
+NECESSARY runtime conditions (idle/empty-block window, timing, account class, fee relation) and
+CONSTRUCT them in the setup (e2e: §5b step 3b idle window). Only after a faithful setup *still*
+fails to reproduce may you downgrade the hypothesis. **Never swap to a different, more-easily-
+reproducible defect and call it this ticket** — that is precisely how a fix lands on the wrong
+root cause (see docs/test/pr-77 fidelity analysis).
+
+If, after a faithful setup honoring the above, the symptom genuinely cannot be made RED, this is
+`reproduction_unobtainable`:
+```
     state-machine.log_failure(workspace_dir, { state:"ANALYSIS", agent:"analyzer",
       actual_outcome:{ type:"reproduction_unobtainable", summary:"could not author a test
-      that reproduces the reported symptom", tier_tried:[...], ... } })
+      that reproduces the reported symptom", tier_tried:[...], setup_conditions_tried:[...] } })
     transition to BLOCKED (autonomy: escalate one simplified attempt first), STOP.
 ```
 
@@ -458,17 +497,24 @@ AND accumulates as regression (§5.3, point 5).
 The e2e oracle `.sh` is written **under `$CHAINBENCH_DIR/tests/repro/`** so it is auto-discovered
 by `chainbench_test_list`/`chainbench_test_run` and accumulates as a permanent regression
 artifact. (Once it has guarded a shipped fix it can later graduate into `tests/regression/`.)
-Write `reproduction.json` per the **reproduce-first** contract (tier-keyed):
+Write `reproduction.json` per the **reproduce-first** contract (tier-keyed). `symptom_assertion`
+names which assertion encodes the TICKET symptom, and `symptom_red_confirmed` records that THAT
+assertion (not a sibling) failed on base — both REQUIRED (D-1; the ANALYSIS→PLANNING gate checks them):
 ```
 simulation:  { "tier":"simulation", "test_file":"<path>", "test_name":"<TestName>",
                "package":"<pkg>", "run_cmd":"go test -run '<TestName>' ./<pkg>/...",
-               "race":<bool>, "red_confirmed":true, "red_output":"<tail>", "authored_cycle":1 }
+               "race":<bool>, "symptom_assertion":"<the assertion that encodes the ticket symptom>",
+               "symptom_red_confirmed":true, "red_confirmed":true, "red_output":"<tail>", "authored_cycle":1 }
 e2e:         { "tier":"e2e", "test_name":"repro/<ticket>-<slug>",
                "chainbench_test":"repro/<ticket>-<slug>",
                "chainbench_test_file":"<CHAINBENCH_DIR>/tests/repro/<ticket>-<slug>.sh",
                "profile":"<profile>", "binary_build_cmd":"make gstable",
-               "preconditions":[...], "red_confirmed":true, "red_output":"<tail>", "authored_cycle":1 }
+               "preconditions":[...], "idle_window":"<empty-block window built, if staleness symptom>",
+               "symptom_assertion":"<the assertion that encodes the ticket symptom>",
+               "symptom_red_confirmed":true, "red_confirmed":true, "red_output":"<tail>", "authored_cycle":1 }
 ```
+`symptom_red_confirmed` MUST be the symptom assertion's result on base — if a *different* assertion
+failed while the symptom one passed, this is `reproduction_inadequate` (§5.2), not a confirmed RED.
 Set the marker `states.ANALYSIS.reproduction_confirmed = true`.
 
 > **This is HARD-gated, not advisory.** For `ticket_type == "bugfix"` the

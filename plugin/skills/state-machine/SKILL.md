@@ -232,8 +232,12 @@ coding-agent 파이프라인의 상태 전이를 관리한다. 이 skill은 `Rea
      - `Bash`: `test -f {workspace_dir}/reproduction.json && echo OK`
      - `states.ANALYSIS.reproduction_confirmed == true` (analyzer가 RED를 본 마커)
      - reproduction.json을 파싱하여 `red_confirmed == true`
+     - **증상-결속 RED (D-1, HARD)**: reproduction.json의 `symptom_assertion`(티켓 증상을 인코딩한
+       assertion)이 비어있지 않고 `symptom_red_confirmed == true` — 즉 *증상 그 자체*가 base에서 RED였어야
+       한다. 인접한 다른 assertion만 실패하고 증상 assertion은 GREEN이면(= `reproduction_inadequate`)
+       통과시키지 않는다. (이것이 "재현은 존재하나 *엉뚱한 것*을 재현"을 막는 지점 — #19 게이트의 한 단계 위.)
      - 하나라도 불충족 → TRANSITION_BLOCKED, `missing`:
-       `["bugfix requires a reproduction test confirmed RED (reproduction.json + reproduction_confirmed + red_confirmed)"]`.
+       `["bugfix requires the TICKET SYMPTOM reproduced RED (reproduction.json + reproduction_confirmed + red_confirmed + symptom_assertion + symptom_red_confirmed); a sibling assertion failing while the symptom assertion passes is reproduction_inadequate, not a reproduction"]`.
      - 정당하게 재현 불가한 경우는 analyzer가 `reproduction_unobtainable`로 **BLOCKED 전이**하지
        PLANNING으로 오지 않는다 → 이 게이트를 우회하는 합법 경로는 없다.
 
