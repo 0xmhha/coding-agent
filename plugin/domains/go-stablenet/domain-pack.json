@@ -20,9 +20,10 @@
     },
     "unit_test": {
       "runner": "go",
-      "_scope_doc": "targeted_tmpl runs per bug-cycle on changed packages (fast feedback). full runs ONCE as the final regression gate (Evaluator §8.0), only when every other gate is green — not on every failing iteration.",
+      "_scope_doc": "targeted_tmpl runs per bug-cycle on changed packages (fast feedback). affected_tmpl runs ONCE as the final regression gate (Evaluator §8.0) over the change's AFFECTED CLOSURE — changed packages plus their reverse-dependency importers (packages whose transitive deps include a changed package) — only when every other gate is green, not on every failing iteration, and NOT the whole repo. A whole-repo ./... run wastes time on packages unrelated to the change (e.g. a pre-existing accounts/abi/bind 600s test timeout, core ~7min) that the fix cannot affect. full is retained for manual/whole-repo use only.",
       "full": "go test ./... -count=1 -timeout=600s",
       "targeted_tmpl": "go test {pkgs} -count=1 -timeout=300s",
+      "affected_tmpl": "go test {pkgs} -count=1 -timeout=420s",
       "coverage_tmpl": "go test {pkgs} -coverprofile={cover_out} -covermode=atomic",
       "cover_report_tmpl": "go tool cover -func={cover_out}",
       "race_tmpl": "go test -race {pkgs} -count=1 -timeout=300s",
