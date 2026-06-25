@@ -348,11 +348,12 @@ this list is the oracle for "did the fix cover everything?", not just "did the b
 §4.1 is **symptom-bound**: it covers every site that yields *this ticket's* observable. But
 fixing a value's lifecycle routinely exposes *adjacent* defects that share the value's
 **semantics** yet surface a **different** symptom — these fall outside the reproduction oracle
-AND outside §4.1, so they are silently dropped unless captured here. (PR-77: fixing the stale
-`AnzeonTipEnv` (1st defect) implies that, once the gasTip floor can rise, pooled txs whose
-*effective* tip is below the new floor must be dropped — `RemotesBelowTip` compared the raw
-tip and did not, a 2nd defect with a *different* symptom. A senior reaches it *while* fixing the
-1st; this step makes the pipeline reach it too.)
+AND outside §4.1, so they are silently dropped unless captured here. (Domain-neutral shape:
+fixing a value V so it updates correctly implies that a consumer which made a decision under
+the OLD V may now be wrong — e.g. once a threshold/policy value can rise, items admitted under
+the old threshold must be re-evaluated or dropped, yet the code performing that drop may still
+compare the pre-change value. A senior reaches the second defect *while* fixing the first; this
+step makes the pipeline reach it too.)
 
 Run the `root-cause-lifecycle` **consequence-of-change** movement over the **consumer set you
 already enumerated** in §4 (no new global scan — grounding kills hallucination). For each
@@ -368,7 +369,7 @@ write `## Side findings` in analysis.md AND persist `related-code.json.side_find
 ```jsonc
 "side_findings": [
   { "site": "<file:line>", "value": "<shared value / semantics>",
-    "change_scenario": "V changes A→B (e.g. gasTip floor rises)",
+    "change_scenario": "V changes A→B (e.g. a threshold/policy value rises)",
     "missing_behavior": "C does not drop / recompute / invalidate …",
     "predicted_symptom": "<distinct from THIS ticket's symptom>",
     "confidence": "high|medium|low",
