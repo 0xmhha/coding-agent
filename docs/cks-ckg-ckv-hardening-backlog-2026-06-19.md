@@ -18,10 +18,13 @@
 
 ---
 
-## 0. 한눈에 (현재 상태)
+## 0. 한눈에 (현재 상태 — 2026-06-25 갱신)
 
-방금까지의 **신뢰성 라인은 전부 main에 머지됨.** 남은 것은 (a) 운영 반영(재시작/재설치),
-(b) 코드리뷰에서 나온 ckg/ckv 정합성·성능 백로그(미착수), (c) 더 큰 인접 줄기(설계 구현·검색실험).
+신뢰성 라인 + **정합성 🔴 2건(A1·A2) 모두 main에 머지됨.** 남은 것은 (a) 운영 반영(재시작/재설치),
+(b) 코드리뷰 잔여 성능·확장성 백로그(§3.3·§3.4·§3.5, 미착수), (c) 더 큰 인접 줄기(설계 구현·검색실험·그래프 추론 갭).
+
+**2026-06-25 진행:** A1(ckv 임베딩 정체성 강제) = ckv #12 머지, A2(ckg silent-incompleteness loud) = ckg #27 머지,
+cks 전파(ckv 핀 bump) = cks #27 머지. 재검증 결과 §3.4.9(MCP envelope)·§3.5.5(coreml CLI)는 별도 작업으로 **이미 해결**됨.
 
 ---
 
@@ -67,9 +70,12 @@ go test -race ./<changed-pkg>/   # 동시성 변경 시
 | ckv 신뢰성 | Ollama 요청 **타임아웃**(probe bounded + 응답 길이 검증) | ckv `ac34a22` (#7) |
 | ckv 신뢰성 | 모델 다운로드 **transport 타임아웃**(connect/TLS/header + 백스톱, 대용량 전송 미캡) | ckv `460a718` (#8) |
 | cks↔ckv | go.mod ckv→`ac34a22`(Ollama 타임아웃 cks 반영) + main.go gofmt | cks `a8f411e` (#19) |
+| **A1** ckv 정합성 🔴 | **임베딩 공간 정체성 강제** — `Identity()`를 `Embedder` 인터페이스 정식 멤버로(provider/model/dim/pooling/normalize+Checksum), registry서 파생(하드코딩 제거), `query.Open`+reindex가 checksum 불일치 시 거부(구 인덱스는 name+dim 폴백). 모델 교체 안전. | ckv #12 |
+| **A2** ckg 정합성 🔴 | **불완전 빌드를 loud하게** — CLI에 parse-fail 수 노출+`--fail-on-parse-errors`, Solidity 쿼리 컴파일 self-check(go/ast 스캔, 드리프트0), `GetManifest` `rows.Err()` 검사. | ckg #27 |
+| cks↔ckv | go.mod ckv→`485b644`(A1 cks 반영) | cks #27 |
 
 핵심 효과: 멈춘 Ollama가 이제 *행(hang)* 대신 **bounded 에러**로 surface → cks가 not-serviceable로
-정직 보고 → planner가 차단. "조용히 틀린 결과"의 1차 경로가 닫힘.
+정직 보고 → planner가 차단. **A1·A2로 "조용히 틀림"의 임베딩-공간 경로와 그래프-불완전 경로까지 닫힘.**
 
 > **정책 근거(왜 degraded=서비스불가):** 사용자 결정(2026-06-15)으로, cks의 기존 "never a crash"
 > graceful-degradation을 *override*. degraded(ckv 없이 ckg/BM25만)로는 설계-급 컨텍스트가 안 나와
@@ -89,49 +95,45 @@ go test -race ./<changed-pkg>/   # 동시성 변경 시
 
 ---
 
-## 3. ☐ ckg / ckv 리뷰 백로그 (4-agent 리뷰 2026-06-16, 미착수)
+## 3. ckg / ckv 리뷰 백로그 (4-agent 리뷰 2026-06-16 · 재검증 2026-06-25)
 
-> **신선도 주의:** file:line은 **2026-06-16 리뷰 시점** 기준. 이후 코드가 이동했을 수 있으니
-> (coding-agent는 그 사이 analyzer agent 추가 등 진화) **착수 전 심볼/grep으로 현재 위치 재확인** 필수.
+> **🔁 재검증 2026-06-25 (4-agent, ckg `e74ce15`·ckv `e5b1380`·cks `08e8dbf` 기준):** ckg canonical_id
+> Phase 1–3(#24–26)·ckv #9–11 머지로 코드가 크게 이동 → 아래 file:line은 재검증 기준으로 갱신함.
+> **🔴 A1(§3.1)·A2(§3.2)는 구현·머지 완료** (아래 ✅). 남은 미착수는 §3.3·§3.4·§3.5.
+> **착수 전 심볼/grep으로 한 번 더 확인** 권장(코드 계속 이동 중).
 > **공통 검증:** 각 수정은 (1) 해당 repo `go test ./...` + `go vet` + 동시성이면 `-race`, (2) cks 거동에
 > 닿으면 §0.5 health smoke로 회귀 확인. 각 항목의 "검증:"은 그 위에 더할 항목-특화 확인.
 
-### 3.1 🔴 ckv 인덱스 identity 부실 — 다른 임베딩 공간이 "호환인 척" 교체됨
-- `EmbeddingChecksum` 필드 선언만 되고 **미기록**(`internal/manifest/manifest.go:39`).
-- `EmbeddingNormalize`가 임베더와 무관하게 `"l2"` **하드코딩**(`internal/build/builder.go:454`).
-- `query.Open` identity 검증이 **name+dim만**(`internal/query/engine.go:252`).
-- → Ollama bge-m3(mean/비정규화)와 ONNX bge-m3(CLS/L2)가 같은 1024d라 교체 가능하게 통과.
-- (확인 필요) registry bge-m3 `Pooling: CLS`(`registry.go:146`)인데 주석은 mean → ONNX 경로 벡터 오류 가능.
-- **처방**: 빌드 시 checksum(모델 해시 또는 name+dim+pooling+normalize+provider 해시) 기록 → `Open`에서 비교. normalize 실제값 기록.
-- **검증**: ollama-bge-m3로 빌드한 인덱스를 (가짜로 normalize/pooling 다른) 임베더로 `Open` 시 **거부**되는 단위테스트; manifest에 checksum 채워지는지; 기존 정상 인덱스는 그대로 Open 성공(회귀 없음).
+### 3.1 ✅ ckv 인덱스 identity — **구현·머지 (ckv #12, A1)**
+- **구현**: `EmbeddingIdentity{provider,model,dim,pooling,normalize}` + `Checksum()`를 `Embedder` 인터페이스 정식 멤버 `Identity()`로 승격. 전 백엔드(ollama/bgeonnx/mock/coreml/cache)가 registry서 파생(하드코딩 `"l2"` 제거). builder가 normalize·checksum 기록, `query.Open`+`reindex`가 checksum 불일치 시 `ErrIndexUnavailable`로 거부(구 인덱스=빈 checksum은 name+dim 폴백→회귀 없음). 새 모델은 registry 엔트리 하나 + 컴파일러가 `Identity()` 강제.
+- (원본 문제) name+dim만 검증 → Ollama bge-m3 ↔ ONNX bge-m3 무성 교체. (해결됨)
+- 테스트: `TestEmbeddingIdentityChecksum`/`TestOpenRejectsIdentityMismatch`/`TestOpenAcceptsMatchingIdentity`/`TestReindex_IdentityMismatchFails`. cks 전파(cks #27) 완료.
 
-### 3.2 🔴 ckg silent-incompleteness — 검색 정확도 지표를 무성히 갉아먹음
-- 빌드가 파싱 실패 파일을 **조용히 드롭하고 성공 처리**(`internal/buildpipe/language_runners.go:80`, `runColdBuild`는 항상 `nil`).
-- Solidity tree-sitter 쿼리 실패 시 **edge 클래스 통째 소실**(`internal/parse/solidity/dispatch.go:85` + ~19개 detector `if qErr!=nil{return}`).
-- `GetManifest`가 `rows.Err()` 무시(`internal/persist/manifest.go:114`).
-- **처방**: parse-error 비율 게이트(또는 top-level 경고 요약), init-time 쿼리 컴파일 self-check, `rows.Err()` 검사.
-- **검증**: 일부러 깨진 .go/.sol 픽스처로 빌드 → 게이트가 비-제로 종료/경고; 깨진 tree-sitter 쿼리 주입 시 init self-check가 실패; `rows.Err()` 경로 단위테스트. 정상 트리 빌드는 노드/엣지 수 회귀 없음.
+### 3.2 ✅ ckg silent-incompleteness — **구현·머지 (ckg #27, A2)**
+- **구현**: (1) CLI 성공 라인에 parse-fail 수 노출 + `--fail-on-parse-errors` 게이트(`cmd/ckg/build.go`). (2) Solidity 쿼리 컴파일 self-check 테스트 — `go/ast`로 패키지 내 모든 쿼리(26개) 스캔·grammar 컴파일, 드리프트 0·프로덕션 코드 변경 0, guard-on-guard 포함(`queries_selfcheck_test.go`). (3) `GetManifest` `rows.Err()` 검사(`internal/persist/manifest.go`).
+- (원본 문제) parse 실패 파일 조용히 드롭, Solidity 쿼리 실패 시 edge 클래스 소실, `rows.Err()` 무시. (해결됨)
+- 전부 additive — 정상 빌드 노드/엣지 수 회귀 없음.
 
-### 3.3 🟠 ckg 성능 (180K 노드 빌드)
-- `loadAllNodes/Edges` **N+1 쿼리**(`internal/persist/postgres_exporter.go:195`) → `AllNodes()` 단일 스캔.
-- 역의존 쿼리 **leading-wildcard LIKE**로 인덱스 무효(`internal/persist/sqlite_reader.go:707`) → `simple_name` 컬럼+equi-join.
-- impact 분석 **6× 재순회**(공유 visited 없음, `pkg/impact/impact.go:154`; 게다가 `pkg/impact` 테스트 0) → 1회 순회 후 버킷 분할.
-- 파이프라인/SQLite 리더 **`context.Context` 부재**(취소 불가) → `Run`/리더에 ctx 배선.
-- SQLite DSN `busy_timeout`/`synchronous=NORMAL` 미설정(`internal/persist/sqlite.go:42`) — 싸고 효과 큼.
-- `parseConcurrent`가 파일당 goroutine 선생성(`language_runners.go:72`) → sem을 부모 루프서 acquire.
+### 3.3 🟠 ckg 성능 (180K 노드 빌드) — ☐ 미착수 (재검증 2026-06-25)
+- `loadAllNodes/Edges` **N+1 쿼리**(`internal/persist/postgres_exporter.go:195`·`:224`) → `AllNodes()`/`AllEdges()` 단일 스캔. **이 메서드들이 이제 `StoreReader` 인터페이스(`store_interface.go:144-145`)에 존재 + `Export`가 이미 수신 → 2줄 swap으로 수정 가능.**
+- 역의존 쿼리 **leading-wildcard LIKE**로 인덱스 무효(`internal/persist/sqlite_reader.go:739` `ReverseDepsForFiles`; `FindSymbol`:354도 동일) → `simple_name` 컬럼+equi-join. (canonical_id가 `CanonicalID` 컬럼은 추가했으나 `simple_name`은 미추가)
+- impact 분석 **6× 재순회**(공유 visited 없음, `pkg/impact/impact.go:154`; `pkg/impact` 테스트 여전히 0) → 1회 순회 후 버킷 분할.
+- 파이프라인/SQLite 리더 **`context.Context` 부재**(취소 불가; `Run`은 `pipeline.go:217`) → ctx 배선.
+- SQLite DSN `busy_timeout`/`synchronous=NORMAL` 미설정(`internal/persist/sqlite.go:42`, 현 DSN은 foreign_keys+WAL만) — **싸고 효과 큼(권장 시작점)**.
+- `parseConcurrent`가 파일당 goroutine 선생성(`language_runners.go:73-100`) → sem을 부모 루프서 acquire.
 
-### 3.4 🟠 ckg 확장성 / API
-- 언어 추가 시 cold+incremental 분기 **다중 중복**(레지스트리 없음) → `LanguageRunner` 인터페이스+map. post-Resolve pass ~80% 중복도 함께.
-- `types.Node`가 Solidity 불린 ~20개 단 **god-struct**(`pkg/types/node.go:46`) → `SolFacts` 서브구조 분리.
-- MCP 10개 도구 응답 **envelope 불일치** → 단일 `ToolResponse`.
-- Policy/SecurityPattern 노드 **인덱싱되나 MCP 미노출**(`pkg/types/enums.go:157` vs `registerall.go`) → 도구 추가 or 빌드작업 제거.
-- `NewLLMSafeReader` 안전경계 **opt-in(미강제)**.
+### 3.4 🟠 ckg 확장성 / API — ☐ 미착수 (재검증 2026-06-25)
+- 언어 추가 시 cold(`pipeline.go:308-361`)+incremental(`incremental.go:311-345`) 분기 **다중 중복** → `LanguageRunner` 인터페이스+map. post-Resolve pass ~80% 중복도 함께.
+- `types.Node`가 Solidity 불린 ~20개 단 **god-struct**(`pkg/types/node.go:46-155`) → `SolFacts` 서브구조 분리. **⚠️ canonical_id가 `CanonicalID`(node.go:15)를 또 추가해 악화.**
+- ~~MCP 응답 envelope 불일치~~ → **✅ 해결(재검증): `pkg/mcphandlers/helpers.go:89` `textResult()`로 전 핸들러 단일 envelope.**
+- Policy/SecurityPattern 노드 **인덱싱되나 MCP 미노출**(`pkg/types/enums.go:157-158` vs `registerall.go:24-38` 10개 도구) → 도구 추가 or 빌드작업 제거.
+- `NewLLMSafeReader` 안전경계 **opt-in(미강제)**(`pkg/mcphandlers/safety.go:26`).
 
-### 3.5 🟠 ckv 기타
-- **coreml 백엔드 반쪽 배선**(`cmd/ckv/embedder.go:23`서 미처리인데 문서/명령은 광고) → 배선 or experimental 격리. *(주의: 로컬 빌드 시 네이티브 `tokenizers` lib 미설치로 coreml 테스트 링크 실패 — 환경 이슈.)*
-- Ollama `MaxInputTokens` **8192 하드코딩**(registry 무시, `pkg/embed/ollama/adapter.go:74`) → 모델별 registry 조회.
-- build 첫 embed 실패 시 **부분 인덱스 + stale manifest**(`internal/build/builder.go:327`) → retry or 실패 시 인덱스 무효화.
-- `CKVVersion:"dev"` 하드코딩(`builder.go:447`) → ldflags 주입. `~/.cache/ckv/models` 경로 3곳 중복.
+### 3.5 🟠 ckv 기타 — ☐ 미착수 (재검증 2026-06-25)
+- ~~coreml 백엔드 반쪽 배선~~ → **✅ 해결(재검증): `cmd/ckv/embedder.go:21-44`가 mock/bgeonnx/ollama만 처리·광고, coreml 제거.** 잔존: `internal/embed/coreml` dead-package(`model convert --format coreml` 출력용).
+- Ollama `MaxInputTokens` **8192 하드코딩**(registry 무시, `pkg/embed/ollama/adapter.go:104`) → 모델별 registry 조회.
+- build 첫 embed 실패 시 **부분 인덱스 + stale manifest**(`internal/build/builder.go:332-342`) → retry or 실패 시 인덱스 무효화.
+- `CKVVersion:"dev"` 하드코딩(`builder.go:452`; ldflags 훅 `cmd/ckv/root.go:8`는 있으나 미배선) → 배선. `~/.cache/ckv/models` 경로 3곳 중복(`model/fetch.go:78`·`registry.go:125`·`bgeonnx.go:115`).
 
 ---
 
@@ -155,25 +157,27 @@ go test -race ./<changed-pkg>/   # 동시성 변경 시
 
 ---
 
-## 6. 추천 실행 순서
+## 6. 추천 실행 순서 (2026-06-25 갱신)
 
-1. **즉시**: §2 운영 반영(세션 재시작 / 플러그인 재설치) — 머지된 변경을 실동작에.
-2. **정합성 우선**(이번 라인과 같은 방향): §3.1 ckv identity → §3.2 ckg silent-incompleteness.
-3. **성능**: §3.3 (N+1 / LIKE / SQLite pragma — 싸고 큼).
-4. **확장성/정리**: §3.4·§3.5.
+1. ✅ **정합성 🔴 — 완료**: §3.1 ckv identity(A1, ckv #12) · §3.2 ckg silent-incompleteness(A2, ckg #27) · cks 전파(cks #27).
+2. **즉시**: §2 운영 반영(세션 재시작) — 머지된 cks-mcp 바이너리 활성화.
+3. **성능**(다음 권장): §3.3 — B2(SQLite pragma, 한 줄) → B1(N+1, 인터페이스 이미 존재해 2줄) → B3(LIKE) → 나머지. 싸고 효과 큼.
+4. **확장성/정리**: §3.4·§3.5 (envelope·coreml은 이미 해결, 잔여만).
 5. **별개 줄기**: §5는 규모/차단 고려해 별도 계획.
 
 ---
 
 ## 부록. 저장소 · 머지 커밋 맵
 
-| repo | 경로 | main tip(2026-06-19) |
-|---|---|---|
-| cks | `~/Work/github/code-knowledge-system` | `a8f411e` |
-| ckv | `~/Work/github/code-knowledge-vector` | `460a718` |
-| coding-agent | `~/Work/github/coding-agent` | (Phase 5 `f636d43` 포함) |
-| 설계 코퍼스 | `~/Work/github/study/docs/research/ai-knowledge-data` | (비-git 스냅샷) |
+| repo | 경로 | main tip(2026-06-19) | A1/A2 머지 후(2026-06-25) |
+|---|---|---|---|
+| cks | `~/Work/github/code-knowledge-system` | `a8f411e` | ckv 핀 `485b644` (cks #27); 활성화엔 세션 재시작 |
+| ckv | `~/Work/github/code-knowledge-vector` | `460a718` | A1 머지 (ckv #12) |
+| ckg | `~/Work/github/code-knowledge-graph` | (`56306ed`) | A2 머지 (ckg #27); canonical_id Phase 1–3(#24–26) |
+| coding-agent | `~/Work/github/coding-agent` | (Phase 5 `f636d43` 포함) | 이 문서 갱신 |
+| 설계 코퍼스 | `~/Work/github/study/docs/research/ai-knowledge-data` | (비-git 스냅샷) | — |
 
 > 빌드/검증: ckv·ckg `go vet` clean·focus `-race` 통과; cks `make build-bins`+23pkg 그린.
 > coreml만 네이티브 lib 미설치로 테스트 링크 실패(환경, 무관).
+> A1·A2·cks 전파 전부 `go test ./...` green (ckv 38pkg·ckg 31pkg·cks 23pkg).
 </content>
