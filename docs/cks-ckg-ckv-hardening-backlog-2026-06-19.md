@@ -114,13 +114,12 @@ go test -race ./<changed-pkg>/   # 동시성 변경 시
 - (원본 문제) parse 실패 파일 조용히 드롭, Solidity 쿼리 실패 시 edge 클래스 소실, `rows.Err()` 무시. (해결됨)
 - 전부 additive — 정상 빌드 노드/엣지 수 회귀 없음.
 
-### 3.3 🟠 ckg 성능 (180K 노드 빌드) — ☐ 미착수 (재검증 2026-06-25)
-- `loadAllNodes/Edges` **N+1 쿼리**(`internal/persist/postgres_exporter.go:195`·`:224`) → `AllNodes()`/`AllEdges()` 단일 스캔. **이 메서드들이 이제 `StoreReader` 인터페이스(`store_interface.go:144-145`)에 존재 + `Export`가 이미 수신 → 2줄 swap으로 수정 가능.**
-- 역의존 쿼리 **leading-wildcard LIKE**로 인덱스 무효(`internal/persist/sqlite_reader.go:739` `ReverseDepsForFiles`; `FindSymbol`:354도 동일) → `simple_name` 컬럼+equi-join. (canonical_id가 `CanonicalID` 컬럼은 추가했으나 `simple_name`은 미추가)
-- impact 분석 **6× 재순회**(공유 visited 없음, `pkg/impact/impact.go:154`; `pkg/impact` 테스트 여전히 0) → 1회 순회 후 버킷 분할.
-- 파이프라인/SQLite 리더 **`context.Context` 부재**(취소 불가; `Run`은 `pipeline.go:217`) → ctx 배선.
-- SQLite DSN `busy_timeout`/`synchronous=NORMAL` 미설정(`internal/persist/sqlite.go:42`, 현 DSN은 foreign_keys+WAL만) — **싸고 효과 큼(권장 시작점)**.
-- `parseConcurrent`가 파일당 goroutine 선생성(`language_runners.go:73-100`) → sem을 부모 루프서 acquire.
+### 3.3 🟠 ckg 성능 (180K 노드 빌드) — 부분 착수 (B1·B2 PR, B3~B5 미착수)
+- ✅ **B1** `loadAllNodes/Edges` **N+1 쿼리** → `AllNodes()`/`AllEdges()` 단일 스캔(언어 외 노드=proto 누락도 해소). **구현(ckg `perf/ckg-query-hotpaths`).**
+- ✅ **B2** SQLite DSN `busy_timeout(5000)`+`synchronous(NORMAL)` 추가(`internal/persist/sqlite.go`). **구현(같은 PR).**
+- ☐ **B3** 역의존 쿼리 **leading-wildcard LIKE**로 인덱스 무효(`internal/persist/sqlite_reader.go:739` `ReverseDepsForFiles`; `FindSymbol`:354도 동일) → `simple_name` 컬럼+equi-join. **별도 PR**(스키마 마이그레이션 + cache.go SchemaVersion bump=전체 재인덱싱 강제).
+- ☐ **B4** impact 분석 **6× 재순회**(공유 visited 없음, `pkg/impact/impact.go:154`; `pkg/impact` 테스트 여전히 0) → 1회 순회 후 버킷 분할 + 테스트.
+- ☐ **B5** 파이프라인/SQLite 리더 **`context.Context` 부재**(취소 불가; `Run`은 `pipeline.go:217`) → ctx 배선; `parseConcurrent` 파일당 goroutine 선생성(`language_runners.go:73-100`) → sem을 부모 루프서 acquire. (침습적, 별도 PR)
 
 ### 3.4 🟠 ckg 확장성 / API — ☐ 미착수 (재검증 2026-06-25)
 - 언어 추가 시 cold(`pipeline.go:308-361`)+incremental(`incremental.go:311-345`) 분기 **다중 중복** → `LanguageRunner` 인터페이스+map. post-Resolve pass ~80% 중복도 함께.
@@ -161,7 +160,7 @@ go test -race ./<changed-pkg>/   # 동시성 변경 시
 
 1. ✅ **정합성 🔴 — 완료**: §3.1 ckv identity(A1, ckv #12) · §3.2 ckg silent-incompleteness(A2, ckg #27) · cks 전파(cks #27).
 2. **즉시**: §2 운영 반영(세션 재시작) — 머지된 cks-mcp 바이너리 활성화.
-3. **성능**(다음 권장): §3.3 — B2(SQLite pragma, 한 줄) → B1(N+1, 인터페이스 이미 존재해 2줄) → B3(LIKE) → 나머지. 싸고 효과 큼.
+3. **성능**: §3.3 — ✅ B1(N+1)·B2(pragma) PR 완료 → 다음 B3(LIKE, 스키마 마이그레이션·재인덱싱) → B4(impact)·B5(context, 침습적).
 4. **확장성/정리**: §3.4·§3.5 (envelope·coreml은 이미 해결, 잔여만).
 5. **별개 줄기**: §5는 규모/차단 고려해 별도 계획.
 
