@@ -183,8 +183,8 @@ When the Evaluator reports all stages green:
                   (analyzer §4.2; in_scope:false): "- [{confidence}] {site}: {missing_behavior}
                   → {predicted_symptom} (suggested: {suggested_action})". Omit the whole
                   section when side_findings is empty/absent. These are NOT fixed by this PR —
-                  they are surfaced so a reviewer can open separate tickets. (PR-77's 2nd defect,
-                  RemotesBelowTip, is exactly the kind of consequence-of-change finding this routes.)
+                  they are consequence-of-change findings (adjacent, different-symptom,
+                  out-of-scope) surfaced so a reviewer can open separate tickets.
 
    Run the pr-sanitize skill on the assembled body (P7-7):
 
