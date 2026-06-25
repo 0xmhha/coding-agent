@@ -20,13 +20,16 @@
     },
     "unit_test": {
       "runner": "go",
-      "_scope_doc": "targeted_tmpl runs per bug-cycle on changed packages (fast feedback). affected_tmpl runs ONCE as the final regression gate (Evaluator §8.0) over the change's AFFECTED CLOSURE — changed packages plus their reverse-dependency importers (packages whose transitive deps include a changed package) — only when every other gate is green, not on every failing iteration, and NOT the whole repo. A whole-repo ./... run wastes time on packages unrelated to the change (e.g. a pre-existing accounts/abi/bind 600s test timeout, core ~7min) that the fix cannot affect. full is retained for manual/whole-repo use only.",
+      "_scope_doc": "focused_tmpl is the per-bug-cycle default (Evaluator §4.2): it runs ONLY the test functions the fix itself added/changed (go test -run, fast — NOT whole changed-package suites, which can run tens of minutes for heavy trees like miner/core). For an e2e-tier bug the acceptance oracle is the chainbench repro (§7.5c), not a unit suite; for a simulation-tier bug the reproduction unit test is among the fix's own tests. affected_tmpl runs ONCE as the final regression gate (Evaluator §8.0) over the change's AFFECTED CLOSURE — changed packages plus their reverse-dependency importers — only when every other gate is green. targeted_tmpl (whole changed packages) is available but is NOT the per-cycle default; full (whole-repo ./...) is manual only (a ./... run wastes time on packages the fix cannot affect, e.g. a pre-existing accounts/abi/bind 600s timeout, core ~7min).",
       "full": "go test ./... -count=1 -timeout=600s",
       "targeted_tmpl": "go test {pkgs} -count=1 -timeout=300s",
       "affected_tmpl": "go test {pkgs} -count=1 -timeout=420s",
       "coverage_tmpl": "go test {pkgs} -coverprofile={cover_out} -covermode=atomic",
       "cover_report_tmpl": "go tool cover -func={cover_out}",
       "race_tmpl": "go test -race {pkgs} -count=1 -timeout=300s",
+      "focused_tmpl": "go test -run '{names}' {pkgs} -count=1 -timeout=300s",
+      "focused_coverage_tmpl": "go test -run '{names}' {pkgs} -coverprofile={cover_out} -covermode=atomic",
+      "focused_race_tmpl": "go test -race -run '{names}' {pkgs} -count=1 -timeout=300s",
       "single_tmpl": "go test -run '{name}' ./{pkg}/..."
     },
     "stages": [

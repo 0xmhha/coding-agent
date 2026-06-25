@@ -129,77 +129,103 @@ evidence is incomplete — do NOT compensate by trusting it. Harden this run:
 - broaden §4.4 `-race` scope to **all** touched packages, not just the ckg-derived set.
 - note "evaluated under DEGRADED retrieval" in test-report.md so the PR reviewer sees it.
 
-### 4.1 Decide test scope
+### 4.1 Decide test scope (the fix's OWN tests — NOT whole changed-package suites)
+
+The per-cycle unit gate is a FAST regression check on what the fix itself touched — it runs ONLY
+the test functions this fix added or changed, not the full test tree of every changed package
+(those trees, e.g. miner/core, can run tens of minutes and dominate a multi-cycle run). The
+*acceptance* oracle lives elsewhere: for an `e2e`-tier bug it is the §7.5c reproduction test; for
+a `simulation`-tier bug it is the reproduction unit test (which IS one of the fix's own tests, so
+it runs here). The broad changed + reverse-dependency regression is the single §8.0 gate (run
+once, only when otherwise green). So a failing bug cycle never pays for heavy unrelated suites.
 
 ```
-changed_pkgs = bash:
-  git -C {repo_root} diff main...HEAD --name-only '*.go' \
-    | xargs -I{} dirname {} \
-    | sort -u
+changed_test_funcs = bash:                  # the test funcs the fix added/changed
+  git -C {repo_root} diff main...HEAD -- '*_test.go' \
+    | grep -E '^\+func (Test|Fuzz)[A-Za-z0-9_]+' \
+    | sed -E 's/^\+func (([A-Za-z0-9_]+)).*/\1/' | sort -u
+test_pkgs = bash:                           # packages holding those changed _test.go files
+  git -C {repo_root} diff main...HEAD --name-only '*_test.go' \
+    | xargs -I{} dirname {} | sort -u
+changed_pkgs = bash:                        # still needed for §4.4 race relevance + §4.6
+  git -C {repo_root} diff main...HEAD --name-only '*.go' | xargs -I{} dirname {} | sort -u
 ```
 
-### 4.2 Targeted test run (changed packages — per cycle)
+### 4.2 Focused unit run (per cycle — the fix's own tests only)
 
-Run the tests for the packages this fix changed — fast per-cycle feedback. The whole-repo
-`go test ./...` regression suite is **NOT** run here; it is deferred to the single final gate
-(§8.0), so a failing bug cycle never pays for the entire suite. Skip if `changed_pkgs` is empty
-(no Go changed → unit status PASS, nothing to run).
+```
+if changed_test_funcs is non-empty:
+  names = changed_test_funcs joined by '|'
+  bash: cd {repo_root} && \
+        {ver.unit_test.focused_tmpl, fill {names}=${names} {pkgs}=${test_pkgs[@]}} 2>&1 \
+        | tee {workspace_dir}/logs/eval-unit-test.log
+  exit_code = $?
+else:
+  # Prod code changed but the fix added/modified NO unit test — common for an e2e-tier bug whose
+  # oracle is the chainbench .sh. Nothing fix-owned to run per cycle; acceptance = the e2e oracle
+  # (§7.5c) and the broad regression = §8.0. Record unit (per-cycle) = PASS with the note
+  # "no fix-owned unit tests; covered by the e2e oracle (§7.5c) + §8.0 affected-closure regression".
+  # (If tier==simulation and there is no fix-owned test, that is a gap — the reproduction unit test
+  #  should exist; flag it, do not silently PASS.)
+```
+
+### 4.3 Coverage (focused — the fix's tests)
+
+Skip if `changed_test_funcs` is empty.
 
 ```
 bash: cd {repo_root} && \
-      {ver.unit_test.targeted_tmpl, fill {pkgs}=${changed_pkgs[@]}} 2>&1 \
-      | tee {workspace_dir}/logs/eval-unit-test.log
-exit_code = $?
-```
-
-### 4.3 Coverage for changed packages
-
-Skip if `changed_pkgs` is empty (e.g., no Go files changed):
-
-```
-bash: cd {repo_root} && \
-      {ver.unit_test.coverage_tmpl, fill {pkgs}=${changed_pkgs[@]} {cover_out}={workspace_dir}/logs/coverage.out} 2>&1 \
+      {ver.unit_test.focused_coverage_tmpl, fill {names}=${names} {pkgs}=${test_pkgs[@]} {cover_out}={workspace_dir}/logs/coverage.out} 2>&1 \
         | tee -a {workspace_dir}/logs/eval-unit-test.log
 bash: cd {repo_root} && \
       {ver.unit_test.cover_report_tmpl, fill {cover_out}={workspace_dir}/logs/coverage.out} \
         > {workspace_dir}/logs/coverage-summary.txt
 ```
 
-### 4.4 -race scope (RI-21)
+### 4.4 -race scope (RI-21 — focused, concurrency-sensitive)
 
 ```
 read {workspace_dir}/related-code.json → ckg.concurrency_impact
-race_pkgs = unique parent packages of every symbol with
-            concurrency_impact[].risk_assessment.race_condition_risk != "none"
-also include packages in changed_pkgs that touch consensus|core/txpool|miner
+race_relevant = (changed_test_funcs is non-empty) AND
+                (any changed_pkg touches consensus|core/txpool|miner|core/state
+                 OR any concurrency_impact[].risk_assessment.race_condition_risk != "none")
 
-if race_pkgs is non-empty:
+if race_relevant:
   bash: cd {repo_root} && \
-        {ver.unit_test.race_tmpl, fill {pkgs}=${race_pkgs[@]}} 2>&1 \
+        {ver.unit_test.focused_race_tmpl, fill {names}=${names} {pkgs}=${test_pkgs[@]}} 2>&1 \
         | tee {workspace_dir}/logs/eval-race.log
 ```
 
 ### 4.5 Parse + classify
 
 ```
-result.passed = count of "--- PASS:"
-result.failed = count of "--- FAIL:"
-result.skipped = count of "--- SKIP:"
+if §4.2 took the "no fix-owned tests" else-branch (focused run did not execute):
+  status = "PASS"
+  note   = "no fix-owned unit tests this cycle — acceptance via e2e oracle (§7.5c); broad
+            regression deferred to §8.0 affected-closure gate"
+  (skip the parse below; coverage/race were skipped too)
+else:
+  result.passed = count of "--- PASS:"
+  result.failed = count of "--- FAIL:"
+  result.skipped = count of "--- SKIP:"
 
-failures = parsed failure blocks:
-  { package, test_name, file, line, error_text }
+  failures = parsed failure blocks:
+    { package, test_name, file, line, error_text }
 
-if any "WARNING: DATA RACE" appears in eval-race.log:
-  result.race_detected = true
-  collect race report blocks
+  if any "WARNING: DATA RACE" appears in eval-race.log:
+    result.race_detected = true
+    collect race report blocks
 
-coverage_percent_total = parsed from coverage-summary.txt total: line
-coverage_per_package = parsed per-row breakdown
+  coverage_percent_total = parsed from coverage-summary.txt total: line
+  coverage_per_package = parsed per-row breakdown
 
-status =
-  "FAIL" if failed > 0 OR race_detected
-  "PASS" otherwise
+  status =
+    "FAIL" if failed > 0 OR race_detected
+    "PASS" otherwise
 ```
+The per-cycle unit status reflects ONLY the fix's own tests (the heavy changed-package regression
+is the §8.0 gate). A genuine regression the fix introduced in a *changed package's existing* tests
+surfaces at §8.0, not here — that is the intended speed/scope trade.
 
 ### 4.6 Derived-state consistency gate (B-4)
 
@@ -821,7 +847,7 @@ HEAD: {commit hash}
 ## Summary
 | Stage | Status | Duration |
 |-------|--------|----------|
-| Unit Test (changed pkgs) | {status} | {ms}ms |
+| Unit Test (fix's own tests, per cycle) | {status} | {ms}ms |
 | Lint & Format | {status} | {ms}ms |
 | Security Scan | {status} | {ms}ms |
 | ChainBench | {status} | {ms}ms |
