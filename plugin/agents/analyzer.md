@@ -264,7 +264,8 @@ include `## Root cause` (§4) and `## Reproduction` (§5). Minimum length > 200 
 
 ### 3.7 Persist related-code.json
 `{ "pack": {...}, "ckv": [...], "ckg": { "subgraphs": [...], "concurrency_impact": [...] },
-   "impacts": [...], "affected_sites": [...] }`  (affected_sites for bugfix — §4.1)
+   "impacts": [...], "affected_sites": [...], "side_findings": [...] }`
+(`affected_sites` for bugfix — §4.1; `side_findings` for bugfix — §4.2)
 
 ---
 
@@ -342,6 +343,45 @@ this list is the oracle for "did the fix cover everything?", not just "did the b
 > (design-time, forward: source → keep all consumers consistent). Same principle, opposite
 > direction. `affected_sites` carries forward so the Planner's §5.2b and the Evaluator's
 > §4.8 sibling-path check are both exhaustive.
+
+### 4.2 Consequence-of-change side-findings (semantics-bound — NON-BLOCKING, do NOT fix here)
+§4.1 is **symptom-bound**: it covers every site that yields *this ticket's* observable. But
+fixing a value's lifecycle routinely exposes *adjacent* defects that share the value's
+**semantics** yet surface a **different** symptom — these fall outside the reproduction oracle
+AND outside §4.1, so they are silently dropped unless captured here. (PR-77: fixing the stale
+`AnzeonTipEnv` (1st defect) implies that, once the gasTip floor can rise, pooled txs whose
+*effective* tip is below the new floor must be dropped — `RemotesBelowTip` compared the raw
+tip and did not, a 2nd defect with a *different* symptom. A senior reaches it *while* fixing the
+1st; this step makes the pipeline reach it too.)
+
+Run the `root-cause-lifecycle` **consequence-of-change** movement over the **consumer set you
+already enumerated** in §4 (no new global scan — grounding kills hallucination). For each
+consumer C of the root-cause value V, ask not "is it stale?" but: *when V legitimately changes
+A→B at runtime, does C need an action it does not currently take?* — e.g. re-evaluate/withdraw a
+decision made under A (drop items that passed the OLD threshold), recompute, invalidate a cache,
+re-check a boundary. **Self-refute each candidate ONCE** against the cks bodies already in hand
+("already handled elsewhere? intended design?") and drop the ones that don't survive.
+
+These are **NOT this ticket's fix surface** (`in_scope:false` — the reproduction oracle cannot
+verify a different symptom). **Do NOT fix them, do NOT expand scope.** Capture and route only:
+write `## Side findings` in analysis.md AND persist `related-code.json.side_findings`:
+```jsonc
+"side_findings": [
+  { "site": "<file:line>", "value": "<shared value / semantics>",
+    "change_scenario": "V changes A→B (e.g. gasTip floor rises)",
+    "missing_behavior": "C does not drop / recompute / invalidate …",
+    "predicted_symptom": "<distinct from THIS ticket's symptom>",
+    "confidence": "high|medium|low",
+    "refuted_check": "why it survived self-refutation",
+    "in_scope": false,
+    "suggested_action": "separate ticket; Planner may raise to must_fix if same surface" }
+]
+```
+`"side_findings": []` is a valid, expected answer when none survive. Keep low-confidence
+optimization/style observations in the `low` lane or omit them — they are the noisiest and
+often re-discover existing mechanisms (e.g. a value already cached in an atomic). The
+Orchestrator surfaces surviving `side_findings` at completion as found-while-here follow-ups;
+they never block this fix.
 
 ---
 
@@ -670,4 +710,5 @@ reproduction or fix plan.
 ## 9. Return value
 Return a short status only (the artifacts are the real output): mode, retrieval backend,
 the one-line root cause + broken edge (bugfix), reproduction tier (simulation/e2e) + RED
-confirmed (yes/no), and the next state.
+confirmed (yes/no), the count of surviving `side_findings` (§4.2, with the highest-confidence
+one named — "found-while-here, not fixed"), and the next state.
