@@ -34,14 +34,21 @@ cks 도구를 로드(미인식이면 ToolSearch 1회)한 뒤:
 
 각 MCP가 미등록/미연결이어도 **차단하지 않고 사실만 보고**한다.
 
-## 3. 판정 + 다음 행동
+## 3. 판정 + 다음 행동 (remediation)
 
-READY / ATTENTION 으로 종합하고, §1 issues + restart_needed + §2 MCP 미연결·불일치를 한 목록으로:
+수정 매핑의 **단일 소스는 `doctor.py`의 `REMEDIATION` 테이블**이다(ADR
+[doctor-remediation-adr-2026-06-26](../../docs/doctor-remediation-adr-2026-06-26.md)). 각 항목은
+`klass`(`setup`=우리 setup.py가 해결 / `restart`=세션 재시작 / `manual`=재설정 / `external`=빌드·설치→docs/SETUP.md)로 분류된다.
 
-- `repo_root_env` unset/restart_needed → **`/coding-agent:setup --fix` 후 세션 재시작**.
-- cks not serviceable → ckv/Ollama 기동 또는 `CKS_CONFIG` 재배선 + 세션 재시작.
-- `source_root ≠ repo_root` → cks config 재설정 + 세션 재시작(현재 repo를 인덱싱하도록).
-- index stale → 재인덱싱(⚠ *의도된 base 인덱스면 하지 말 것* — 사용자에게 확인).
-- permissions 미등록이고 무인 실행 원하면 → `/coding-agent:setup --autonomous`.
+1. **§1 스크립트가 이미 계산한 `remediations` 목록을 그대로 표시**한다(산문으로 재작성하지 말 것).
+   스크립트는 이를 결정론적으로 출력하므로 doctor 보고의 "다음 행동" 절은 그 목록이다. 예: fresh repo →
+   `setup --fix`(repo_root_env+env), `setup --fix --set`(시크릿), `setup --autonomous`(allowlist).
+2. **§2 라이브 MCP 결과는 스크립트가 못 보므로, 같은 `REMEDIATION` 키로 라우팅**해 동일 형식으로 덧붙인다:
+   - cks not serviceable → `cks_not_serviceable` (manual: ckv/Ollama 기동 또는 `CKS_CONFIG` 재배선 + 재시작)
+   - `source_root ≠ repo_root` → `source_root_mismatch` (manual: 현재 repo를 인덱싱하도록 재설정 + 재시작)
+   - index stale → `index_stale` (manual: 재인덱싱 — ⚠ *의도된 base 인덱스면 하지 말 것*, 사용자 확인)
+   - MCP 미연결 → `mcp_unreachable` / `cks_mcp_not_built` / `chainbench_not_installed`
+3. 맨 끝에 스크립트의 **한 줄 요약**(`READY` / `ATTENTION — N action(s): <명령>`)을 그대로 노출한다.
 
-**읽기 전용 계약**: doctor는 어떤 파일·설정·인덱스도 수정하지 않는다.
+**읽기 전용 계약**: doctor는 어떤 파일·설정·인덱스도 수정하지 않는다 — remediation은 *출력만* 하고, 실제 적용은
+사용자가 해당 `setup` 명령을 호출한다.

@@ -4,6 +4,7 @@
 Run:  python3 plugin/scripts/tests/test_doctor.py
 """
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -68,7 +69,7 @@ class TestSmoke(unittest.TestCase):
                 cwd=d, capture_output=True, text=True)
             out = json.loads(r.stdout)
             for key in ("plugin", "project", "domain_pack", "env", "cks_config",
-                        "permissions", "verdict", "issues", "restart_needed"):
+                        "permissions", "verdict", "issues", "restart_needed", "remediations"):
                 self.assertIn(key, out)
             self.assertEqual(out["plugin"]["active_version"], "9.9.9")
             self.assertEqual(out["domain_pack"]["project_id"], "go-stablenet")
@@ -79,6 +80,70 @@ class TestSmoke(unittest.TestCase):
     def test_secret_masked(self):
         self.assertEqual(doctor._mask("JIRA_API_TOKEN", "supersecret"), "********")
         self.assertEqual(doctor._mask("CKS_CONFIG", "/path"), "/path")
+
+
+class TestRemediationTable(unittest.TestCase):
+    """Gate: the fix table is the single source — every entry well-formed, no orphans."""
+
+    def test_every_entry_well_formed(self):
+        for kind, r in doctor.REMEDIATION.items():
+            self.assertIn(r["klass"], doctor.KLASSES, f"{kind}: bad klass")
+            # must give the user something actionable: a command or an action
+            self.assertTrue(r.get("command") or r.get("action"), f"{kind}: empty fix")
+
+    def test_no_orphan_issue_kinds(self):
+        """Every kind passed to _add_issue() in doctor.py must exist in REMEDIATION."""
+        src = (_SCRIPTS / "doctor.py").read_text()
+        emitted = set(re.findall(r'_add_issue\(out,\s*"([^"]+)"', src))
+        self.assertTrue(emitted, "no _add_issue calls found — regex/source drift")
+        missing = emitted - set(doctor.REMEDIATION)
+        self.assertEqual(missing, set(), f"issue kinds with no fix-table entry: {missing}")
+
+    def test_remediation_kinds_resolve(self):
+        """Every kind the remediation builder can add resolves in REMEDIATION."""
+        src = (_SCRIPTS / "doctor.py").read_text()
+        # kinds added via add("...") inside _remediations + the issue kinds
+        added = set(re.findall(r'\badd\("([^"]+)"', src))
+        for k in added:
+            self.assertIn(k, doctor.REMEDIATION, f"remediation kind {k!r} not in fix table")
+
+
+class TestRemediationRouting(unittest.TestCase):
+    def _run_json(self, cwd, plugin_root):
+        # strip required env so the fresh-repo path is deterministic
+        import os
+        env = {k: v for k, v in os.environ.items() if k not in doctor.ENV_KEYS}
+        r = subprocess.run(
+            [sys.executable, str(DOCTOR_PY), "--plugin-root", str(plugin_root), "--json"],
+            cwd=str(cwd), capture_output=True, text=True, env=env)
+        return json.loads(r.stdout)
+
+    def test_fresh_repo_routes_to_setup(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            root = _make_plugin_root(d, {"go-stablenet": "GO_STABLENET_ROOT"})
+            out = self._run_json(d, root)
+            self.assertIn("remediations", out)
+            self.assertEqual(out["verdict"], "ATTENTION")
+            kinds = [r["kind"] for r in out["remediations"]]
+            self.assertIn("repo_root_env_unset", kinds)
+            # every remediation carries a klass and an actionable target
+            for r in out["remediations"]:
+                self.assertIn(r["klass"], doctor.KLASSES)
+                self.assertTrue(r["command"] or r["action"])
+            # the repo_root_env fix routes to our setup command
+            rre = next(r for r in out["remediations"] if r["kind"] == "repo_root_env_unset")
+            self.assertEqual(rre["klass"], "setup")
+            self.assertIn("setup --fix", rre["command"])
+
+    def test_repo_root_env_not_duplicated_in_env_unset(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            root = _make_plugin_root(d, {"go-stablenet": "GO_STABLENET_ROOT"})
+            out = self._run_json(d, root)
+            self.assertNotIn("GO_STABLENET_ROOT",
+                             next((r["detail"] for r in out["remediations"]
+                                   if r["kind"] == "env_unset"), ""))
 
 
 if __name__ == "__main__":
