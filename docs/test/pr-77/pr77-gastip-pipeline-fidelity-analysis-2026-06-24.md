@@ -137,3 +137,33 @@ Ranked by leverage.
 - `reproduction.json`: tier=e2e, red_at_parent=true (AC#4), green_at_head=true (13/13), oracle_unmodified=true, reproduction_verdict=PASS, fix_validity_verdict=PASS.
 - `findings.log`: L14–15 correct root cause; L16–18 the falsify-and-pivot; L21–37 cycle-2 locals extension.
 - Oracle `repro/LOCAL-20260623_042159-gastip-restore-stall.sh`: header comment lines 28–37 (correct symptom), AC#4 lines 205–212 (the actual RED, eviction on raise), AC#5 lines 229–253 (faithful symptom, passed on base).
+
+---
+
+## F. Clean blind re-run (run-2) outcome + three-way comparison (2026-06-25)
+
+Re-run on a fresh checkout (`analysis-test-2`) with the hardened harness (0.1.32 symptom-bound RED + anti-pivot + idle-window; 0.1.33 focused per-cycle unit), the answer-free/blind constraints, and the answer-leaking chainbench mechanism tests (`c-08`, `c-09`) quarantined. Ticket `LOCAL-20260625_011010`.
+
+**Result: BLOCKED after 3 bug-cycles** (oracle RED all 3; `green_at_head=NO`, `Total 9 | Pass 8 | Fail 1`, the lone fail being the symptom assertion). No PR (FAIL never reaches COMPLETION; auto_merge=false).
+
+### What the hardened harness got RIGHT (the validation)
+- **Reproduction is genuine + symptom-bound.** Oracle `repro/LOCAL-20260625_011010-gastip-restore-stall.sh`; `symptom_assertion = "tip-27600 normal tx is included after restore (not stalled)"`; the symptom assertion is the *sole* RED on base (`symptom_red_confirmed=true`), timing assertions PASS. The cycle-2 evaluator's suspected nonce-gap/future-queue *oracle fragility* was **refuted by cycle-3 runtime instrumentation** → oracle correctly kept immutable. (Contrast run-1, which pivoted to an adjacent eviction defect.)
+- **Diagnosis converged on the EXPERT's root cause — independently.** The §5c runtime loop confirmed: the add-gate compares `MinTip = pool.gasTip = 30000` (from imported header **N+1**) against `effective = currentBlock.GasTip() = 27600` (from `anzeonTipEnv.currentBlock`, which **lags at header N** because `SetCurrentBlock` is driven only by `Reset`/`Pending`/`reheap`, not the gasTip-update path). That lag IS the expert's `98f05c2a0c` primary edge (refresh `currentBlock` when GasTip changes).
+- **The gate correctly refused to ship a wrong fix.** Three cycles, each a plausible fix that PASSED unit/lint/sec, were all held RED by the e2e symptom oracle and the run BLOCKED — it did **not** emit a false PASS. This is the central improvement over run-1 (which shipped a fix that greened the gates while fixing the wrong defect).
+- **Speed (D-7) held.** Per-cycle focused unit ran in seconds (not the ~38-min whole-package suite); 3 full cycles completed.
+
+### What still failed (the remaining weak link = FIX SYNTHESIS, not reproduce/diagnose/verify)
+- All 3 cycles kept an **add-time DROP** for a non-local normal-account tx instead of removing it. Cycle-3's `rawSourced := cap==nil || cap.Cmp(tx.GasTipCap())==0` heuristic **false-positived on the exact oracle case**: the symptom tx's raw tip (27600) *equals* the lagging env header tip (27600) → `rawSourced=true` → the drop still fires → tx never pooled → `inclusion_block=NONE`.
+- **A focused unit test masked it (recurring pattern).** Cycle-3's unit used raw=25000 (≠ header 27600), so it passed while the e2e (raw==header) failed — the same "unit green / e2e red" shape as run-1's remote-only unit test. The symptom-bound e2e oracle caught it each time; the unit test did not. (Validates e2e-oracle-as-acceptance; flags a unit-fidelity gap.)
+- **Sound fix for a future run** (per cycle-3 evaluator): gate the add-time reject on account class (`AnzeonTipEnv.IsAuthorized(from)`) — or remove the add-time underprice check entirely for non-local Anzeon txs and let the retain-not-drop Pending filter govern inclusion — AND align the unit test to use raw == genesis/header tip (the real oracle condition). This is the spirit of the expert fix (make the gate not reject a header-sourced normal tx).
+
+### Three-way comparison
+| | run-1 (old harness, contaminated) | run-2 (hardened, clean blind) | expert `98f05c2a0c` |
+|---|---|---|---|
+| Reproduction | adjacent eviction defect (symptom passed on base) | **genuine, symptom-bound, oracle sound** | n/a |
+| Root cause reached | eviction (wrong); dismissed SetCurrentBlock | **currentBlock lag = expert edge (runtime-confirmed)** | SetCurrentBlock stale + RemotesBelowTip raw |
+| Fix shipped? | **yes — wrong fix passed all gates (false green)** | **no — BLOCKED after 3 cycles (no false green)** | yes (correct) |
+| Outcome | bug not actually fixed, but looked PASS | bug not fixed, but **honestly reported BLOCKED** | bug fixed |
+
+### Net research conclusion
+The hardening (symptom-bound RED, anti-pivot, idle-window, focused unit) **closed the original failure mode**: the pipeline no longer ships a wrong fix behind a false PASS, it reproduces the real symptom, and it converges (via §5c) on the true root cause. The **unresolved gap is fix-synthesis**: the planner/implementer kept choosing an add-time-drop variant and a unit test that didn't exercise the raw==header case. Next harness iteration should target (a) implementer fix-pattern guidance for "retain-not-drop / account-class gating," and (b) a fix-validity/unit rule that the fix's own unit test must exercise the *exact* oracle-failing condition (here raw == header tip), not a convenient neighbor.
