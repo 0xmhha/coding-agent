@@ -49,6 +49,10 @@ echo "P1 — domain-pack structure (Phase 1)"
 run "P1 domain-pack structure check"                       python3 bench/domain-pack/check.py
 run "P1 domain-pack tests"                                 python3 bench/domain-pack/tests/test_check.py
 echo
+echo "setup / doctor (env onboarding + remediation routing)"
+run "setup tests (autonomous guard, repo_root_env)"       python3 plugin/scripts/tests/test_setup.py
+run "doctor tests (fix-table coverage, remediation)"      python3 plugin/scripts/tests/test_doctor.py
+echo
 echo "bench measurement infra"
 run "bench unit tests"                                     python3 -m unittest bench.tests.test_usage bench.tests.test_report
 
