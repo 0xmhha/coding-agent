@@ -145,6 +145,101 @@
           "owner": "chainbench",
           "description": "Stop all running chain nodes gracefully (local network only).",
           "input": { "properties": { "network": { "type": "string" } } }
+        },
+        "chainbench_restart": {
+          "owner": "chainbench",
+          "description": "Restart the chain: stop all nodes, clean data, re-initialize with the same profile, and start fresh.",
+          "input": { "properties": { "project_root": { "type": "string" }, "binary_path": { "type": "string" } } }
+        },
+        "chainbench_state_compact": {
+          "owner": "chainbench",
+          "description": "Compact JSON snapshot (<300B) of current chain state: running status, profile, per-node height/peers, consensus health, last test result.",
+          "input": { "properties": {} }
+        },
+        "chainbench_test_list": {
+          "owner": "chainbench",
+          "description": "List all available built-in tests, organized by category (e.g. basic/consensus, basic/tx-send).",
+          "input": { "properties": {} }
+        },
+        "chainbench_contract_deploy": {
+          "owner": "chainbench",
+          "description": "Deploy a contract by signing a contract-creation tx (to: nil). mode 'legacy' (gas_price) or '1559' (max_fee + max_priority). Returns {tx_hash, contract_address}; confirm via chainbench_tx_wait.",
+          "input": { "properties": { "network": { "type": "string" }, "signer": { "type": "string" }, "mode": { "type": "string" }, "bytecode": { "type": "string" }, "abi": { "type": "string" }, "constructor_args": { "type": "array" }, "gas": { "type": ["string", "number"] }, "gas_price": { "type": "string" }, "max_fee_per_gas": { "type": "string" }, "max_priority_fee_per_gas": { "type": "string" }, "node_id": { "type": "string" }, "nonce": { "type": ["string", "number"] }, "value": { "type": "string" } }, "required": ["network", "signer", "mode", "bytecode"] }
+        },
+        "chainbench_contract_call": {
+          "owner": "chainbench",
+          "description": "Read-only contract call (eth_call). Provide raw calldata, or abi+method+args for server-side encoding. Returns result_raw always; result_decoded only in ABI mode.",
+          "input": { "properties": { "network": { "type": "string" }, "contract_address": { "type": "string" }, "abi": { "type": "string" }, "method": { "type": "string" }, "args": { "type": "array" }, "calldata": { "type": "string" }, "from": { "type": "string" }, "block_number": { "type": ["string", "number"] }, "node_id": { "type": "string" } }, "required": ["network", "contract_address"] }
+        },
+        "chainbench_tx_send": {
+          "owner": "chainbench",
+          "description": "Send a signed transaction. Modes: 'legacy' (gas_price), '1559' (max_fee + max_priority), 'set_code' (EIP-7702, authorization_list), 'fee_delegation' (go-stablenet 0x16, fee_payer). Signer/fee_payer are aliases; key material never crosses the MCP boundary.",
+          "input": { "properties": { "network": { "type": "string" }, "signer": { "type": "string" }, "mode": { "type": "string" }, "to": { "type": "string" }, "value": { "type": "string" }, "data": { "type": "string" }, "gas": { "type": ["string", "number"] }, "gas_price": { "type": "string" }, "max_fee_per_gas": { "type": "string" }, "max_priority_fee_per_gas": { "type": "string" }, "nonce": { "type": ["string", "number"] }, "fee_payer": { "type": "string" }, "authorization_list": { "type": "array" }, "node_id": { "type": "string" } }, "required": ["network", "signer", "mode"] }
+        },
+        "chainbench_tx_wait": {
+          "owner": "chainbench",
+          "description": "Poll for a tx receipt with exponential backoff; returns receipt fields when mined (status, block_number, gas_used, logs_count, ...) or {status:'pending'} on timeout. Default timeout_ms 60000.",
+          "input": { "properties": { "network": { "type": "string" }, "tx_hash": { "type": "string" }, "node_id": { "type": "string" }, "timeout_ms": { "type": "integer" } }, "required": ["network", "tx_hash"] }
+        },
+        "chainbench_txpool_inspect": {
+          "owner": "chainbench",
+          "description": "Transaction pool status (pending/queued counts) across all running nodes or a specific node.",
+          "input": { "properties": { "node": { "type": "integer" } } }
+        },
+        "chainbench_node_rpc": {
+          "owner": "chainbench",
+          "description": "Send a JSON-RPC call directly to a specific node and return the response (e.g. eth_blockNumber, eth_getBalance, net_peerCount).",
+          "input": { "properties": { "node": { "type": "integer" }, "method": { "type": "string" }, "params": { "type": "string" } }, "required": ["node", "method"] }
+        },
+        "chainbench_consensus_status": {
+          "owner": "chainbench",
+          "description": "WBFT consensus activity statistics over a block range: validator participation, block-authoring distribution, round stability, seal signature counts.",
+          "input": { "properties": { "blocks": { "type": "integer" }, "node": { "type": "integer" } } }
+        },
+        "chainbench_consensus_health": {
+          "owner": "chainbench",
+          "description": "Quick consensus health check across all running nodes: block production, sync status, validator agreement, round stability.",
+          "input": { "properties": {} }
+        },
+        "chainbench_consensus_validators": {
+          "owner": "chainbench",
+          "description": "WBFT validator set at a specific block (validator addresses and count). Omit block for latest.",
+          "input": { "properties": { "block": { "type": "integer" }, "node": { "type": "integer" } } }
+        },
+        "chainbench_consensus_block_info": {
+          "owner": "chainbench",
+          "description": "Decoded WBFT extra data from a block header: consensus round, prepared/committed seals, RANDAO reveal, gas tip, epoch info.",
+          "input": { "properties": { "block": { "type": "integer" }, "node": { "type": "integer" } }, "required": ["block"] }
+        },
+        "chainbench_network_partition": {
+          "owner": "chainbench",
+          "description": "Create or heal a network partition between two node groups (admin_removePeer / admin_addPeer) to test BFT consensus under splits.",
+          "input": { "properties": { "action": { "type": "string" }, "group_a": { "type": "array" }, "group_b": { "type": "array" } }, "required": ["action", "group_a", "group_b"] }
+        },
+        "chainbench_network_peers": {
+          "owner": "chainbench",
+          "description": "Peer connectivity for all running nodes or a specific node: peer count, connected peer IDs, topology overview.",
+          "input": { "properties": { "node": { "type": "integer" } } }
+        },
+        "chainbench_network_topology": {
+          "owner": "chainbench",
+          "description": "Set a P2P topology for testing: 'full-mesh', 'hub-spoke' (via hub node), or 'ring'. Useful for testing consensus under restricted connectivity.",
+          "input": { "properties": { "topology": { "type": "string" }, "hub": { "type": "integer" } }, "required": ["topology"] }
+        },
+        "chainbench_log_search": {
+          "owner": "chainbench",
+          "description": "Search node log files for a grep-compatible regex pattern; returns matching log lines. Omit node to search all nodes.",
+          "input": { "properties": { "pattern": { "type": "string" }, "node": { "type": "integer" } }, "required": ["pattern"] }
+        },
+        "chainbench_log_timeline": {
+          "owner": "chainbench",
+          "description": "Consensus event timeline from all node logs: block proposals, votes, commits, and view changes ordered by timestamp.",
+          "input": { "properties": {} }
+        },
+        "chainbench_events_get": {
+          "owner": "chainbench",
+          "description": "Fetch event logs (eth_getLogs) with optional address / block-range / topics filtering. When abi + event are both given, each log is decoded server-side as decoded:{event,args}.",
+          "input": { "properties": { "network": { "type": "string" }, "address": { "type": "string" }, "from_block": { "type": ["string", "number"] }, "to_block": { "type": ["string", "number"] }, "topics": { "type": "array" }, "abi": { "type": "string" }, "event": { "type": "string" }, "node_id": { "type": "string" } }, "required": ["network"] }
         }
       }
     },
