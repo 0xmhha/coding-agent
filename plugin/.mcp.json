@@ -11,8 +11,8 @@
       }
     },
     "cks": {
-      "command": "${CKS_MCP_BIN}",
-      "args": ["-config", "${CKS_CONFIG}"]
+      "type": "http",
+      "url": "${CKS_MCP_URL}"
     },
     "chainbench": {
       "command": "chainbench-mcp",
