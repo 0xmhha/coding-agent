@@ -1,6 +1,7 @@
 ---
 description: 플러그인·프로젝트 환경 진단(read-only). 버전·env·MCP·cks·도메인팩 상태를 한 화면으로 보고하고, 빠진 것·재시작 필요·불일치를 알려준다. 아무것도 수정하지 않는다.
 argument-hint: "[--project <id>] [--json]"
+allowed-tools: Bash(python3:*), ToolSearch, mcp__plugin_coding-agent_cks__cks_ops_health, mcp__plugin_coding-agent_cks__cks_ops_freshness, mcp__plugin_coding-agent_chainbench__chainbench_status, mcp__plugin_coding-agent_jira-gateway__jira_read_ticket, mcp__plugin_coding-agent_jira-gateway__jira_search
 ---
 
 # /coding-agent:doctor
