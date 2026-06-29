@@ -3,8 +3,8 @@
 > 범위: `cks`(code-knowledge-system) · `ckg`(code-knowledge-graph) · `ckv`(code-knowledge-vector)의
 > **신뢰성/정합성 하드닝** 라인 — serviceability 정책, 네트워크 transport, Ollama/모델 신뢰성,
 > 그리고 4-agent 코드리뷰(2026-06-16)에서 도출한 개선 백로그.
-> 짝 문서: [`knowledge-system-analysis-2026-06-17.md`](./knowledge-system-analysis-2026-06-17.md)(4-repo 교차 조사),
-> [`remaining-work-detail.md`](./remaining-work-detail.md)(coding-agent 파이프라인/bench thesis — **다른 스코프**).
+> 짝 문서: [`knowledge-system-analysis-2026-06-17.md`](./archive/knowledge-system-analysis-2026-06-17.md)(4-repo 교차 조사),
+> [`remaining-work-detail.md`](./archive/remaining-work-detail.md)(coding-agent 파이프라인/bench thesis — **다른 스코프**).
 > 진행 범례: ✅완료·머지 / ⏳즉시(운영) / ☐미착수 / 🔵선택 / ⏸차단.
 
 ---
@@ -13,7 +13,7 @@
 
 이 문서는 **자급자족을 목표로** 빌드/검증/컨벤션/근거를 아래 §0.5·§0.6에 담았다. 추가 맥락:
 
-- **저장소 동반 문서(누구나)**: [`SETUP.md`](./SETUP.md)(빌드·Ollama·cks 설정·플러그인 설치), [`knowledge-system-analysis-2026-06-17.md`](./knowledge-system-analysis-2026-06-17.md)(4-repo 교차 조사), [`remaining-work-detail.md`](./remaining-work-detail.md)(coding-agent 파이프라인/bench — 별개 스코프).
+- **저장소 동반 문서(누구나)**: [`SETUP.md`](./SETUP.md)(빌드·Ollama·cks 설정·플러그인 설치), [`knowledge-system-analysis-2026-06-17.md`](./archive/knowledge-system-analysis-2026-06-17.md)(4-repo 교차 조사), [`remaining-work-detail.md`](./archive/remaining-work-detail.md)(coding-agent 파이프라인/bench — 별개 스코프).
 - **머신 로컬 메모리(이 머신의 Claude 세션에서만 자동 로드 — 다른 머신/사람에겐 안 따라감)**: `~/.claude/projects/-Users-wm-it-25-0220-Work-github/memory/`의 `cks-mcp-serving-architecture.md`(serviceability 구현 상세+정책결정), `ckg-ckv-review-2026-06.md`(이 백로그의 원본 리뷰), `ollama-apple-silicon-cask.md`, `cks-composer-retrieval-fix.md`. → 이 메모리가 없는 환경에서는 **본 문서 + SETUP.md가 전부**이므로, 본 문서를 1차 권위로 본다.
 
 ---
@@ -152,7 +152,7 @@ go test -race ./<changed-pkg>/   # 동시성 변경 시
   invariant→test catalog, externalizer. (Gate 0/1은 이번 serviceability 작업으로 일부 실증.)
 - ⏸ **corpus 검색실험** — `ai-knowledge-data/corpus/REMAINING-WORK.md`: Track A(RetrievalTrace A vs B),
   Track B(corpus→cks 적재). **ckv 한글용어 오추출 버그 수정에 종속(차단).**
-- (참고) coding-agent 파이프라인/bench thesis 백로그는 [`remaining-work-detail.md`](./remaining-work-detail.md) 참조.
+- (참고) coding-agent 파이프라인/bench thesis 백로그는 [`remaining-work-detail.md`](./archive/remaining-work-detail.md) 참조.
 
 ---
 

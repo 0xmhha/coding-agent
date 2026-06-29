@@ -3,7 +3,7 @@
 > 이 문서는 `coding-agent`가 현재 시스템에서 어떤 역할을 하는지, 그리고 `cks`·`Claude Code`와
 > 어떻게 맞물려 동작하는지를 그림 중심으로 빠르게 이해하기 위한 개요 문서다.
 > 상세 빌드/설정은 [SETUP.md](SETUP.md), 설계 근거는 [../HANDOFF.md](../HANDOFF.md)와
-> [r1-refactor/00-system-contract.md](r1-refactor/00-system-contract.md)를 참고.
+> [system-contract.md](system-contract.md)를 참고.
 
 ---
 

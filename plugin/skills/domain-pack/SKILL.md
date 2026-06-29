@@ -1,6 +1,6 @@
 ---
 name: domain-pack
-description: "프로젝트-불문 도메인팩 로더. state.json의 project_id로 활성 프로젝트의 domain-pack(${CLAUDE_PLUGIN_ROOT}/domains/{project_id}/)을 런타임에 해석해, 경로→모듈 분류·복잡도 추정·항상-켜진 invariants backstop을 제공한다. 도메인 *지식*은 그 프로젝트의 cks 인덱스가 권위. (ADR docs/domain-pack-contract-adr-2026-06-22.md)"
+description: "프로젝트-불문 도메인팩 로더. state.json의 project_id로 활성 프로젝트의 domain-pack(${CLAUDE_PLUGIN_ROOT}/domains/{project_id}/)을 런타임에 해석해, 경로→모듈 분류·복잡도 추정·항상-켜진 invariants backstop을 제공한다. 도메인 *지식*은 그 프로젝트의 cks 인덱스가 권위. (ADR docs/adr/ADR-0001-domain-pack-contract.md)"
 type: skill
 ---
 

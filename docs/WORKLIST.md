@@ -3,12 +3,12 @@
 > 작성: 2026-06-22. 목적: `docs/` 하위 문서에 흩어진 작업 항목을 **6개 스트림**으로 통합한 단일 기준점.
 > 상세는 각 원본 문서를 링크. 진행 마커: ✅완료 / ◐부분 / 🟡진입가능·대기 / 🔴미착수 / ☐예정.
 >
-> 짝 문서: [`remaining-work-detail.md`](./remaining-work-detail.md)(스트림1 상세) ·
+> 짝 문서: [`remaining-work-detail.md`](./archive/remaining-work-detail.md)(스트림1 상세) ·
 > [`cks-ckg-ckv-hardening-backlog-2026-06-19.md`](./cks-ckg-ckv-hardening-backlog-2026-06-19.md)(스트림2) ·
 > [`graph-reasoning-gap-and-fix-plan-2026-06-19.md`](./graph-reasoning-gap-and-fix-plan-2026-06-19.md)(스트림3) ·
 > [`rag-context-efficiency-proposals-2026-06-19.md`](./rag-context-efficiency-proposals-2026-06-19.md)(스트림4) ·
 > [`harness-improvement-proposals-2026-06-17.md`](./harness-improvement-proposals-2026-06-17.md)(스트림5) ·
-> [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md)(스트림6: 오버레이 개선·도메인팩 확장·평가전략).
+> [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./archive/coding-agent-overlay-improvements-and-eval-2026-06-22.md)(스트림6: 오버레이 개선·도메인팩 확장·평가전략).
 >
 > ⚠️ `./archive/followup-plan.md`·`./archive/followup-expected-outcomes.md`는 `followup-status-2026-06-15.md`가 정정·대체했으므로
 > 아카이브 후보(중복·상충 주의).
@@ -44,7 +44,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 ---
 
 ## 스트림 1 — coding-agent 파이프라인 / thesis 검증  ★핵심
-원본: [`remaining-work-detail.md`](./remaining-work-detail.md) 항목 1–12
+원본: [`remaining-work-detail.md`](./archive/remaining-work-detail.md) 항목 1–12
 
 | ID | 작업 | 상태 |
 |---|---|---|
@@ -61,7 +61,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | 9 H 가드레일 일반화 | 구현 불변식 확장 | ☐ |
 
 ## 스트림 2 — cks/ckg/ckv 하드닝
-원본: [`cks-ckg-ckv-hardening-backlog-2026-06-19.md`](./cks-ckg-ckv-hardening-backlog-2026-06-19.md) · [`knowledge-system-analysis-2026-06-17.md`](./knowledge-system-analysis-2026-06-17.md)
+원본: [`cks-ckg-ckv-hardening-backlog-2026-06-19.md`](./cks-ckg-ckv-hardening-backlog-2026-06-19.md) · [`knowledge-system-analysis-2026-06-17.md`](./archive/knowledge-system-analysis-2026-06-17.md)
 
 | ID | 작업 | 상태 |
 |---|---|---|
@@ -99,7 +99,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | 5/6 evidence digest·prompt-cache prefix | | 🔴 미착수 |
 
 ## 스트림 5 — harness 자율성/안전 (hooks)
-원본: [`harness-improvement-proposals-2026-06-17.md`](./harness-improvement-proposals-2026-06-17.md) · [`query-core-agent-evaluation-2026-06-19.md`](./query-core-agent-evaluation-2026-06-19.md)
+원본: [`harness-improvement-proposals-2026-06-17.md`](./harness-improvement-proposals-2026-06-17.md) · [`query-core-agent-evaluation-2026-06-19.md`](./archive/query-core-agent-evaluation-2026-06-19.md)
 
 | ID | 작업 | 상태 |
 |---|---|---|
@@ -110,7 +110,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | query.ts 권고 (#1 reducer·#2 budget) | | ⏸ 본 repo 범위 밖 (상위 Claude Code 코어) |
 
 ## 스트림 6 — coding-agent 오버레이 개선 / 도메인팩 확장
-원본: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md)
+원본: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./archive/coding-agent-overlay-improvements-and-eval-2026-06-22.md)
 
 | ID | 작업 | 평가 오라클 | 상태 |
 |---|---|---|---|
@@ -118,7 +118,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | P2 cks 결함강건 | 재시도·백오프 + degraded/blocked 임계 명문화 ("조용한 best-effort" 금지) | PR-77 fault-injection (0/10/30/50%) → 조용한 오답 **0** | ✅ **스펙 패치 + 결정론 평가 완료 (06-22)** — analyzer §3.0b(retry+PRIMARY/COMPLETENESS/ENHANCEMENT tier+degraded 전파)·planner §3.0 미러·evaluator §4.0. 하네스 `bench/p2-cks-fault/` (policy·scenarios·score·tests 7/7). **측정: silent-incomplete before 6→after 0, 과잉차단 0, retry 회복 3**. 잔여: 라이브 fault-injection(flaky 프록시+PR-77 오라클) 충실도 레이어 미실행 |
 | P5 정리 범위 한정 | evaluator §7.6 pkill→spawn한 PID만 | 동명 더미 프로세스 생존 이진 테스트 | ✅ **완료 (06-22)** — evaluator §7.3 pre-start PID 스냅샷 + §7.6 scoped cleanup(스냅샷 차집합 ∖ $$/$PPID, self-match 버그도 제거). 하네스 `bench/p5-cleanup-scope/` (cleanup_scoped.sh + verify.sh). **실프로세스 이진 테스트 PASS: foreign 생존·ours 종료, naive pkill는 foreign 죽임(버그 실증)** |
 | P3 모델 핀 중앙화/갱신 | 6파일 산재 핀 → 단일 설정원, 4-7→4-8 | 동일 픽스처 3-way bench A/B (정확성 무회귀·비용) | ✅ **완료 (06-22)** — 4-8 갱신(`304afba`) + 중앙화: `bench/model-pins/models.json` 단일 소스(tier→id, agent→tier), capture.py가 런타임에 그걸 읽음(이중소스 제거), `check.py`가 frontmatter·capture·prices 정합성 검증(+`--apply` 1-커맨드 갱신). **발견(claude-code-guide 확인): frontmatter `model:`은 런타임 간접참조 불가, `CLAUDE_CODE_SUBAGENT_MODEL`은 tier 평탄화 → 진짜 런타임 중앙화는 불가, 툴링레벨 단일소스+드리프트 게이트가 최선.** 테스트 7/7 + bench 14/14 무회귀 |
-| P1 도메인팩 계약 | `domain-pack.json`+`project_id`, `stablenet-*` 정적 호명 → 활성 팩 해석, chainbench→`mcp:` 스테이지 일반화 | ① 코어 grep-clean(도메인 용어 0) ② go-stablenet 무회귀(fcore-baseline) ③ Phase1 라이브 신뢰성 | ◐ **Phase 1 완료 (구조 이동, 06-22)** — 설계 ACCEPTED(`domain-pack-contract-adr-2026-06-22.md`). `plugin/domains/go-stablenet/{domain-pack.json,invariants.md,context.md}` 신설(콘텐츠 단일소스 이동, 불변식 11·경로맵 보존), `stablenet-*` 스킬→thin pointer, 제너릭 `domain-pack` 로더 스킬 신설(미배선). 게이트 `bench/domain-pack/check.py`(5/5)+overlay-gates 편입. **에이전트 frontmatter 무변경=동작 보존**(라이브 무회귀는 미실행). **Phase 2a 브랜치 작업 (`p1-phase2-domain-pack-wire`, 미머지)**: analyzer/planner/evaluator/bench-analyzer-skills frontmatter+본문을 `domain-pack` 로더로 배선, dead 포인터 스킬 삭제, dangling 참조(root-cause-lifecycle·domain-pack) 수정, check.py를 wiring 검증으로 갱신. frontmatter stablenet-* 의존 0·overlay-gates ALL PASS. **검증 3/4 통과**(`phase2a-verification.md`): ①콘텐츠 byte-identical ②로더 해석 결정론 ③**실제 에이전트가 로더만으로 resolve·분류·불변식 적용 PASS(§3.1 실측)**. ④풀파이프라인 무회귀: **세션이 설치 캐시(baseline)를 디스패치 → 브랜치 테스트엔 설치+재시작 필요** → **결정: main 머지 후 v0.1.22 재설치하고 테스트(머지-후-테스트), 실패 시 revert.** PR `p1-phase2-domain-pack-wire`→main, 버전 0.1.21→0.1.22 bump. runbook은 verification.md Layer 4. **④ 라이브 무회귀 실행 (06-23, clean 체크아웃 `test/dev-test/pr-77`@0bf2f4d1b + pr-77 cks)**: Phase 2a analyzer가 PR-77 오라클 **PRIMARY 근본원인(`anzeon.go:54 SetCurrentBlock`) 정확 도달** + RED 재현 + domain-pack 로더 정상 해석·분류 → **분석 무회귀 PASS**(06-22 baseline #1 일치). **단 실런이 실버그 발견**: 로더 경로 `plugin/domains/...`가 설치 플러그인에서 안 풀림(cwd=타깃repo, 캐시엔 plugin/ 접두 없음) → **fix `${CLAUDE_PLUGIN_ROOT}/domains/...`(인라인 치환), v0.1.23, PR `fix-domain-pack-plugin-root`**(머지됨, 현 main 0.1.25). **③ 치환 라이브 검증 닫힘 (06-23, 0.1.25 설치+reload)**: 에이전트 로드 시 `${CLAUDE_PLUGIN_ROOT}`→절대경로 인라인 치환 실측 확인 → 로더가 워크어라운드 없이 정확한 팩 경로 Read. ∴ **Phase 2a(배선)+경로fix 검증완료·클린.** **Phase 2b + 3 머지됨 (PR #21, v0.1.28, 06-23)**: 2b-α(evaluator repo_root+build/test 팩 `verification` 소싱)·2b-β(§3 stage-loop 데이터주도, kind 디스패치)·Phase 3(`go_stablenet_root`→`repo_root` orchestrator+analyzer 계약통일 + grep-clean 게이트 in check.py). **코어 `go_stablenet_root` 0**, overlay-gates ALL PASS. 계획·체크리스트 `docs/p1-phase2b-3-plan-2026-06-23.md`. **잔여 = 라이브 무회귀(게이트)만**: 0.1.28 설치+reload 후 evaluator+chainbench로 go-stablenet 무회귀(2b-5/3-4). 정직한 한계: MCP grant frontmatter 정적·bench-orchestration manifest 키 allowlist. |
+| P1 도메인팩 계약 | `domain-pack.json`+`project_id`, `stablenet-*` 정적 호명 → 활성 팩 해석, chainbench→`mcp:` 스테이지 일반화 | ① 코어 grep-clean(도메인 용어 0) ② go-stablenet 무회귀(fcore-baseline) ③ Phase1 라이브 신뢰성 | ◐ **Phase 1 완료 (구조 이동, 06-22)** — 설계 ACCEPTED(`adr/ADR-0001-domain-pack-contract.md`). `plugin/domains/go-stablenet/{domain-pack.json,invariants.md,context.md}` 신설(콘텐츠 단일소스 이동, 불변식 11·경로맵 보존), `stablenet-*` 스킬→thin pointer, 제너릭 `domain-pack` 로더 스킬 신설(미배선). 게이트 `bench/domain-pack/check.py`(5/5)+overlay-gates 편입. **에이전트 frontmatter 무변경=동작 보존**(라이브 무회귀는 미실행). **Phase 2a 브랜치 작업 (`p1-phase2-domain-pack-wire`, 미머지)**: analyzer/planner/evaluator/bench-analyzer-skills frontmatter+본문을 `domain-pack` 로더로 배선, dead 포인터 스킬 삭제, dangling 참조(root-cause-lifecycle·domain-pack) 수정, check.py를 wiring 검증으로 갱신. frontmatter stablenet-* 의존 0·overlay-gates ALL PASS. **검증 3/4 통과**(`phase2a-verification.md`): ①콘텐츠 byte-identical ②로더 해석 결정론 ③**실제 에이전트가 로더만으로 resolve·분류·불변식 적용 PASS(§3.1 실측)**. ④풀파이프라인 무회귀: **세션이 설치 캐시(baseline)를 디스패치 → 브랜치 테스트엔 설치+재시작 필요** → **결정: main 머지 후 v0.1.22 재설치하고 테스트(머지-후-테스트), 실패 시 revert.** PR `p1-phase2-domain-pack-wire`→main, 버전 0.1.21→0.1.22 bump. runbook은 verification.md Layer 4. **④ 라이브 무회귀 실행 (06-23, clean 체크아웃 `test/dev-test/pr-77`@0bf2f4d1b + pr-77 cks)**: Phase 2a analyzer가 PR-77 오라클 **PRIMARY 근본원인(`anzeon.go:54 SetCurrentBlock`) 정확 도달** + RED 재현 + domain-pack 로더 정상 해석·분류 → **분석 무회귀 PASS**(06-22 baseline #1 일치). **단 실런이 실버그 발견**: 로더 경로 `plugin/domains/...`가 설치 플러그인에서 안 풀림(cwd=타깃repo, 캐시엔 plugin/ 접두 없음) → **fix `${CLAUDE_PLUGIN_ROOT}/domains/...`(인라인 치환), v0.1.23, PR `fix-domain-pack-plugin-root`**(머지됨, 현 main 0.1.25). **③ 치환 라이브 검증 닫힘 (06-23, 0.1.25 설치+reload)**: 에이전트 로드 시 `${CLAUDE_PLUGIN_ROOT}`→절대경로 인라인 치환 실측 확인 → 로더가 워크어라운드 없이 정확한 팩 경로 Read. ∴ **Phase 2a(배선)+경로fix 검증완료·클린.** **Phase 2b + 3 머지됨 (PR #21, v0.1.28, 06-23)**: 2b-α(evaluator repo_root+build/test 팩 `verification` 소싱)·2b-β(§3 stage-loop 데이터주도, kind 디스패치)·Phase 3(`go_stablenet_root`→`repo_root` orchestrator+analyzer 계약통일 + grep-clean 게이트 in check.py). **코어 `go_stablenet_root` 0**, overlay-gates ALL PASS. 계획·체크리스트 `docs/archive/p1-phase2b-3-plan-2026-06-23.md`. **잔여 = 라이브 무회귀(게이트)만**: 0.1.28 설치+reload 후 evaluator+chainbench로 go-stablenet 무회귀(2b-5/3-4). 정직한 한계: MCP grant frontmatter 정적·bench-orchestration manifest 키 allowlist. |
 | P4 문서 드리프트 | HANDOFF-simulation-verification supersede (reproduce-first/§4.7로 충족분 반영) | doc-truth 대조표: 활성문서 ↔ 코드 모순 0건 | ✅ **완료 (06-22)** — `plugin/docs/HANDOFF-simulation-verification.md` 상단에 STATUS+doc-truth 대조표(7행) prepend, §8 NEXT supersede. 제안 (1)~(5)는 reproduce-first 트랙으로 충족 확인, **활성 잔여 1건만 분리**: 신규 `simulation-harness` 스킬(L1/L2/L3 라우팅 + L2 in-process 시뮬 + ChainBench L2 down-push) → 아래 잔여항목 추적 |
 
 > **시퀀싱 핵심**: P0·P1·P3은 파이프라인 동작을 *바꾼다* → 스트림1 thesis bench(F-core)의 측정을

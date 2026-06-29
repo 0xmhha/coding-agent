@@ -1,11 +1,14 @@
 # ADR — Domain-Pack Contract (coding-agent multi-project extension, overlay P1)
 
 문서 성격: **ADR / 설계 결정 (ACCEPTED 2026-06-22 — 설계 합의됨, 코드 변경 0).** 2026-06-19~22
-오버레이 작업의 P1. 짝 문서: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](./coding-agent-overlay-improvements-and-eval-2026-06-22.md) Part B(스케치) · [`WORKLIST.md`](./WORKLIST.md) 스트림6.
+오버레이 작업의 P1. 짝 문서: [`coding-agent-overlay-improvements-and-eval-2026-06-22.md`](../archive/coding-agent-overlay-improvements-and-eval-2026-06-22.md) Part B(스케치) · [`WORKLIST.md`](../WORKLIST.md) 스트림6.
 
 > **상태: ACCEPTED (설계만).** §8 결정 4건 모두 확정. **구현(Phase 1~3)은 교란·대형이라 별도
 > 세션/승인 게이트 유지** — 이 문서 승인이 곧 구현 착수 승인은 아니다. Phase 1은 fcore-baseline
 > 무회귀로 §3 메커니즘 신뢰성을 라이브 확인하며 진행.
+>
+> **구현 상태 갱신 (코드 검증 2026-06-28):** 구현됨. `plugin/domains/go-stablenet/`에
+> `domain-pack.json`·`context.md`·`invariants.md` 존재 — 위 "설계만/코드 변경 0"은 작성 시점 기준.
 
 > **결정 한 줄:** go-stablenet 전용 콘텐츠를 **선언적 도메인팩**으로 분리하고, 제너릭 에이전트가
 > `state.json.project_id`로 활성 팩을 **런타임 `Read`로 해석**하게 한다. frontmatter는 정적

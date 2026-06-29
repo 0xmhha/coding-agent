@@ -38,7 +38,7 @@ cks 도구를 로드(미인식이면 ToolSearch 1회)한 뒤:
 ## 3. 판정 + 다음 행동 (remediation)
 
 수정 매핑의 **단일 소스는 `doctor.py`의 `REMEDIATION` 테이블**이다(ADR
-[doctor-remediation-adr-2026-06-26](../../docs/doctor-remediation-adr-2026-06-26.md)). 각 항목은
+[doctor-remediation-adr-2026-06-26](../../docs/adr/ADR-0004-doctor-remediation-routing.md)). 각 항목은
 `klass`(`setup`=우리 setup.py가 해결 / `restart`=세션 재시작 / `manual`=재설정 / `external`=빌드·설치→docs/SETUP.md)로 분류된다.
 
 1. **§1 스크립트가 이미 계산한 `remediations` 목록을 그대로 표시**한다(산문으로 재작성하지 말 것).
