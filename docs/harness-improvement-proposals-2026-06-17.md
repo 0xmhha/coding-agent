@@ -1,5 +1,14 @@
 # 하네스 개선 제안 — Claude 에이전틱 패턴 기반 (2026-06-17)
 
+> **STATUS (2026-06-29): 제안 1~3 구현·머지됨 (v0.1.41).** Part D 롤아웃 순서대로
+> **제안 2 git-guard** (`plugin/hooks/git-guard.py`, PreToolUse:Bash — main 직접 commit/push·
+> force-push deny / reset --hard·clean -f·branch -D·tag push ask), **제안 1 Stop 훅**
+> (`plugin/hooks/on-stop.py`, Stop — auto 모드·비종료·cycle 한도·`stop_hook_active`·staleness
+> 가드 동봉), **제안 3 SessionStart** (`plugin/hooks/session-context.py` — 비종료 워크스페이스
+> 주입) 신설 + `hooks/hooks.json` 배선 + 결정론 테스트(`bench/hooks/test_hooks.py`, overlay-gates 편입).
+> **잔여 = 제안 4(교차-티켓 학습 lessons.md)·5(evaluator 병렬화)·6(state.json 스키마 검증)·7(context:fork).**
+> SubagentStop 정밀 게이트(제안 1의 서브)는 의도적 보류(오버블록 위험 — Stop 본체로 충분).
+
 문서 성격: **분석 + 제안 (status/proposal, 미구현)**. 구현 전 근거·합의용.
 근거: Claude Code 코어(소스맵 복원본 ~1,900 TS 파일) 동작 원리 분석 문서 3종 +
 `coding-agent` 플러그인 전체 인벤토리(agent 4 · hook 3 · skill 7 · command 9 · MCP 3) 교차 점검.
