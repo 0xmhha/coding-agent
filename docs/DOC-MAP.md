@@ -45,8 +45,8 @@
 | [WORKLIST.md](WORKLIST.md) | **활성 SSoT** | 6개 워크스트림 통합 백로그. 잔여작업의 단일 기준점 |
 | [cks-ckg-ckv-hardening-backlog-2026-06-19.md](cks-ckg-ckv-hardening-backlog-2026-06-19.md) | 활성 | A1·A2·B1 머지, B3–B5·확장 API 미착수 |
 | [graph-reasoning-gap-and-fix-plan-2026-06-19.md](graph-reasoning-gap-and-fix-plan-2026-06-19.md) | 활성 | P0 흡수(analyzer), P1.5·P2·P3 잔존 |
-| [rag-context-efficiency-proposals-2026-06-19.md](rag-context-efficiency-proposals-2026-06-19.md) | 활성 | 7개 비용절감 제안 미구현 |
-| [harness-improvement-proposals-2026-06-17.md](harness-improvement-proposals-2026-06-17.md) | 활성 | Stop 훅·git-guard 등 7개 제안 미구현 |
+| [rag-context-efficiency-proposals-2026-06-19.md](rag-context-efficiency-proposals-2026-06-19.md) | 활성 | 3.1·2.2·4.1 머지(#38·#40); 2.1 캐시 홀드; 2.3/2.4/3.2/3.3 잔여 |
+| [harness-improvement-proposals-2026-06-17.md](harness-improvement-proposals-2026-06-17.md) | 활성 | 제안 1~3(git-guard·Stop·SessionStart) 머지(#41); 4~7 잔여 |
 | [reproduction-verification-runbook-2026-06-23.md](reproduction-verification-runbook-2026-06-23.md) | 재사용 절차 | ADR-0003 라이브 검증 프로토콜 |
 
 ## 아카이브 (`archive/`) — 완료·superseded (이력 보존, 삭제 금지)

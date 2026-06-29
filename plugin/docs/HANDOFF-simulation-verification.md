@@ -1,23 +1,22 @@
-> ## ⚠️ STATUS (2026-06-22): 대부분 SUPERSEDED — `reproduce-first` 트랙으로 구현됨
+> ## ⚠️ STATUS (2026-06-29): 전부 SUPERSEDED — `reproduce-first` + `simulation-harness`로 구현 완료
 >
-> 이 문서(2026-06-19)가 제안한 **"재현 테스트를 1급 시민으로 + red→green 기계검증"의 코어는
-> 이미 구현·머지됐다** — 단, 제안서의 `simulation-harness` 스킬 경로가 아니라 **`reproduce-first`
-> 스킬 + analyzer/implementer/evaluator 분업**으로. §1~§9는 *역사적 제안 원문*으로 보존한다
+> 이 문서(2026-06-19) 제안은 **전부 구현·머지됐다.** 코어(red→green 기계검증)는 `reproduce-first`
+> 트랙으로(2026-06-22), **마지막 잔여였던 `simulation-harness` 스킬(L1/L2/L3 레벨 라우팅 + L3→L2
+> down-push)은 PR #39(v0.1.39)로** 닫혔다. §1~§9는 *역사적 제안 원문*으로 보존한다
 > (supersede-not-delete). 코드와의 1:1 대조:
 >
 > | 제안 항목(§5/§6) | 현재 코드 (2026-06-22) | 판정 |
 > |---|---|---|
 > | (1) `/diagnose` 실행 falsification | `commands/diagnose.md` §3 → `investigative-probe` 스킬(throwaway 관찰) + reproduce-first 오라클 | ✅ 충족 (이름은 `--repro`가 아니라 investigative-probe) |
-> | (2) planner red→green 버그캡처 *요구* | `reproduce-first` 스킬: analyzer **§5 REPRODUCE**가 RED 테스트 작성 + `reproduction.json` | ✅ 실질 충족 (단 L1/L2/L3 시뮬레벨 선택은 미구현) |
+> | (2) planner red→green 버그캡처 *요구* | `reproduce-first` 스킬: analyzer **§5 REPRODUCE**가 RED 테스트 작성 + `reproduction.json`; L1/L2/L3 레벨 선택은 `simulation-harness`(#39) | ✅ 충족 |
 > | (3) implementer red-before-green | implementer **§3.4**(재현 테스트 FIRST 커밋=RED) + **§6.0**(GREEN 선확인) | ✅ 충족 |
 > | (4) evaluator red→green 회귀게이트 (핵심 enabler) | evaluator **§4.7** Reproduction GREEN gate (HEAD green + repro_commit red 재확인 + 테스트파일 무수정) | ✅ 충족 — §7이 제안한 격리 red→green 기계검증 그대로 |
 > | (5) 리포트/상태 연결 | `reproduction.json.{green_confirmed,green_at_head,red_at_parent}` evaluator 기록 | ✅ 충족 |
-> | (신규) `simulation-harness` 스킬 (L1/L2/L3 라우팅 + L2 in-process 체인·합의 시뮬 레시피) | **없음** | 🔴 **미구현 — 유일한 살아있는 잔여** |
-> | ChainBench L2 down-push (무거운 L3 → 경량 L2 우선) | 여전히 §7 generic L3 | 🔴 **미구현 (잔여)** |
+> | (신규) `simulation-harness` 스킬 (L1/L2/L3 라우팅 + L2 in-process 체인·합의 시뮬 레시피) | `skills/simulation-harness`(#39) — 도메인 중립 레벨 라우팅; L2 레시피는 도메인팩 `domains/go-stablenet/simulation.md` | ✅ **구현 (PR #39, v0.1.39)** |
+> | ChainBench L2 down-push (무거운 L3 → 경량 L2 우선) | `simulation-harness` 비용 down-push(L3 전 팩의 충실한 L2 확인) — 단 **충실성 불변**(analyzer §5.0 약화 안 함, under-push) | ✅ **구현 (#39)** |
 >
-> **활성 잔여는 단 하나**: 재현 테스트의 **시뮬레이션 레벨 라우팅(특히 L2 in-process)** 을
-> `simulation-harness` 스킬로 카탈로그화하는 것. red→green 골격 자체는 reproduce-first로 닫혔으므로
-> 이 문서의 §0·§8 "범위 결정 대기" 서술은 **더 이상 유효하지 않다**(§8 갱신 참조). 추적: WORKLIST 스트림6 P4.
+> **활성 잔여 0.** red→green 골격(reproduce-first)+레벨 라우팅(simulation-harness, #39) 모두 닫힘.
+> 이 문서의 §0·§8 "범위 결정 대기" 서술은 더 이상 유효하지 않다. 추적: WORKLIST 스트림6 P4(완료).
 
 # HANDOFF — 시뮬레이션 기반 "수정 검증/재현" 도입 (coding-agent plugin)
 

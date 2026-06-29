@@ -1,6 +1,14 @@
 # RAG · 컨텍스트 엔지니어링 효율 개선 제안 — coding-agent (2026-06-19)
 
-문서 성격: **분석 + 제안 (status/proposal, 미구현)**. 퍼포먼스·경제성 개선 근거/합의용.
+> **STATUS (2026-06-29): 우선순위 1·3·4 구현·머지됨 (PR #38·#40).**
+> **3.1 Implementer EvidencePack 재사용**(#38, v0.1.38 — implementer §4.2 scoped Read) ·
+> **2.2 적응형 검색 깊이**(#38 — analyzer §3.4/§3.5 complexity tier 게이트) ·
+> **4.1 검색 충분성 게이트**(#40, v0.1.40 — analyzer §6.0) 완료.
+> **홀드: 2.1 검색 캐시** — 새 메커니즘·stale 위험으로 베이스 검증(Phase 2) 후로 보류.
+> **잔여: 2.3 evidence 증류 · 2.4 자기-과거 RAG · 3.2 필드 분할 · 3.3 prompt-cache prefix.**
+> 효과(총비용 절감)는 Phase 2 bench(A′ 모드)로 측정.
+
+문서 성격: **분석 + 제안 (일부 구현·status/proposal)**. 퍼포먼스·경제성 개선 근거/합의용.
 대상: `coding-agent` 플러그인 파이프라인 — `analyzer`(RAG 진입점) → `planner` → `implementer` → `evaluator`.
 근거: 실제 에이전트 마크다운 + cks 사용 패턴 + EvidencePack(`related-code.json`) 소비 추적
 (grep 확인) + `bench-orchestration` 측정 하네스.
@@ -141,10 +149,10 @@ evaluator:  related-code.json 통째 로드하지만 실제 사용은 ckg.concur
 
 | 순위 | 아이디어 | 레버리지 | 노력 | 범위 |
 |------|---------|---------|------|------|
-| 1 | 3.1 Implementer EvidencePack 재사용 | 높음 | 낮음 | coding-agent only |
-| 2 | 2.1 검색 캐시(index-head 무효화) | 높음 | 중간 | coding-agent only |
-| 3 | 2.2 적응형 검색 깊이(라우터) | 높음 | 낮음 | coding-agent only |
-| 4 | 4.1 검색 충분성 게이트 | 중간 | 낮음 | coding-agent only |
+| 1 | 3.1 Implementer EvidencePack 재사용 ✅ **머지 #38** | 높음 | 낮음 | coding-agent only |
+| 2 | 2.1 검색 캐시(index-head 무효화) ⏸ **홀드** | 높음 | 중간 | coding-agent only |
+| 3 | 2.2 적응형 검색 깊이(라우터) ✅ **머지 #38** | 높음 | 낮음 | coding-agent only |
+| 4 | 4.1 검색 충분성 게이트 ✅ **머지 #40** | 중간 | 낮음 | coding-agent only |
 | 5 | 2.3 evidence 증류 / 3.2 필드 분할 | 중간 | 중간 | coding-agent only |
 | 6 | 3.3 프롬프트-캐시 프리픽스 | 중간 | 중간 | coding-agent only |
 | 7 | 2.4 자기-과거 RAG | 중간(지능) | 높음 | +벡터스토어 |

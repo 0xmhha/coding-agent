@@ -31,6 +31,20 @@
 - ✅ **전문가 근본원인(`SetCurrentBlock` currentBlock lag)에 §5c 런타임으로 독립 수렴.**
 - ❌ **남은 약한 고리 = FIX SYNTHESIS**(reproduce/diagnose/verify 아님): planner/implementer가 계속 *add-time-drop* 변형을 골랐고, unit test가 `raw==header tip` 실제 오라클 조건을 안 건드려 masking. → **신규 잔여 2건**(아래 스트림1).
 
+### Phase 1 후속 머지 (2026-06-29) — coding-agent 파이프라인 하드닝 5건
+
+위 run-2가 가리킨 FIX SYNTHESIS 약점부터 시작해 Phase 1 *기능·수정* 트랙을 진행(코드 동결 후 Phase 2 측정 원칙 유지):
+
+| PR | 작업 | ver |
+|---|---|---|
+| #37 | **fix-synthesis 갭** — source-correct over downstream-compensate(planner §5.2c) + unit-oracle fidelity(evaluator §4.8 check 6) + implementer §4.2 | 0.1.37 |
+| #38 | **RAG 효율** — implementer EvidencePack 재사용(§4.2 scoped Read) + adaptive 그래프 깊이(analyzer §3.4/§3.5 complexity 게이트) | 0.1.38 |
+| #39 | **simulation-harness 스킬** — L1/L2/L3 재현 레벨 라우팅 + L3→L2 비용 down-push(충실성 불변); L2 레시피는 도메인팩 | 0.1.39 |
+| #40 | **검색 충분성 게이트** — analyzer §6.0 ANALYSIS→PLANNING 전 unknown 해소(reproduce-first RED 게이트의 검색판) | 0.1.40 |
+| #41 | **harness 안전 hooks** — git-guard(PreToolUse:Bash) + on-stop(Stop) + session-context(SessionStart) + 결정론 테스트(overlay-gates) | 0.1.41 |
+
+**홀드(의도적, 베이스 검증 후):** 검색 캐시(2.1)·lessons.md 학습루프(harness #4) = 새 메커니즘·stale/노이즈 위험 / H 가드레일 = **코드-도출 구현 불변식**으로 재정의(cks 컨벤션-마이닝 의존). **cross-repo(ckg·ckv)** = 다른 세션 정리 중 → Phase 2 직전 빌드+재인덱싱과 배치.
+
 ---
 
 ## 이번 세션 진척 (2026-06-22)
@@ -76,8 +90,8 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | 2 (d) **F-core full pipeline 라이브 1셀** | red→green 완주 | 🟡 **진입가능** (전제충족·analyzer검증됨·승인+autopilot 대기) |
 | A/B/C 정의 재설계 (whole-approach) | B/C=coding-agent 배제 단독 solver, C=프로젝트 .claude | ✅ **완료 (06-22)** — 정의문서 + `bench-solver-{codeonly,project-skills}` + SKILL §4.4 분기 + `stable-0005-abc.json` |
 | F-core 전체 A/B/C bench | thesis 종착점 | 🟡 **진입가능** (STABLE-0005 매니페스트 준비됨·승인+autopilot 대기) |
-| **fix-synthesis 갭** (run-2 §F a·b) | implementer fix-pattern 가이드(retain-not-drop / account-class gating) + fix-validity unit 규칙(unit이 오라클 실패조건 *exact* exercise) | 🟡 **신규 최우선** (run-2가 가리킨 살아있는 단일 약점; reproduce/diagnose/verify는 닫힘) |
-| 9 H 가드레일 일반화 | 구현 불변식 확장 | ☐ |
+| **fix-synthesis 갭** (run-2 §F a·b) | source-correct over downstream-compensate(planner §5.2c) + unit-oracle fidelity(evaluator §4.8 check 6) | ✅ **머지 (PR #37, v0.1.37)** |
+| 9 H 가드레일 일반화 | 구현 불변식 확장 → **코드-도출 방식으로 재정의**(cks 컨벤션-마이닝 의존) | ⏸ 홀드 |
 
 ## 스트림 2 — cks/ckg/ckv 하드닝
 원본: [`cks-ckg-ckv-hardening-backlog-2026-06-19.md`](./cks-ckg-ckv-hardening-backlog-2026-06-19.md) · [`knowledge-system-analysis-2026-06-17.md`](./archive/knowledge-system-analysis-2026-06-17.md)
@@ -111,10 +125,10 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 
 | ID | 작업 | 상태 |
 |---|---|---|
-| 1 implementer EvidencePack 재사용 | 중복 full-Read 제거 | 🔴 미착수 (High/Low) |
-| 2 evidence 캐시 (index-head 키) | | 🔴 미착수 |
-| 3 adaptive search depth 라우터 | | 🔴 미착수 |
-| 4 search sufficiency 게이트 | | 🔴 미착수 |
+| 1 implementer EvidencePack 재사용 | 중복 full-Read 제거 | ✅ **머지 (PR #38, v0.1.38)** — design 인용 범위 scoped Read |
+| 2 evidence 캐시 (index-head 키) | | ⏸ **홀드** (새 메커니즘·stale 위험 — 베이스 검증 후) |
+| 3 adaptive search depth 라우터 | | ✅ **머지 (PR #38)** — analyzer §3.4/§3.5 complexity tier 게이트 |
+| 4 search sufficiency 게이트 | ANALYSIS→PLANNING 전 unknown 해소 | ✅ **머지 (PR #40, v0.1.40)** — analyzer §6.0 |
 | 5/6 evidence digest·prompt-cache prefix | | 🔴 미착수 |
 
 ## 스트림 5 — harness 자율성/안전 (hooks)
@@ -122,10 +136,10 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 
 | ID | 작업 | 상태 |
 |---|---|---|
-| 1 PreToolUse git-guard | force-push/main 차단 | 🔴 미착수 (autonomy=auto 전제) |
-| 2 Stop/SubagentStop 훅 | state 게이트 | 🔴 미착수 |
-| 3 SessionStart 컨텍스트 주입 | | 🔴 미착수 |
-| 4~7 lessons.md·evaluator 병렬화·schema 검증·context:fork | | 🔴 미착수 |
+| 1 PreToolUse git-guard | force-push/main 차단 | ✅ **머지 (PR #41, v0.1.41)** — `hooks/git-guard.py` |
+| 2 Stop/SubagentStop 훅 | state 게이트 | ✅ **머지 (PR #41)** — `hooks/on-stop.py` (Stop only; SubagentStop은 over-block 위험으로 보류) |
+| 3 SessionStart 컨텍스트 주입 | | ✅ **머지 (PR #41)** — `hooks/session-context.py` |
+| 4~7 lessons.md·evaluator 병렬화·schema 검증·context:fork | | 🔴 미착수 (4 lessons.md = **홀드**: 베이스 검증 후) |
 | query.ts 권고 (#1 reducer·#2 budget) | | ⏸ 본 repo 범위 밖 (상위 Claude Code 코어) |
 
 ## 스트림 6 — coding-agent 오버레이 개선 / 도메인팩 확장
@@ -168,15 +182,16 @@ pre-commit/CI 후보. P0~P5의 "진짜 개선" 보증을 영구 고정하는 cap
 
 ### Phase 1 — 기능 구현 및 수정 (먼저)
 
-| 순위 | 작업 | 스트림 | 근거 |
+| 순위 | 작업 | 스트림 | 상태 |
 |---|---|---|---|
-| **1** | **fix-synthesis 갭 닫기** — implementer fix-pattern 가이드(retain-not-drop / account-class gating) + fix-validity unit 규칙(수정의 unit이 *정확히* 오라클 실패조건을 exercise) | 1 | **run-2(#32)가 가리킨 살아있는 단일 약점.** reproduce/diagnose/verify는 닫혔고 남은 건 fix 합성 품질 = G1 정확성 직결 |
-| **2** | **implementer EvidencePack 재사용**(#1) → 검색 캐시(#2) → 적응형 깊이(#3) | 4 | 저비용·고효과·비교란·즉시 토큰절감. 단독 coding-agent |
-| **3** | **simulation-harness 스킬**(P4 분리) — L1/L2/L3 재현 레벨 라우팅 | 6 | red→green 골격 존재 → 레벨 카탈로그/라우팅만 추가. 비교란 |
-| **4** | **graph-gap P1.5** depth-cap 절단 가시화(additive·재인덱싱 불필요) → P2/P3 정확성 | 3 | P0는 analyzer가 흡수. 저비용 가시성부터 |
-| **5** | **cks 하드닝** §3.3 B3–B5(LIKE·impact·context) → §3.4/§3.5 정리 | 2 | A1/A2 닫힘 → 우선순위 하향. 성능·정리성 fix |
-| **6** | **harness hooks** git-guard·Stop훅·SessionStart | 5 | autonomy=auto 전제. fail-closed 안전성 |
-| **7** | **H 가드레일 일반화** (구현 불변식 확장) | 1 | |
+| **1** | **fix-synthesis 갭 닫기** — source-correct over downstream-compensate + unit-oracle fidelity | 1 | ✅ **머지 (PR #37, v0.1.37)** |
+| **2** | **RAG 효율** — implementer EvidencePack 재사용(#1) + 적응형 그래프 깊이(#3) | 4 | ✅ **머지 (PR #38, v0.1.38)** · 검색 캐시(#2)는 홀드(아래) |
+| **3** | **simulation-harness 스킬**(P4 분리) — L1/L2/L3 재현 레벨 라우팅 | 6 | ✅ **머지 (PR #39, v0.1.39)** |
+| **3.5** | **검색 충분성 게이트** (rag-efficiency §4.1) — ANALYSIS→PLANNING 전 unknown 해소 | 4 | ✅ **머지 (PR #40, v0.1.40)** |
+| **4** | **harness hooks** git-guard·Stop·SessionStart | 5 | ✅ **머지 (PR #41, v0.1.41)** — 제안 1~3. 4~7·SubagentStop 잔여 |
+| **홀드** | **검색 캐시**(2.1) / **lessons.md 학습루프**(harness #4) | 4·5 | ⏸ **홀드** — 베이스 검증(Phase 2) 후. stale·노이즈 위험(새 메커니즘) |
+| **홀드** | **H 가드레일 일반화** (구현 불변식) | 1 | ⏸ **홀드·재정의** — 하드코딩 리스트가 아니라 **코드 패턴에서 도출**(cks 컨벤션-마이닝 parity 갭 의존, cross-repo) |
+| **cross-repo** | **graph-gap P1.5 / cks B3–B5** | 2·3 | 🔵 ckg·ckv 다른 세션 정리 중 → Phase 2 직전 빌드+재인덱싱과 배치 |
 
 ### Phase 2 — 성능 테스트 / thesis 측정 (Phase 1 동결 후)
 
