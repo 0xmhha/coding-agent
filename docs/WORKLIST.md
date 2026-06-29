@@ -43,7 +43,7 @@
 | #40 | **검색 충분성 게이트** — analyzer §6.0 ANALYSIS→PLANNING 전 unknown 해소(reproduce-first RED 게이트의 검색판) | 0.1.40 |
 | #41 | **harness 안전 hooks** — git-guard(PreToolUse:Bash) + on-stop(Stop) + session-context(SessionStart) + 결정론 테스트(overlay-gates) | 0.1.41 |
 
-**홀드(의도적, 베이스 검증 후):** 검색 캐시(2.1)·lessons.md 학습루프(harness #4) = 새 메커니즘·stale/노이즈 위험 / H 가드레일 = **코드-도출 구현 불변식**으로 재정의(cks 컨벤션-마이닝 의존). **cross-repo(ckg·ckv)** = 다른 세션 정리 중 → Phase 2 직전 빌드+재인덱싱과 배치.
+**홀드(의도적, 베이스 검증 후):** 검색 캐시(2.1)·lessons.md 학습루프(harness #4) = 새 메커니즘·stale/노이즈 위험. **H 가드레일**(코드-도출 구현 불변식)은 협의 D-4로 **해금**(cks `get_invariant_enforcement` 표면 노출이 Phase 2 deliverable 확정 → enabler 도착 시 구현). **cross-repo(ckg·ckv)** = 협의 D-1~D-5 수렴 → Phase 2 재인덱싱(`0bf2f4d1b`·≥1.19·모델축 A/B)과 배치.
 
 ---
 
@@ -190,7 +190,7 @@ pre-commit/CI 후보. P0~P5의 "진짜 개선" 보증을 영구 고정하는 cap
 | **3.5** | **검색 충분성 게이트** (rag-efficiency §4.1) — ANALYSIS→PLANNING 전 unknown 해소 | 4 | ✅ **머지 (PR #40, v0.1.40)** |
 | **4** | **harness hooks** git-guard·Stop·SessionStart | 5 | ✅ **머지 (PR #41, v0.1.41)** — 제안 1~3. 4~7·SubagentStop 잔여 |
 | **홀드** | **검색 캐시**(2.1) / **lessons.md 학습루프**(harness #4) | 4·5 | ⏸ **홀드** — 베이스 검증(Phase 2) 후. stale·노이즈 위험(새 메커니즘) |
-| **홀드** | **H 가드레일 일반화** (구현 불변식) | 1 | ⏸ **홀드·재정의** — 하드코딩 리스트가 아니라 **코드 패턴에서 도출**(cks 컨벤션-마이닝 parity 갭 의존, cross-repo) |
+| **Phase 2 enabled** | **H 가드레일 일반화** (코드-도출 구현 불변식) | 1 | 🟢 **해금됨(협의 D-4)** — `get_invariant_enforcement`의 cks 표면 노출이 Phase 2 deliverable 확정 → enabler 도착 시 구현(3자 인터페이스 공동설계). 하드코딩 아닌 cks 마이닝 |
 | **cross-repo** | **graph-gap P1.5 / cks B3–B5** | 2·3 | 🔵 ckg·ckv 다른 세션 정리 중 → Phase 2 직전 빌드+재인덱싱과 배치 |
 
 ### Phase 2 — 성능 테스트 / thesis 측정 (Phase 1 동결 후)
@@ -201,17 +201,21 @@ pre-commit/CI 후보. P0~P5의 "진짜 개선" 보증을 영구 고정하는 cap
 | **2** | **A/B/C neutral-oracle 판정 + 교차재현** (abc-3way §5 보류분) | run-2로 A가 신뢰가능해짐 → canonical 정답 대조 가능 |
 | **3** | **도메인팩 라이브 무회귀 게이트** + (필요시) Phase 1 교란항목 자체 before/after A/B | 동작보존 최종 확인 |
 
-#### ⚠️ Phase 2 착수 전 — cross-session 결정 (협의 D-1~D-5, 안 닫으면 PR-77 측정 무효/충돌)
+#### ✅ Phase 2 착수 전 cross-session 결정 (협의 D-1~D-5) — **5세션 수렴 완료 (2026-06-29)**
 
-CKV/CKG/CKS 협의(`coordination-response-coding-agent-2026-06-29.md`, CKV 문서 §3-R)에서 제기·미결:
+CKV/CKG/CKS 협의(`coordination-response-coding-agent-2026-06-29.md` §3-R/§3-R2, CKV 문서)에서 전부 합의:
 
-| # | 결정 | 상태 |
+| # | 결정 | 결과 |
 |---|---|---|
-| **D-1** ★ | **재인덱싱 커밋 핀 통일 = `0bf2f4d1b`**(PR-77 버그-부모). CKG 매칭률 그래프 커밋 미지정 → 다른 커밋이면 PR-77 A/B 무효. 1회 재인덱싱으로 3자 커버 제안 | 🔴 **CKG/CKV 합의 대기** |
-| **D-2** | 재인덱싱 그래프 cache SchemaVersion **≥1.19(현 1.22)** 보장(canonical_id 값). coding-agent도 그 그래프에 cks 배선 | 🔴 채택 확인 |
-| **D-3** | parity 분리(위 스트림2): recall툴=불요 / flow·invariant=cks 표면 노출 필요 | ✅ 우리측 정리 |
-| **D-4** | `get_invariant_enforcement`(=코드-도출 구현 불변식·H 가드레일 enabler) Phase 2 deliverable 스케줄 vs post-Phase-2 defer | 🔴 cks/ckv 결정 대기 |
-| **D-5** | ckg #40 R06 precision change가 graph-gap **P3**(suffix-resolver) supersede 여부 | 🔴 CKG 확인 |
+| **D-1** ★ | 재인덱싱 커밋 **`0bf2f4d1b` 통일** | ✅ **합의.** CKG가 `LANG=auto`로 canonical graph.db 빌드·sha 공표 → 3자가 가리킴(독자 빌드 금지). **모델축 2회**: reindex-A(bge-m3)/reindex-B(Qwen3) |
+| **D-2** | SchemaVersion **≥1.19(현 1.22)** | ✅ **합의.** CKG manifest 공표 → coding-agent 배선 전 단언 |
+| **D-3** | parity 분리 | ✅ **합의.** recall=불요 / flow·invariant=cks 표면 노출(CKS 소관) |
+| **D-4** | `get_invariant_enforcement` 일정 | ✅ **Phase 2 deliverable 확정** → **H 가드레일 해금**(홀드→Phase 2 enabled). 조건=3자 인터페이스 공동설계 |
+| **D-5** | R06가 P3 supersede? | ✅ **CKG: NO.** P3=ckg build Resolve 소관 이관. 우리 "~23%"=코드-리딩 추정치 → CKG에 PR #31 종결 역질문 |
+
+> **재인덱싱 일괄(D-1/D-2 합의분):** CKG가 `0bf2f4d1b`·≥1.19·`LANG=auto`로 canonical graph.db 빌드·sha 공표 →
+> CKV 인덱스 동일 커밋, **reindex-A(bge-m3)/reindex-B(Qwen3) 2회**. CKS는 그 그래프 config swap+재시작.
+> coding-agent는 두 인덱스 각각에 cks 배선 → **PR-77 통합 bench**(A=현행 baseline, A→B 델타=임베딩 효과).
 
 > **재인덱싱 일괄(D-1/D-2 충족 시):** 임베딩 교체(bge-m3→Qwen3, dim 1024 유지) + B3(스키마 마이그레이션) +
 > 기타 retrieval-바꾸는 변경을 **`0bf2f4d1b`·≥1.19 그래프 1회 재인덱싱**으로 묶고, 그 위에서 **PR-77 통합 bench =
