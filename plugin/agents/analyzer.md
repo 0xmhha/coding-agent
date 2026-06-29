@@ -237,19 +237,37 @@ if stale (indexed_head != current_head, or changed_files non-empty):
 ```
 If unavailable/fails, record "index stale; analysis may miss recent changes" and continue.
 
-### 3.4 Structural traversal (cks graph)
+### 3.4 Structural traversal (cks graph) — depth gated by the §3.3 tier
+These are the most expensive retrieval calls; spend them in proportion to the §3.3
+`complexity` + `classify` tier — but **NEVER below what completeness requires**. The gate
+only removes work that the tier proves unnecessary; it must not trim enumeration a bugfix
+needs for §4.1 `affected_sites`:
+
+```
+FULL sweep (subgraph + concurrency_impact + §3.5 impact) — REQUIRED when ANY of:
+  complexity == "complex"  |  the §3.3 classify/estimate flagged concurrency (the active
+  pack's concurrency-sensitive classification — same signal that escalates complexity)  |
+  the change touches shared/derived/parallel state (the §5.2b-style derived-state signal).
+REDUCED — allowed ONLY when complexity == "simple" AND the change is local
+  (no concurrency domain, no shared/derived state): ONE get_subgraph(depth=1) on the primary
+  seed; SKIP concurrency_impact; SKIP §3.5 (or depth=1). Note the reduction + its tier in
+  analysis.md so a reviewer / the bench can see the trade.
+When in doubt → FULL. A missed sibling site costs a full bug-cycle (§3.1c), which dwarfs the
+graph-call saving. (Completeness is PRIMARY/COMPLETENESS-tier per §3.0b — this gate touches
+only ENHANCEMENT-tier breadth, never the COMPLETENESS floor.)
+```
 ```
 seeds = top symbols from §3.1b/§3.2 (deduped, qualified names preferred)
-for each seed:
-  subgraph = cks_context_get_subgraph(symbol=seed, depth=2, max_total=200)
+for each seed:                                         # FULL: all seeds; REDUCED: primary only
+  subgraph = cks_context_get_subgraph(symbol=seed, depth=2, max_total=200)   # REDUCED: depth=1
   callers  = cks_context_find_callers(symbol=seed)   # when caller direction is needed
   # concurrency-sensitive paths (consensus/txpool/state/miner/systemcontracts):
-  conc     = cks_context_concurrency_impact(symbol=seed, depth=3, max_total=200)
+  conc     = cks_context_concurrency_impact(symbol=seed, depth=3, max_total=200)  # FULL only
 ```
 Persist as `related-code.json.ckg` (`subgraphs`, `concurrency_impact`). The Evaluator reads
 `concurrency_impact` for its `-race` scope.
 
-### 3.5 Impact analysis (per top-3 seed; skip for code_review-only)
+### 3.5 Impact analysis (per top-3 seed; skip for code_review-only; REDUCED tier may skip — §3.4)
 ```
 impact = cks_context_impact_analysis(symbol=<qualified>, depth = bugfix→2 / feature→3)
 ```
