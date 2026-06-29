@@ -103,7 +103,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | §3.2 ckg silent-incompleteness | 파싱실패 게이트 | ✅ **머지 (A2, ckg #27)** |
 | §3.3 ckg 성능 6종 | N+1·LIKE·SQLite pragma | 🟠 미착수 |
 | §3.4/§3.5 ckg 확장성·ckv 기타 | | 🟠 미착수 |
-| analysis Item 9 CKV 15툴 parity gap | flow/invariants 배선 | 🔴 미착수 (※analyzer가 13툴로 PRIMARY 도달 → 우선순위 재평가 여지) |
+| ~~Item 9 "CKV 15툴 parity gap"~~ → **분리(협의 D-3)** | (a) recall/rerank류 cks 배선 = **불요**(cks가 fusion 소유, 단일 SemanticSearch만 proxy) / (b) **flow·invariant·conventions = cks 표면 노출 필요(미구현)** | (a) 닫힘 / (b) 🔴 cks Phase 2 deliverable 대기(=H 가드레일 enabler, 협의 D-4) |
 
 ## 스트림 3 — graph reasoning gap
 원본: [`graph-reasoning-gap-and-fix-plan-2026-06-19.md`](./graph-reasoning-gap-and-fix-plan-2026-06-19.md)
@@ -201,5 +201,22 @@ pre-commit/CI 후보. P0~P5의 "진짜 개선" 보증을 영구 고정하는 cap
 | **2** | **A/B/C neutral-oracle 판정 + 교차재현** (abc-3way §5 보류분) | run-2로 A가 신뢰가능해짐 → canonical 정답 대조 가능 |
 | **3** | **도메인팩 라이브 무회귀 게이트** + (필요시) Phase 1 교란항목 자체 before/after A/B | 동작보존 최종 확인 |
 
+#### ⚠️ Phase 2 착수 전 — cross-session 결정 (협의 D-1~D-5, 안 닫으면 PR-77 측정 무효/충돌)
+
+CKV/CKG/CKS 협의(`coordination-response-coding-agent-2026-06-29.md`, CKV 문서 §3-R)에서 제기·미결:
+
+| # | 결정 | 상태 |
+|---|---|---|
+| **D-1** ★ | **재인덱싱 커밋 핀 통일 = `0bf2f4d1b`**(PR-77 버그-부모). CKG 매칭률 그래프 커밋 미지정 → 다른 커밋이면 PR-77 A/B 무효. 1회 재인덱싱으로 3자 커버 제안 | 🔴 **CKG/CKV 합의 대기** |
+| **D-2** | 재인덱싱 그래프 cache SchemaVersion **≥1.19(현 1.22)** 보장(canonical_id 값). coding-agent도 그 그래프에 cks 배선 | 🔴 채택 확인 |
+| **D-3** | parity 분리(위 스트림2): recall툴=불요 / flow·invariant=cks 표면 노출 필요 | ✅ 우리측 정리 |
+| **D-4** | `get_invariant_enforcement`(=코드-도출 구현 불변식·H 가드레일 enabler) Phase 2 deliverable 스케줄 vs post-Phase-2 defer | 🔴 cks/ckv 결정 대기 |
+| **D-5** | ckg #40 R06 precision change가 graph-gap **P3**(suffix-resolver) supersede 여부 | 🔴 CKG 확인 |
+
+> **재인덱싱 일괄(D-1/D-2 충족 시):** 임베딩 교체(bge-m3→Qwen3, dim 1024 유지) + B3(스키마 마이그레이션) +
+> 기타 retrieval-바꾸는 변경을 **`0bf2f4d1b`·≥1.19 그래프 1회 재인덱싱**으로 묶고, 그 위에서 **PR-77 통합 bench =
+> 임베딩 before/after A/B**(thesis 수치 + 회귀 동시 산출).
+
 > **한 줄:** Phase 1 = 파이프라인을 *더 정확하게/싸게* 만드는 기능·수정(최우선=fix-synthesis 갭) →
-> 동결 → Phase 2 = 그 위에서 thesis/성능을 측정(F-core A/B/C). 측정은 반드시 기능·수정 동결 이후.
+> 동결 → Phase 2 = 그 위에서 thesis/성능을 측정(F-core A/B/C). 측정은 반드시 기능·수정 동결 이후
+> **그리고 D-1~D-2(재인덱싱 커밋·스키마) 합의 이후.**
