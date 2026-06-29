@@ -15,6 +15,24 @@
 
 ---
 
+## 진척 갱신 (2026-06-29) — 06-22 스냅샷 이후 닫힌 것 + 신규 잔여
+
+06-22 이후 #16~#35 머지로 여러 스트림이 닫혔다. 이 절이 최신 기준, 아래 06-22 절은 이력.
+
+**닫힘(머지):**
+- **스트림6 P1 도메인팩**(최대 작업): Phase 2a/2b/3 전부 머지(#16·#21)+경로fix(#17). 본체 완료.
+- **스트림2 A1·A2**: §3.1 ckv identity(ckv #12)·§3.2 ckg silent-incompleteness(ckg #27)+cks 전파(cks #27). "조용히 틀림" 임베딩·그래프 경로 닫힘.
+- **재현 하드닝**: ADR-0003 2-티어 재현 + 재현/수정타당성 분리(#18·#19·#20·#25), evaluator per-cycle unit gate D-7(#26).
+- **doctor**: read-only 진단 + fix table + allowed-tools/CI(#22·#31·#33, ADR-0002/0004). setup auto repo_root+autonomous(#23·#24).
+- **consequence-of-change side-findings**(#27·#28)+버전 bump(#29). cks **HTTP transport**(#34). docs **3-tier 재편**(#35).
+
+**★ PR-77 blind 재측정 = #32 run-2 (06-25) — thesis 핵심, 완료.** 하드닝 하네스(0.1.32 symptom-bound RED+anti-pivot+idle-window, 0.1.33 focused unit)로 clean blind 재실행:
+- ✅ **원래 실패모드 CLOSED** — run-1은 *틀린 수정을 false-GREEN으로 PR*까지 냈으나, run-2는 3 사이클 모두 증상 오라클에 RED → **false-green 없이 정직하게 BLOCKED**.
+- ✅ **전문가 근본원인(`SetCurrentBlock` currentBlock lag)에 §5c 런타임으로 독립 수렴.**
+- ❌ **남은 약한 고리 = FIX SYNTHESIS**(reproduce/diagnose/verify 아님): planner/implementer가 계속 *add-time-drop* 변형을 골랐고, unit test가 `raw==header tip` 실제 오라클 조건을 안 건드려 masking. → **신규 잔여 2건**(아래 스트림1).
+
+---
+
 ## 이번 세션 진척 (2026-06-22)
 
 MCP 재연결 트랙 + analyzer 단독 검증을 완주:
@@ -58,6 +76,7 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | 2 (d) **F-core full pipeline 라이브 1셀** | red→green 완주 | 🟡 **진입가능** (전제충족·analyzer검증됨·승인+autopilot 대기) |
 | A/B/C 정의 재설계 (whole-approach) | B/C=coding-agent 배제 단독 solver, C=프로젝트 .claude | ✅ **완료 (06-22)** — 정의문서 + `bench-solver-{codeonly,project-skills}` + SKILL §4.4 분기 + `stable-0005-abc.json` |
 | F-core 전체 A/B/C bench | thesis 종착점 | 🟡 **진입가능** (STABLE-0005 매니페스트 준비됨·승인+autopilot 대기) |
+| **fix-synthesis 갭** (run-2 §F a·b) | implementer fix-pattern 가이드(retain-not-drop / account-class gating) + fix-validity unit 규칙(unit이 오라클 실패조건 *exact* exercise) | 🟡 **신규 최우선** (run-2가 가리킨 살아있는 단일 약점; reproduce/diagnose/verify는 닫힘) |
 | 9 H 가드레일 일반화 | 구현 불변식 확장 | ☐ |
 
 ## 스트림 2 — cks/ckg/ckv 하드닝
@@ -66,8 +85,8 @@ MCP 재연결 트랙 + analyzer 단독 검증을 완주:
 | ID | 작업 | 상태 |
 |---|---|---|
 | §2 세션 재시작/운영 반영 | 머지 PR 6개 반영 | ✅ **완료 (06-22, 재연결로 흡수)** |
-| §3.1 ckv identity checksum | 임베딩 공간 교체 감지 | 🔴 미착수 |
-| §3.2 ckg silent-incompleteness | 파싱실패 게이트 | 🔴 미착수 |
+| §3.1 ckv identity checksum | 임베딩 공간 교체 감지 | ✅ **머지 (A1, ckv #12 + cks 전파 #27)** |
+| §3.2 ckg silent-incompleteness | 파싱실패 게이트 | ✅ **머지 (A2, ckg #27)** |
 | §3.3 ckg 성능 6종 | N+1·LIKE·SQLite pragma | 🟠 미착수 |
 | §3.4/§3.5 ckg 확장성·ckv 기타 | | 🟠 미착수 |
 | analysis Item 9 CKV 15툴 parity gap | flow/invariants 배선 | 🔴 미착수 (※analyzer가 13툴로 PRIMARY 도달 → 우선순위 재평가 여지) |
@@ -141,29 +160,31 @@ pre-commit/CI 후보. P0~P5의 "진짜 개선" 보증을 영구 고정하는 cap
 
 ---
 
-## 권장 다음 순서 (2026-06-22 6/19 재검토 반영 — 조정본)
+## 권장 다음 순서 (2026-06-29 — 2단계: 기능 구현·수정 → 성능 테스트)
+
+> **계획 원칙(사용자 지시 2026-06-29):** **기능 구현 및 수정을 먼저** 끝내고, **성능 테스트는 그 뒤에** 한다.
+> 근거는 *교란 의존성* — Phase 1의 파이프라인 동작 변경은 thesis/bench 측정을 교란한다. 따라서
+> 기능·수정을 **동결**한 뒤 베이스라인을 재캡처하고 Phase 2 측정을 돌린다(이전 06-22 절의 "베이스라인 락" 원칙과 동일).
+
+### Phase 1 — 기능 구현 및 수정 (먼저)
+
+| 순위 | 작업 | 스트림 | 근거 |
+|---|---|---|---|
+| **1** | **fix-synthesis 갭 닫기** — implementer fix-pattern 가이드(retain-not-drop / account-class gating) + fix-validity unit 규칙(수정의 unit이 *정확히* 오라클 실패조건을 exercise) | 1 | **run-2(#32)가 가리킨 살아있는 단일 약점.** reproduce/diagnose/verify는 닫혔고 남은 건 fix 합성 품질 = G1 정확성 직결 |
+| **2** | **implementer EvidencePack 재사용**(#1) → 검색 캐시(#2) → 적응형 깊이(#3) | 4 | 저비용·고효과·비교란·즉시 토큰절감. 단독 coding-agent |
+| **3** | **simulation-harness 스킬**(P4 분리) — L1/L2/L3 재현 레벨 라우팅 | 6 | red→green 골격 존재 → 레벨 카탈로그/라우팅만 추가. 비교란 |
+| **4** | **graph-gap P1.5** depth-cap 절단 가시화(additive·재인덱싱 불필요) → P2/P3 정확성 | 3 | P0는 analyzer가 흡수. 저비용 가시성부터 |
+| **5** | **cks 하드닝** §3.3 B3–B5(LIKE·impact·context) → §3.4/§3.5 정리 | 2 | A1/A2 닫힘 → 우선순위 하향. 성능·정리성 fix |
+| **6** | **harness hooks** git-guard·Stop훅·SessionStart | 5 | autonomy=auto 전제. fail-closed 안전성 |
+| **7** | **H 가드레일 일반화** (구현 불변식 확장) | 1 | |
+
+### Phase 2 — 성능 테스트 / thesis 측정 (Phase 1 동결 후)
 
 | 순위 | 작업 | 근거 |
 |---|---|---|
-| **1** | **스트림1 (d) F-core full pipeline 라이브 1셀** | 유일한 진짜 미완 *실행*·thesis 종착점. 전제(analyzer검증·MCP재연결·bench코드) 충족 → **승인+autopilot+오염정리만** 남음 |
-| **2 (병렬)** | **스트림4 3.1 + 2.2 + 4.1** (저노력·고효과) | coding-agent 단독·차단 없음·즉시 비용절감. (3.1=implementer EvidencePack 재사용이 최우선) |
-| **3** | **스트림2 §3.1 ckv identity + §3.2 ckg silent-incompleteness** | (d) 측정의 정확도 지표 신뢰성 보존. (d) 실행을 막지는 않음 |
-| **4 (하향)** | **스트림3 P1.5 → P2/P3** (P0 제외) | P0는 analyzer가 흡수(반증). 살아남는 건 저비용 가시성(P1.5)·정확성(P2/P3) |
-| **보류** | parity gap · query-eval · 스트림5 hooks | parity는 analyzer 13툴 PRIMARY 도달로 근거 약화 / query-eval 범위밖 / hooks는 autonomy=auto 전제 |
+| **1** | **F-core 전체 A/B/C 라이브 bench** | full-pipeline-thesis 종착점. Phase 1 동결 후 베이스라인 재캡처하고 측정 |
+| **2** | **A/B/C neutral-oracle 판정 + 교차재현** (abc-3way §5 보류분) | run-2로 A가 신뢰가능해짐 → canonical 정답 대조 가능 |
+| **3** | **도메인팩 라이브 무회귀 게이트** + (필요시) Phase 1 교란항목 자체 before/after A/B | 동작보존 최종 확인 |
 
-### 스트림6 오버레이 트랙 통합 순서 (thesis 트랙과의 관계)
-
-오버레이 개선(P0~P5)은 위 thesis/cks 트랙과 **별개 축**이지만, **교란 의존성**으로 끼워 넣어야 한다:
-
-| 단계 | 작업 | 근거·의존 |
-|---|---|---|
-| **A. 즉시·병렬** | 스트림6 **P2·P5** + 스트림6 **P4** | 파이프라인 비교란 → thesis 측정과 무관하게 아무 때나. P2는 PR-77 오라클로 단독 평가 |
-| **B. 베이스라인 락 이후** | 스트림6 **P0** | 계약 기계검증은 파이프라인 동작을 바꿈 → **스트림1 F-core 베이스라인 캡처 후** 착수(또는 자체 A/B) |
-| **C. 갱신 게이트** | 스트림6 **P3** | 모델 핀 갱신은 동일 픽스처 bench A/B로 무회귀 게이트 통과 시에만 |
-| **D. 대형 확장** | 스트림6 **P1** | 도메인팩 계약 = 최대 작업. 반드시 *무리팩터 이동→무회귀 락→일반화* 순. P0 구조화 산출물·P2 degraded 전파와 맞물림 |
-
-> **두 트랙 합본 1줄 우선순위**: ①스트림1 F-core 라이브(thesis 종착·overlay 교란분의 베이스라인) →
-> ②스트림6 P2·P5 + 스트림4 저비용(병렬·비교란) → ③스트림6 P0 + 스트림2 §3.1/§3.2(정확도 신뢰성) →
-> ④스트림6 P3(게이트) → ⑤스트림6 P1(도메인팩 대형) → ⑥스트림6 P4 + 잔여 문서정리.
-
-**한 줄**: 6/19 문서는 "분석 끝·구현 0", graph-gap P0 전제는 6/22 검증으로 흔들림 → 진짜 중단된 건 **F-core (d) 하나뿐 = 1순위**. 그 위에 **오버레이 트랙(스트림6)**은 *비교란 P2·P5·P4 즉시 / 교란 P0·P3·P1은 F-core 베이스라인 캡처 후* 끼워 넣는다.
+> **한 줄:** Phase 1 = 파이프라인을 *더 정확하게/싸게* 만드는 기능·수정(최우선=fix-synthesis 갭) →
+> 동결 → Phase 2 = 그 위에서 thesis/성능을 측정(F-core A/B/C). 측정은 반드시 기능·수정 동결 이후.
