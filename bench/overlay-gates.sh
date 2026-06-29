@@ -53,6 +53,9 @@ echo "setup / doctor (env onboarding + remediation routing)"
 run "setup tests (autonomous guard, repo_root_env)"       python3 plugin/scripts/tests/test_setup.py
 run "doctor tests (fix-table coverage, remediation)"      python3 plugin/scripts/tests/test_doctor.py
 echo
+echo "safety hooks (git-guard / on-stop / session-context)"
+run "hooks deterministic guards"                          python3 bench/hooks/test_hooks.py
+echo
 echo "bench measurement infra"
 run "bench unit tests"                                     python3 -m unittest bench.tests.test_usage bench.tests.test_report
 
