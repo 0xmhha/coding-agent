@@ -376,12 +376,21 @@ diff = git -C {repo_root} diff main...HEAD        (the fix surface; for e2e the 
    reproduction test, or the changed surface is suspiciously narrower than the `must_fix` sites.
    This is not mechanically decidable → do NOT hard-FAIL; record the suspicion, set WARN, add the
    `needs-careful-review` label, and surface it in the PR body for a human to judge.
+6. **Unit-oracle fidelity** (bugfix with a fix-owned unit test): the fix's own unit test should
+   trigger on the SAME condition the acceptance oracle (`reproduction.json`) fails on. Flag when
+   the unit's triggering input looks like a *convenient neighbour* of the oracle's (it greens on a
+   near-but-different value/timing) rather than the exact oracle-failing condition — a "unit green
+   / oracle red" divergence means the unit is not evidence of the fix and a future regression of
+   this path would slip the per-cycle unit gate. Also flag a `downstream-compensate` fix (a new
+   drop/evict/override guard) gated on a **proxy** discriminator (value equality / flag
+   coincidence) that could collide with the legitimate case (planner §5.2c). Judgmental → WARN +
+   `needs-careful-review`; do not hard-FAIL (the oracle verdict §4.7 is the binding gate).
 
 **Verdict:**
 ```
 fix_validity_verdict =
-  "FAIL" if any of checks 1–4 fail        (→ bug cycle; route per the failing check above)
-  "WARN" else if check 5 flags overfit    (→ PASS allowed, needs-careful-review)
+  "FAIL" if any of checks 1–4 fail          (→ bug cycle; route per the failing check above)
+  "WARN" else if check 5 or 6 flags         (→ PASS allowed, needs-careful-review)
   "PASS" otherwise
 ```
 Persist `reproduction.json.fix_validity_verdict` (+ a `validity_findings[]` list of the failing/
