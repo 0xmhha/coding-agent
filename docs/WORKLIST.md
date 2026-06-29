@@ -217,6 +217,27 @@ CKV/CKG/CKS 협의(`coordination-response-coding-agent-2026-06-29.md` §3-R/§3-
 > CKV 인덱스 동일 커밋, **reindex-A(bge-m3)/reindex-B(Qwen3) 2회**. CKS는 그 그래프 config swap+재시작.
 > coding-agent는 두 인덱스 각각에 cks 배선 → **PR-77 통합 bench**(A=현행 baseline, A→B 델타=임베딩 효과).
 
+#### 📥 Phase 2 트리거 — CKG 정본 그래프 수신 (2026-06-29, [CKG → coding-agent])
+
+CKG가 정본 그래프를 공표했다(3자 공통, **독자 재빌드 금지**). D-1/D-2 충족 확인:
+
+| 항목 | 값 |
+|---|---|
+| graph.db | `/tmp/ckg-eval/stablenet-0bf2f4d1bfeb/graph.db` (⚠️ tmp = 휘발 → sha로 동일성 확인, 영속 위치 확보 필요) |
+| commit | `0bf2f4d1b` (D-1 ✅) |
+| schema | **1.23** (D-2 ✅ ≥1.19; 협의 시점 1.22→1.23 상향, 게이트 충족) |
+| sha256 | `16ee6fb70b7391b1dcf792c58cbcef78b7584dd90e092fe349eeac51222c9f78` |
+
+**coding-agent action items (Phase 2):**
+1. ☐ **D-5 답 relay (→ CKG):** "~23% recall"은 **fixture/툴 측정 아님** — `graph-reasoning-gap` 문서가
+   `ckg internal/parse/golang/resolve.go:30-71`을 **코드-리딩**해 붙인 추정치(명명 fixture 없음). 이미
+   §3-R2로 답함 → CKG에 그대로 전달. **역질문**: PR #31(`simple_name` suffix lookup)이 cross-package
+   random-binding+silent-drop을 닫았나? 닫혔으면 P3 종결, 남았으면 affected_sites 완전성 위협.
+2. ☐ **cks 배선 (재인덱싱 그래프):** cks config가 위 graph.db(sha 검증 + manifest `schema_version`≥1.19
+   단언) + **CKV reindex-A(bge-m3) 인덱스**를 가리키게 함. ⚠️ **선행 의존**: 이 ckg 그래프만으론 부족 —
+   **CKV reindex-A 벡터 인덱스 + CKS config swap**이 와야 cks가 서빙. (현재 ckg 그래프만 수신.)
+3. ☐ **PR-77 통합 bench:** reindex-A(bge-m3)=현행 baseline, reindex-B(Qwen3)=A→B 임베딩 델타. 두 인덱스 각각 측정.
+
 > **재인덱싱 일괄(D-1/D-2 충족 시):** 임베딩 교체(bge-m3→Qwen3, dim 1024 유지) + B3(스키마 마이그레이션) +
 > 기타 retrieval-바꾸는 변경을 **`0bf2f4d1b`·≥1.19 그래프 1회 재인덱싱**으로 묶고, 그 위에서 **PR-77 통합 bench =
 > 임베딩 before/after A/B**(thesis 수치 + 회귀 동시 산출).
