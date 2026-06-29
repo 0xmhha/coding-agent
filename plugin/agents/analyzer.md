@@ -280,6 +280,8 @@ Write `{workspace_dir}/analysis.md` with: `# Analysis — {ticket_id}`, `## Tick
 `## Impact Analysis`, `## Risk Assessment`, and `## Open Questions`. For `bugfix`, also
 include `## Root cause` (§4) and `## Reproduction` (§5). Minimum length > 200 chars
 (required by `state-machine.transition`'s completeness check).
+`## Open Questions` is not decorative — it is the input to the §6.0 search-sufficiency gate:
+list every unknown the design will need, so the gate can resolve or flag each before handoff.
 
 ### 3.7 Persist related-code.json
 `{ "pack": {...}, "ckv": [...], "ckg": { "subgraphs": [...], "concurrency_impact": [...] },
@@ -708,6 +710,37 @@ incremented on re-entry; do NOT count files).
 ---
 
 ## 6. Hand off to the Planner (transition ANALYSIS → PLANNING)
+
+### 6.0 Search-sufficiency gate (pre-handoff — "can the Planner design without guessing?")
+
+Before transitioning, self-check that retrieval is COMPLETE enough for a guess-free design —
+the search-layer mirror of the reproduce-first RED gate. An incomplete analysis that proceeds
+forces the Planner to GUESS, and a wrong guess costs a full IMPLEMENT→EVALUATION bug cycle —
+far more than one more targeted search now (§3.1c total-cost logic).
+
+1. **Enumerate the unresolved unknowns** the design will need but retrieval has NOT pinned —
+   each is something the Planner would otherwise guess. Typical unknowns:
+   - the real signature / type / return of a symbol the fix will change;
+   - a caller / consumer / write-site not yet enumerated (bugfix: the §4.1 `affected_sites`
+     closure — an empty or thin closure on a non-trivial change is itself an unknown);
+   - an invariant / precondition the change must preserve (domain-pack backstop / cks guidance);
+   - the ACTUAL current behavior at a cited `file:line` whose excerpt you have not read.
+   These are exactly the entries of analysis.md `## Open Questions`.
+2. **Classify + resolve each:**
+   - **retrieval-resolvable** (a targeted cks call would answer it) → do ONE focused search to
+     close it (`find_symbol` / `find_callers` / `search_text` / a narrow `get_for_task`
+     follow-up); record the answer + the edge that closed it. Bounded: one targeted pass per
+     unknown, NOT an open-ended re-sweep (honor §3.0b tiers + §3.4 depth gate).
+   - **external** (needs the ticket author / a human, or is a genuine design choice) → it MAY
+     remain, but FLAG it in `## Open Questions` as `BLOCKING-design` or `design-choice` so the
+     Planner sees it explicitly. Never pass an unresolved unknown silently.
+3. **Gate:** do NOT transition while a **retrieval-resolvable** unknown is still open. Update
+   `## Open Questions` to: resolved (with the closing edge) + remaining (external, flagged), and
+   journal the result in findings.log (`search_sufficiency: N unknowns, M resolved, K external`).
+
+General (fresh + bugfix): for a bugfix it folds in the §4.1 `affected_sites` completeness; for a
+feature it is mostly signatures/types/callers/invariants. The cost asymmetry is the whole point —
+one bounded search closed here is cheaper than the bug cycle a guessed design triggers.
 
 ```
 state-machine.transition(workspace_dir, "ANALYSIS", "PLANNING",
