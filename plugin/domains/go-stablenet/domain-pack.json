@@ -8,6 +8,7 @@
   },
   "invariants": "invariants.md",
   "context_classifier": "context.md",
+  "simulation": "simulation.md",
 
   "verification": {
     "_doc": "Build/test contract the Evaluator consumes (Phase 2b). Commands are run in repo_root; templates use {pkgs}/{cover_out} placeholders the Evaluator fills. `stages` drives the §3 loop (kind: builtin:* | mcp:*) — data-driven dispatch lands in Phase 2b-β. NOTE: a stage's MCP tool (e.g. chainbench) must still be granted in the Evaluator frontmatter — MCP grants are static (not pack-driven).",
