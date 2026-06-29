@@ -526,6 +526,11 @@ function signatures, types, and error returns.)
 #### Tests
 - Existing tests that must still pass: ...
 - New tests to add: ...
+- Oracle fidelity (bugfix): the fix's own unit test MUST trigger on the SAME condition the
+  acceptance oracle (`reproduction.json`) fails on — the same boundary / equality / timing
+  that makes the symptom fire — not a convenient neighbouring input. A unit that greens on a
+  near-but-different input while the oracle stays red is not evidence (the recurring "unit
+  green / oracle red" miss). Name the exact triggering condition the unit reproduces.
 ```
 
 ### 5.2b Derived-state / write-site completeness (REQUIRED when §5.2 flags derived state)
@@ -592,6 +597,40 @@ design hole the Evaluator FAILs on — not a default.
 > skill applies at **diagnosis time** (§6 bug cycle / `/diagnose`): a value plus every
 > copy/cache of it, maintained/invalidated at every edge. Forward here (source → keep
 > all consumers consistent); backward there (symptom → which copy went stale).
+
+### 5.2c Fix-pattern selection — correct the source, don't compensate downstream (bugfix)
+
+When the root cause is "a value V is wrong (stale / miscomputed) and some consumer C made a
+wrong decision from V", two fix shapes are possible:
+
+- **source-correct** — fix V at its producer so every decision derived from V becomes correct
+  automatically (the broken lifecycle edge from `root-cause-lifecycle`).
+- **downstream-compensate** — leave V wrong and add a new remediation at/after C (drop / evict /
+  override / re-filter) that patches the *effect* of the wrong V.
+
+**Default to source-correct.** Choose downstream-compensate only when you can state why
+correcting V at the source is impossible. downstream-compensate is the most common
+wrong-but-green fix:
+
+1. V stays wrong → *other* consumers of V still misbehave. The reproduction oracle can green
+   while a sibling path (§5.2b) stays broken — incomplete by contract (Evaluator §4.8 check 2).
+2. The compensation must tell the legitimate case from the buggy one, and tends to use a
+   **proxy discriminator** (a convenient heuristic — a value equality, a flag coincidence)
+   instead of the **authoritative** distinction. A proxy can *coincide* with the legitimate
+   case → the guard over-fires (harms valid inputs) or under-fires (misses the bug). On the
+   exact reproduction input a proxy is especially likely to collide.
+
+A downstream remediation is justified ONLY when V legitimately changes over time and *past
+decisions made under the old V must be revisited* (the consequence-of-change case,
+`root-cause-lifecycle` 귀결 점검) — and even then it must be gated on the **authoritative
+discriminator** for "must this past decision be revisited?", never a proxy that can equal the
+legitimate value. State the discriminator in the design and show it does NOT collide with the
+reproduction input.
+
+Record the chosen pattern in this step's design: `fix_pattern: source-correct |
+downstream-compensate` + a one-line reason. Choosing `downstream-compensate` while a
+source-correct edge exists in `affected_sites` (`must_fix:true`) is a design smell the
+self-review (§5.3) must justify or revise.
 
 ### 5.3 Self-review loop
 

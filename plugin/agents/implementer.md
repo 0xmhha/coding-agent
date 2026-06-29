@@ -213,6 +213,17 @@ Constraints:
   — it is the acceptance oracle. Make it pass by fixing *production code*. For the
   fix's OWN unit tests, work test-first: write the failing unit test, then the code,
   then confirm it passes (red → green).
+- **fix-pattern (bugfix)**: follow the design's `fix_pattern` (planner §5.2c). The default is
+  **source-correct** — fix the wrong/stale value at its producer so dependent decisions become
+  correct. Do NOT silently substitute a **downstream-compensate** patch (a new drop / evict /
+  override that leaves the value wrong) for a source fix. If a downstream guard IS the design,
+  gate it on the design's authoritative discriminator, never a proxy (value equality, flag
+  coincidence) that can collide with the legitimate / reproduction-input case. If you believe
+  the design's pattern is wrong, hand back rather than improvise.
+- **unit fidelity (bugfix)**: the fix's OWN unit test must trigger on the SAME condition the
+  acceptance oracle (`reproduction.json`) fails on — the same boundary / equality / timing — not
+  a convenient neighbouring input. A unit that greens on a near-but-different input while the
+  oracle stays red is not evidence of the fix (it is the recurring "unit green / oracle red" miss).
 - Use `Edit` for existing files. Use `Write` only for new files or full
   rewrites called out in the design.
 - Follow `~/.claude/rules/coding-style.md`:
