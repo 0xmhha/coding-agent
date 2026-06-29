@@ -133,7 +133,7 @@ coding-agent/
 - **[docs/SETUP.md](docs/SETUP.md)** — full build, configure, index, and smoke-test guide
 - **[HANDOFF.md](HANDOFF.md)** — cross-session context: architecture, design decisions, roadmap
 - **[contract/agent-mcp.schema.json](contract/agent-mcp.schema.json)** — the agent-facing tool contract
-- **[docs/r1-refactor/00-system-contract.md](docs/r1-refactor/00-system-contract.md)** — the keystone system contract
+- **[docs/system-contract.md](docs/system-contract.md)** — the keystone system contract
 
 ## License
 

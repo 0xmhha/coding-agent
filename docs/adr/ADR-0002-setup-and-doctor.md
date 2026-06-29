@@ -1,7 +1,10 @@
 # ADR — `/coding-agent:setup` 확장 + `/coding-agent:doctor` (환경 셋업·진단)
 
 문서 성격: **ADR / 설계 결정 (ACCEPTED 2026-06-23 — 설계 합의됨, 코드 변경 0).** 짝:
-[`scripts/setup.py`](../plugin/scripts/setup.py)(기존 셋업) · [`domain-pack-contract-adr-2026-06-22.md`](./domain-pack-contract-adr-2026-06-22.md)(repo_root_env 출처).
+[`scripts/setup.py`](../../plugin/scripts/setup.py)(기존 셋업) · [`domain-pack-contract-adr-2026-06-22.md`](./ADR-0001-domain-pack-contract.md)(repo_root_env 출처).
+
+> **구현 상태 갱신 (코드 검증 2026-06-28):** 구현됨. `plugin/commands/{setup,doctor}.md`·
+> `plugin/scripts/{setup,doctor}.py` 존재, PR #22·#23 머지 (v0.1.30). 위 "코드 변경 0"은 작성 시점 기준.
 
 > **결정 한 줄:** "go-stablenet 루트에서 claude 실행 → 플러그인 명령으로 작업"이라는 실사용 흐름에서,
 > **(1) `setup`이 의사결정을 묻지 않고** repo_root_env(=현재 repo 루트)·env·allowlist를 settings에 기록하고,

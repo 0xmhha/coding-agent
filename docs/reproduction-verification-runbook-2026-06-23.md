@@ -2,7 +2,7 @@
 
 문서 성격: **검증 runbook (재사용).** 대상 변경: PR #18(2-티어 재현 + 재현/타당성 verdict 분리),
 #19(재현 하드 게이트, v0.1.26), #20(ADR). 짝 문서:
-[`reproduction-and-fix-validity-adr-2026-06-23.md`](./reproduction-and-fix-validity-adr-2026-06-23.md).
+[`adr/ADR-0003-reproduction-and-fix-validity.md`](./adr/ADR-0003-reproduction-and-fix-validity.md).
 
 > **목적:** 별도 세션에서 실제 bugfix 파이프라인을 돌려, 재현이 *강제*되는지 / 게이트가 재현 없이는
 > *막는지* / 두 verdict가 *분리*되는지를 **아티팩트 증거로** 판정한다. 명세(.md)만 바뀌었으므로

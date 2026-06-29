@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Author | design session, 2026-06-08 |
-| Depends on | `docs/r1-refactor/00-system-contract.md` (C1 boundary), `docs/r1-refactor/07-domain-knowledge-curation.md` (entry model + promotion), `docs/r1-refactor/10-cycle1-followup-and-backlog.md` (ROI gate) |
+| Depends on | `docs/system-contract.md` (C1 boundary), `docs/archive/r1-refactor/07-domain-knowledge-curation.md` (entry model + promotion), `docs/archive/r1-refactor/10-cycle1-followup-and-backlog.md` (ROI gate) |
 | Touches repos | `coding-agent` (capture + curate), `code-knowledge-system` (entry store + sync) |
 | Non-goals | A hot-reload index; an auto-verify path; replacing the human curator |
 

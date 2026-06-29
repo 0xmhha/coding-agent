@@ -3,6 +3,7 @@
 > **Status:** Draft for review · **Date:** 2026-06-01 · **Owner:** architecture consultation
 > **Scope:** The single source of truth (SSoT) for how `coding-agent`, `code-knowledge-system` (cks), `code-knowledge-vector` (ckv), `code-knowledge-graph` (ckg), and `chainbench` connect to deliver the Jira→merge automation pipeline for the `go-stablenet` project.
 > **Derives:** All five per-project refactoring docs (`01`–`05`) derive their required interfaces from this document. Do not change a cross-project contract in a per-project doc; change it here first.
+> **Note (2026-06-28, doc-organize):** promoted from `r1-refactor/00-system-contract.md` to a live Tier-2 doc. The R1′ cycle's per-repo specs/plans (`01`–`05`, `plans/`) referenced below are archived under [`archive/r1-refactor/`](archive/r1-refactor/).
 
 ---
 

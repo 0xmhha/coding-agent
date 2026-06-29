@@ -523,7 +523,7 @@ NECESSARY runtime conditions (idle/empty-block window, timing, account class, fe
 CONSTRUCT them in the setup (e2e: §5b step 3b idle window). Only after a faithful setup *still*
 fails to reproduce may you downgrade the hypothesis. **Never swap to a different, more-easily-
 reproducible defect and call it this ticket** — that is precisely how a fix lands on the wrong
-root cause (see docs/test/pr-77 fidelity analysis).
+root cause (see docs/archive/test/pr-77 fidelity analysis).
 
 If, after a faithful setup honoring the above, the symptom genuinely cannot be made RED, this is
 `reproduction_unobtainable`:

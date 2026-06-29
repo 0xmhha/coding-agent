@@ -1,8 +1,8 @@
 # ADR — doctor→setup remediation routing + single-source fix table (P-A + P-B)
 
 문서 성격: **ADR / 설계 결정 (ACCEPTED 2026-06-26 — fix-table는 doctor.py 내 데이터로 합의).** 짝:
-[`scripts/doctor.py`](../plugin/scripts/doctor.py) · [`commands/doctor.md`](../plugin/commands/doctor.md) ·
-[`scripts/setup.py`](../plugin/scripts/setup.py) · 선행 [`setup-doctor-adr-2026-06-23.md`](./setup-doctor-adr-2026-06-23.md).
+[`scripts/doctor.py`](../../plugin/scripts/doctor.py) · [`commands/doctor.md`](../../plugin/commands/doctor.md) ·
+[`scripts/setup.py`](../../plugin/scripts/setup.py) · 선행 [`setup-doctor-adr-2026-06-23.md`](./ADR-0002-setup-and-doctor.md).
 참조 사례: midnight-expert 마켓플레이스(`references/midnight-expert`)의 2단 doctor + `fix-table.md`.
 
 > **결정 한 줄:** doctor가 감지하는 **모든** 결함을 빠짐없이 정확한 다음 행동(주로 `/coding-agent:setup`)으로

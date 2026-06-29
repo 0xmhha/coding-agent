@@ -443,7 +443,8 @@ resolves in your Claude Code build.
 ## 10. What to look at next
 
 - `contract/agent-mcp.schema.json` — the C1 SSoT for every agent-facing tool
-- `docs/r1-refactor/` — the system contract + per-project refactor specs/plans
+- `docs/system-contract.md` — the keystone system contract (per-project refactor
+  specs/plans are archived under `docs/archive/r1-refactor/`)
 - `tools/jira-gateway-mcp/README.md` — jira-gateway server documentation
 - the sibling `code-knowledge-system` and `chainbench` repos — cks and
   chainbench server documentation

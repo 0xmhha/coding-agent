@@ -1,5 +1,5 @@
 {
-  "_doc": "Domain pack for go-stablenet — the reference instance of the domain-pack contract (ADR docs/domain-pack-contract-adr-2026-06-22.md). Phase 2a wires identity + invariants + context_classifier into the agents. Phase 2b (this) promotes the former `_phase2` block to the live `verification` contract: the Evaluator sources repo root + build/test commands from here. The stage LOOP (verification.stages) is data-driven in Phase 2b-β. Resolved at runtime via the generic `domain-pack` loader skill keyed by state.project_id.",
+  "_doc": "Domain pack for go-stablenet — the reference instance of the domain-pack contract (ADR docs/adr/ADR-0001-domain-pack-contract.md). Phase 2a wires identity + invariants + context_classifier into the agents. Phase 2b (this) promotes the former `_phase2` block to the live `verification` contract: the Evaluator sources repo root + build/test commands from here. The stage LOOP (verification.stages) is data-driven in Phase 2b-β. Resolved at runtime via the generic `domain-pack` loader skill keyed by state.project_id.",
   "project_id": "go-stablenet",
   "ticket_namespace": "STABLE",
   "knowledge": {
