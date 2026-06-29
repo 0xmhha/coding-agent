@@ -203,9 +203,20 @@ log to {workspace_dir}/logs/impl.log:
 ```
 read the design block for this step from design-v{final}.md
 for each target_file in step.target_files:
-  read it
+  # Reuse retrieved evidence — do NOT full-Read a file the pipeline already pulled.
+  # The design block quotes the span being changed as
+  #   "#### Current code (excerpt) file:{path} lines {a}-{b}"   (planner §5.2),
+  # and {workspace_dir}/related-code.json carries the analyzer's pack spans for {path}.
+  # Prefer a SCOPED Read(offset, limit) around the cited range (pad ±~20 lines for edit
+  # context). Full-Read this file ONLY when the design cites no line range for it, or the
+  # edit needs structure outside the cited span (e.g. a new import, a sibling function).
   apply the design's edits using Edit (preferred over Write for existing files)
 ```
+
+This is the consumer side of the same reuse rule the analyzer follows (§3.1b "a span the
+pack already gave you is NOT re-Read"): the excerpt + EvidencePack already loaded this code
+once upstream, so re-loading the whole file from disk is the pipeline's largest avoidable
+re-load. Read the delta, not the file.
 
 Constraints:
 
