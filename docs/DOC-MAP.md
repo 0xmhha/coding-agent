@@ -48,6 +48,7 @@
 | [rag-context-efficiency-proposals-2026-06-19.md](rag-context-efficiency-proposals-2026-06-19.md) | 활성 | 3.1·2.2·4.1 머지(#38·#40); 2.1 캐시 홀드; 2.3/2.4/3.2/3.3 잔여 |
 | [harness-improvement-proposals-2026-06-17.md](harness-improvement-proposals-2026-06-17.md) | 활성 | 제안 1~3(git-guard·Stop·SessionStart) 머지(#41); 4~7 잔여 |
 | [reproduction-verification-runbook-2026-06-23.md](reproduction-verification-runbook-2026-06-23.md) | 재사용 절차 | ADR-0003 라이브 검증 프로토콜 |
+| [coordination-response-coding-agent-2026-06-29.md](coordination-response-coding-agent-2026-06-29.md) | 협의 스냅샷 | CKV §3 회신 — cks 도구 계약·bench·flow/invariant parity 갭·임베딩 A/B(Phase 2) |
 
 ## 아카이브 (`archive/`) — 완료·superseded (이력 보존, 삭제 금지)
 
