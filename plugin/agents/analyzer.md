@@ -61,6 +61,7 @@ skills:
   - domain-pack
   - root-cause-lifecycle
   - reproduce-first
+  - simulation-harness
   - investigative-probe
 ---
 
@@ -467,7 +468,16 @@ tier = e2e  if any rule-1 trigger present
 escalate simulation → e2e when §5a RED cannot be honestly obtained
 ```
 
-### 5a. simulation tier — in-process Go test
+**Level within the tier + cost down-push** (`simulation-harness` skill). The rules above are
+authoritative for faithfulness; the skill only refines them. It splits `simulation` into **L1**
+(pure/contained unit) vs **L2** (real subsystem objects stood up in ONE process — not a stub) and,
+**before escalating to e2e**, has you check whether the active pack offers a *faithful* in-process
+**L2** harness for the symptom — if so, reproduce at L2 (seconds) instead of L3 (minutes). This
+down-push is cost-only: it does **NOT** loosen rule 1, and "L2 is faster" is never a reason to pull
+an e2e-required symptom down. When unsure, escalate (under-push). The pack's L2 building blocks for
+this project come from the active domain pack (`${CLAUDE_PLUGIN_ROOT}/domains/{project_id}/simulation.md`).
+
+### 5a. simulation tier — in-process Go test (L1 or L2 — `simulation-harness`)
 ```
 1. From "재현 방법" + the §4 root cause, author a minimal deterministic Go test named
    TestReproduce_{slug} at the correct package (or extend an existing _test.go).
