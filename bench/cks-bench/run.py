@@ -81,7 +81,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=None,
         metavar="DIR",
-        help="Override output directory (default: runs/<experiment> inside ckg-bench/).",
+        help="Override output directory (default: runs/<experiment> inside cks-bench/).",
     )
     return p
 

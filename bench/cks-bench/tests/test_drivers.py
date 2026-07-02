@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 
-# Ensure the ckg-bench package root is on the path
+# Ensure the cks-bench package root is on the path
 _BENCH_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _BENCH_ROOT not in sys.path:
     sys.path.insert(0, _BENCH_ROOT)

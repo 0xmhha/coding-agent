@@ -24,7 +24,7 @@ if _BENCH_ROOT not in sys.path:
     sys.path.insert(0, _BENCH_ROOT)
 
 # Detect the repo root: two levels above the bench directory.
-# ckg-bench is at:  <repo>/.coding-agent/bench/ckg-bench
+# cks-bench is at:  <repo>/.coding-agent/bench/cks-bench
 _REPO_ROOT = os.path.abspath(os.path.join(_BENCH_ROOT, "..", "..", ".."))
 _HAS_REPO = os.path.isdir(os.path.join(_REPO_ROOT, "consensus"))
 

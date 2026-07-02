@@ -113,7 +113,7 @@ class CKSClient:
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "ckg-bench", "version": "0.1"},
+                "clientInfo": {"name": "cks-bench", "version": "0.1"},
             },
         })
         if "error" in init:

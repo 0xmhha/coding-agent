@@ -19,7 +19,7 @@
       "properties": {
         "source": {
           "type": "string",
-          "description": "Path (relative to ckg-bench root) to the golden-set index YAML or a glob pattern.",
+          "description": "Path (relative to cks-bench root) to the golden-set index YAML or a glob pattern.",
           "default": "golden-set/index.yaml"
         },
         "ids": {
@@ -68,7 +68,7 @@
     },
     "output_dir": {
       "type": "string",
-      "description": "Directory (relative to ckg-bench root) where run artifacts are written. Defaults to 'runs/<experiment>'.",
+      "description": "Directory (relative to cks-bench root) where run artifacts are written. Defaults to 'runs/<experiment>'.",
       "default": ""
     },
     "driver_config": {

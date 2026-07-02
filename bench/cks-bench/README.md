@@ -8,7 +8,7 @@ Graph** improves AI code understanding of go-stablenet.
 ## Layout
 
 ```
-.coding-agent/bench/ckg-bench/
+.coding-agent/bench/cks-bench/
 ├── README.md
 ├── qa-manifest.schema.json    # JSON Schema for manifest files
 ├── __init__.py
@@ -82,29 +82,29 @@ Graph** improves AI code understanding of go-stablenet.
 
 ```bash
 # Run tests offline (no AI, no cks)
-python3 -m unittest discover -s .coding-agent/bench/ckg-bench/tests
+python3 -m unittest discover -s .coding-agent/bench/cks-bench/tests
 
 # Validate golden-set against repo
-python3 .coding-agent/bench/ckg-bench/validate_golden.py --offline
+python3 .coding-agent/bench/cks-bench/validate_golden.py --offline
 
 # Dry run (validate + print plan, no LLM calls)
-python3 .coding-agent/bench/ckg-bench/run.py \
-  --manifest .coding-agent/bench/ckg-bench/manifests/default.json \
+python3 .coding-agent/bench/cks-bench/run.py \
+  --manifest .coding-agent/bench/cks-bench/manifests/default.json \
   --dry-run
 
 # Replay run (deterministic, no live AI)
-python3 .coding-agent/bench/ckg-bench/run.py \
-  --manifest .coding-agent/bench/ckg-bench/manifests/default.json \
+python3 .coding-agent/bench/cks-bench/run.py \
+  --manifest .coding-agent/bench/cks-bench/manifests/default.json \
   --driver replay
 
 # Resume interrupted run
-python3 .coding-agent/bench/ckg-bench/run.py \
-  --manifest .coding-agent/bench/ckg-bench/manifests/default.json \
+python3 .coding-agent/bench/cks-bench/run.py \
+  --manifest .coding-agent/bench/cks-bench/manifests/default.json \
   --continue
 
 # Live run (requires claude CLI + cks MCP server)
-python3 .coding-agent/bench/ckg-bench/run.py \
-  --manifest .coding-agent/bench/ckg-bench/manifests/default.json \
+python3 .coding-agent/bench/cks-bench/run.py \
+  --manifest .coding-agent/bench/cks-bench/manifests/default.json \
   --driver claude_cli
 ```
 
@@ -169,7 +169,7 @@ It is also separate from the Go `code-knowledge-system/cmd/cks-eval` tool
 
 - bench-orchestration: coding task completion quality
 - cks-eval: CKG retrieval quality
-- **ckg-bench (this)**: AI answer quality with different CKG context strategies
+- **cks-bench (this)**: AI answer quality with different CKG context strategies
 
 The golden-set YAML schema is compatible with cks-eval v1 (additive fields
 only), so questions can be cross-referenced.

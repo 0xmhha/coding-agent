@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-# Hyphenated dir (matches ckg-bench/ckg-eval) — not importable as a package, so
+# Hyphenated dir (matches cks-bench/cks-eval) — not importable as a package, so
 # put this dir on the path and import siblings directly.
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
