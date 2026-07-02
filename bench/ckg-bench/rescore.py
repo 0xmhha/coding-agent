@@ -67,7 +67,7 @@ def main(argv=None) -> int:
             cks_tool = cks_ctx
             print("cks: connected")
         else:
-            print("cks: not available (CKS_MCP_BIN/CKS_CONFIG unset) — grep fallback only")
+            print("cks: not available (CKS_MCP_URL unset) — grep fallback only")
     except Exception as exc:
         print(f"cks: connect failed ({exc}) — grep fallback only")
 

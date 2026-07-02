@@ -186,10 +186,11 @@ def main(argv=None) -> int:
         if cks_ctx is not None:
             cks_ctx.__enter__()
             cks_tool = cks_ctx
-            print("cks: connected (CKS_MCP_BIN / CKS_CONFIG)")
+            # cks_client prints a connected banner with the instance identity
+            # (name / indexed_head / model) from cks.ops.health.
         else:
             print(
-                "cks: CKS_MCP_BIN or CKS_CONFIG not set — "
+                "cks: CKS_MCP_URL not set — "
                 "M2/M3/M4 will run with cks_partial"
             )
 

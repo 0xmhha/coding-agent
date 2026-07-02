@@ -52,7 +52,7 @@ def main(argv=None) -> int:
     from cks_client import make_cks_client_from_env
     ctx = make_cks_client_from_env()
     if ctx is None:
-        print("cks unavailable (CKS_MCP_BIN/CKS_CONFIG unset)")
+        print("cks unavailable (CKS_MCP_URL unset)")
         return 1
 
     rows = []
